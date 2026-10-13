@@ -62,18 +62,22 @@ Plataforma web e-commerce mobile-first orientada a la venta de fotografías de p
 ### ADR-007: Importación desde Google Drive & Despliegue Continuo (CI/CD)
 - **Importador de Google Drive:** Soporte en el panel para pegar el enlace de una carpeta compartida de Google Drive. El backend importa las imágenes directamente sin que la fotógrafa tenga que descargarlas y re-subirlas manualmente desde su PC.
 - **Estrategia de Despliegue y Mejoras Continuas:** Configuración de pipeline automatizado con GitHub + Vercel / Render. Cada cambio o mejora empujada al repositorio se compila y publica automáticamente en producción sin intervención técnica manual.
+- **Repositorio Oficial:** [github.com/Leandro96JG/LaTercera](https://github.com/Leandro96JG/LaTercera.git) (Rama `main` sincronizada).
 
 ---
 
 ## 4. Branding e Identidad Visual Oficial
-- **Nombre de Marca:** **LA TERCERA** (Fotografía Deportiva).
+- **Nombre de Marca:** **LA TERCERA** (Fotografía Deportiva & Social).
+- **Fotógrafa Oficial:** **Jenifer "Yuyo" Espeche** (Ampliamente reconocida por su apodo "Yuyo" en el ámbito deportivo y social riojano).
+- **Contacto WhatsApp Oficial:** `+54 9 380 486-8714` (`3804868714`).
 - **Logo del Proyecto:** Guardado en `assets/branding/logo_la_tercera.jpg`.
+- **Foto de la Autora:** Guardada en `assets/branding/fotografa.jpg`.
 - **Paleta de Colores Extraída del Logo:**
-  - `Azul Marino Profundo (Fondo Base):` `#0A192F` / `#0C1E36`
+  - `Negro Mate & Carbón (Bento Base):` `#131316` / `#1A1A1E`
+  - `Lienzo Sedoso Claro (Fondo Orgánico):` `#ECEEF2`
   - `Dorado Solar (Acentos & Acciones):` `#FDB813` / `#F59E0B`
   - `Celeste Deportivo (Detalles secundarios):` `#38BDF8`
-  - `Rojo Coral (Insignias & Alertas):` `#EF4444`
-  - `Blanco Nieve (Tipografía & Contraste):` `#FFFFFF`
+  - `Blanco Nieve (Tarjetas & Contraste):` `#FFFFFF`
 - **Concepto del Isotipo:** Fusión de diafragma de cámara de fotos + sol radiante riojano + tribuna/gradería deportiva en semicírculo.
 
 ---
