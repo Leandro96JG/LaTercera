@@ -47,11 +47,16 @@ Plataforma web e-commerce mobile-first orientada a la venta de fotografías de p
 ## 3. Estado Actual & Próximos Pasos (Roadmap)
 - [x] Entrevista `/grill-me` de requerimientos funcionales y técnicos.
 - [x] Definición de stack, modelo de entrega y seguridad de imágenes.
-- [x] Creación de preview visual interactiva (`preview/index.html` activa en `http://localhost:3000/preview/index.html`).
-- [ ] Validación de la experiencia visual y animaciones por parte del usuario.
-- [ ] Inicialización del proyecto Frontend (Angular 19) y Backend con procesamiento de marcas de agua (Sharp).
-- [ ] Integración de Mercado Pago (Checkout Pro y Webhooks).
-- [ ] Dashboard administrativo (subida masiva drag-and-drop, métricas, precios y eliminación de álbumes).
+- [x] Prototipo visual e interactivo Bento Grid (`preview/index.html`).
+- [x] Conexión de Git y repositorio oficial en GitHub ([github.com/Leandro96JG/LaTercera](https://github.com/Leandro96JG/LaTercera.git)).
+- [x] Identidad oficial registrada: **Jenifer "Yuyo" Espeche** y WhatsApp `+54 9 380 486-8714`.
+- [x] Estructuración de `backend/` con Express y TypeScript estricto.
+- [x] Motor de imágenes con **`sharp`** (WebP ligero + marca de agua diagonal estampada en píxeles).
+- [x] Servicio de precios y cálculo de packs de descuento con **TDD (6 tests pasando con Vitest)**.
+- [ ] Integración de Mercado Pago SDK (Preferencias y Webhooks con firma criptográfica).
+- [ ] Conexión del frontend definitivo con la API del backend.
+- [ ] Importador de carpetas compartidas de Google Drive.
+- [ ] Panel administrativo con subida masiva drag-and-drop y métricas en vivo.
 
 ### ADR-006: Especificación del Dashboard Administrativo & Panel de Control
 - **Métricas & Finanzas:** Ingresos del mes ($ ARS), fotos vendidas, álbumes vendidos, espacio en servidor utilizado (GB), tabla histórica de transacciones con estado de Mercado Pago y datos del comprador.
