@@ -1,0 +1,85 @@
+# MEMORY.md - Plataforma de Venta de Fotos Deportivas
+
+## 1. Resumen Ejecutivo del Proyecto
+Plataforma web e-commerce mobile-first orientada a la venta de fotografías de partidos y torneos de fútbol en La Rioja, Argentina. Diseñada para que fotógrafos deportivos suban álbumes masivos, protejan sus imágenes contra descargas y capturas de pantalla, y vendan fotos individuales o álbumes completos con cobro automatizado en pesos argentinos vía Mercado Pago.
+
+---
+
+## 2. Decisiones Arquitectónicas Registradas (ADR)
+
+### ADR-001: Clasificación ODD y Metodología
+- **Nivel Asignado:** ODD Nivel 3 (Compleja).
+- **Justificación:** Sistema completo que involucra frontend reactivo optimizado para móviles con animaciones, procesamiento y compresión de imágenes en el servidor (Sharp), pasarela de pagos con webhooks asíncronos (Mercado Pago), generación de enlaces de descarga protegidos y dashboard de administración con métricas y control de almacenamiento.
+- **Estrategia de Pruebas:** TDD riguroso en lógica de precios, cupones/descuentos, estampado de marcas de agua, validación de webhooks y entrega de tokens de descarga. Auditoría final Guardian Angel previo a producción.
+
+### ADR-002: Stack Tecnológico
+- **Frontend:** Angular 19 (Standalone Components, Signals, OnPush Change Detection, Tailwind CSS, animaciones fluidas de scroll y transiciones de fotos).
+- **Backend & Procesamiento:** Node.js (NestJS / Express) + `sharp` para generación ultrarrápida de miniaturas WebP y estampado de marcas de agua diagonales en píxeles.
+- **Base de Datos & Auth:** Supabase / PostgreSQL con autenticación segura para el panel administrativo.
+- **Almacenamiento de Fotos:** Almacenamiento seguro por capas:
+  - *Capa Pública:* Miniaturas WebP (~800px) con marcas de agua incrustadas y 2-3 fotos HD de muestra.
+  - *Capa Privada:* Fotos originales en máxima resolución protegidas por URLs firmadas con expiración temporal (72h) y generador de ZIPs para álbumes completos.
+- **Pasarela de Pagos:** Mercado Pago (Checkout Pro y Webhooks en ARS).
+
+### ADR-003: Modelo de Negocio y Experiencia de Usuario
+- **Navegación:** Catálogo público tradicional en la portada (buscador por equipo, fecha y torneo). Enlace directo compartible para cada partido por WhatsApp/Instagram.
+- **Flujo de Compra:** Sin registro obligatorio para clientes. Ingreso rápido de Email/WhatsApp, pago en Mercado Pago y entrega instantánea 100% automatizada en pantalla con copia de respaldo por correo.
+- **Protección de Imágenes:**
+  - Marca de agua diagonal repetida quemada en los píxeles del servidor (imposible de remover por CSS o inspección).
+  - Bloqueo en navegador contra clic derecho, arrastre y capas transparentes superpuestas.
+  - 2 o 3 fotos de demostración en alta calidad destacadas con insignia para certificar nitidez y profesionalismo.
+### ADR-004: Rediseño Estético Bento Grid & Filosofía "Photography-First"
+- **Feedback del Usuario:** El diseño anterior se percibía genérico y saturado de mensajes de venta agresivos. Las fotografías deben ser el centro de atención absoluto.
+- **Referencia Adoptada (iDraft UI):**
+  - Estilo **Bento Grid** minimalista de gama alta.
+  - Fondo claro orgánico y sedoso (`#F2F3F6`) con sombras suaves y la silueta de la fotógrafa fundida como sombra artística sutil.
+### ADR-005: Enfoque de Portfolio Multidisciplinar & Marca Personal de la Fotógrafa
+- **Aclaración del Negocio:** La fotógrafa no cubre todos los partidos de fútbol de forma rutinaria. Su modelo de trabajo abarca:
+  - **Deportes Variados:** Fútbol, Hockey sobre césped/pista, Básquetbol.
+  - **Eventos Sociales y Festivos:** Fiestas de cumpleaños (15s), celebraciones, eventos festivos e institucionales.
+- **Estructura de la Plataforma:**
+  - **Presentación de Marca Personal en la Portada:** Tarjeta Bento con retrato real de la fotógrafa (`fotografa.jpg`), biografía breve y enlaces directos a sus redes (Instagram `@latercera.fotos`, botón de WhatsApp para contrataciones de nuevos eventos).
+  - **Directorio de Álbumes por Categorías:** Filtros por disciplina (*Fútbol*, *Hockey*, *Básquet*, *Cumpleaños & Fiestas*). Cada álbum muestra portada, fecha, categoría y cantidad de fotos.
+  - **Flujo de Álbum y Compra:** Al hacer clic en un álbum se abre la galería protegida de ese evento, con el mismo sistema sutil de selección y compra por Mercado Pago (cápsula flotante discreta).
+
+---
+
+## 3. Estado Actual & Próximos Pasos (Roadmap)
+- [x] Entrevista `/grill-me` de requerimientos funcionales y técnicos.
+- [x] Definición de stack, modelo de entrega y seguridad de imágenes.
+- [x] Creación de preview visual interactiva (`preview/index.html` activa en `http://localhost:3000/preview/index.html`).
+- [ ] Validación de la experiencia visual y animaciones por parte del usuario.
+- [ ] Inicialización del proyecto Frontend (Angular 19) y Backend con procesamiento de marcas de agua (Sharp).
+- [ ] Integración de Mercado Pago (Checkout Pro y Webhooks).
+- [ ] Dashboard administrativo (subida masiva drag-and-drop, métricas, precios y eliminación de álbumes).
+
+### ADR-006: Especificación del Dashboard Administrativo & Panel de Control
+- **Métricas & Finanzas:** Ingresos del mes ($ ARS), fotos vendidas, álbumes vendidos, espacio en servidor utilizado (GB), tabla histórica de transacciones con estado de Mercado Pago y datos del comprador.
+- **Gestión de Álbumes:** Creación de eventos (Fútbol, Hockey, Básquet, Fiestas), subida masiva drag-and-drop con Sharp en background, selector de muestras HD (⭐), selector de foto de portada y purga manual de álbumes antiguos con descarga previa de backup.
+- **Configuraciones Dinámicas:** Precios por defecto, packs con descuento automático, credenciales de Mercado Pago (Public Key / Access Token), personalización de marca de agua (texto/logo) y datos de perfil de la fotógrafa (Instagram/WhatsApp).
+- **Herramientas de Productividad:** Generador de enlaces para grupos de WhatsApp de capitanes/DTs, regeneración de enlaces de descarga vencidos en 1 clic.
+
+### ADR-007: Importación desde Google Drive & Despliegue Continuo (CI/CD)
+- **Importador de Google Drive:** Soporte en el panel para pegar el enlace de una carpeta compartida de Google Drive. El backend importa las imágenes directamente sin que la fotógrafa tenga que descargarlas y re-subirlas manualmente desde su PC.
+- **Estrategia de Despliegue y Mejoras Continuas:** Configuración de pipeline automatizado con GitHub + Vercel / Render. Cada cambio o mejora empujada al repositorio se compila y publica automáticamente en producción sin intervención técnica manual.
+
+---
+
+## 4. Branding e Identidad Visual Oficial
+- **Nombre de Marca:** **LA TERCERA** (Fotografía Deportiva).
+- **Logo del Proyecto:** Guardado en `assets/branding/logo_la_tercera.jpg`.
+- **Paleta de Colores Extraída del Logo:**
+  - `Azul Marino Profundo (Fondo Base):` `#0A192F` / `#0C1E36`
+  - `Dorado Solar (Acentos & Acciones):` `#FDB813` / `#F59E0B`
+  - `Celeste Deportivo (Detalles secundarios):` `#38BDF8`
+  - `Rojo Coral (Insignias & Alertas):` `#EF4444`
+  - `Blanco Nieve (Tipografía & Contraste):` `#FFFFFF`
+- **Concepto del Isotipo:** Fusión de diafragma de cámara de fotos + sol radiante riojano + tribuna/gradería deportiva en semicírculo.
+
+---
+
+## 5. Convenciones y Parámetros
+- **Moneda:** Pesos Argentinos ($ ARS).
+- **Zona Horaria y Localización:** La Rioja, Argentina (UTC-3).
+- **Formato de Entrega:** WebP comprimido con marca de agua para catálogo; JPG original / ZIP para entregas pagadas.
+

@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="es" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>LA TERCERA | Fotografía Profesional • Deportes & Eventos</title>
+  
+  <!-- Google Fonts: Plus Jakarta Sans & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            surface: {
+              canvas: '#ECEEF2',
+              card: '#FFFFFF',
+              darkCard: '#131316',
+              darkPill: '#1A1A1E',
+              border: 'rgba(0, 0, 0, 0.05)',
+              muted: '#71717A'
+            }
+          },
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            display: ['Outfit', 'sans-serif'],
+          },
+          boxShadow: {
+            'bento': '0 12px 32px -8px rgba(0, 0, 0, 0.05), 0 4px 12px -2px rgba(0, 0, 0, 0.03)',
+            'bento-hover': '0 20px 40px -12px rgba(0, 0, 0, 0.1), 0 6px 16px -4px rgba(0, 0, 0, 0.04)',
+            'glass': '0 24px 60px -15px rgba(0, 0, 0, 0.08)'
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    body {
+      background-color: #ECEEF2;
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(255,255,255,0.85) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(215,220,230,0.5) 0px, transparent 60%),
+        radial-gradient(at 100% 100%, rgba(255,255,255,0.7) 0px, transparent 50%),
+        radial-gradient(at 0% 100%, rgba(220,225,235,0.6) 0px, transparent 60%);
+      background-attachment: fixed;
+    }
+
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    .prevent-save {
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      pointer-events: none;
+    }
+
+    .animate-float-in {
+      animation: floatIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes floatIn {
+      from { opacity: 0; transform: translateY(16px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+  </style>
+</head>
+<body class="text-zinc-900 font-sans antialiased min-h-screen p-2 sm:p-5 md:p-8 relative selection:bg-zinc-900 selection:text-white">
+
+  <!-- ========================================== -->
+  <!-- FONDO CON SOMBRA DE AUTOR DE LA FOTÓGRAFA  -->
+  <!-- ========================================== -->
+  <div class="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+    <div class="absolute right-0 top-1/4 w-[380px] sm:w-[560px] h-[700px] sm:h-[900px] opacity-[0.05] filter grayscale contrast-125 mix-blend-darken pointer-events-none transition-opacity duration-700">
+      <img src="../assets/branding/fotografa.jpg" alt="Silueta Autora" class="w-full h-full object-cover object-top">
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- CONTENEDOR PRINCIPAL FLOTANTE (iDraft BENTO) -->
+  <!-- ========================================== -->
+  <div class="relative z-10 max-w-[1440px] mx-auto bg-white/60 backdrop-blur-3xl rounded-[32px] sm:rounded-[42px] border border-white/80 shadow-glass p-4 sm:p-6 lg:p-10 transition-all">
+
+    <!-- BARRA SUPERIOR / HEADER BENTO -->
+    <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 mb-8 border-b border-black/[0.05]">
+      
+      <!-- Logo Oficial -->
+      <a href="#" onclick="showSection('home')" class="flex items-center gap-3.5 group">
+        <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-zinc-950 p-1.5 flex items-center justify-center shadow-md">
+          <img src="../assets/branding/logo_la_tercera.jpg" alt="Logo" class="w-full h-full object-cover rounded-xl">
+        </div>
+        <div>
+          <span class="font-display font-black text-xl sm:text-2xl tracking-tight text-zinc-900 block leading-tight">
+            LA TERCERA
+          </span>
+          <span class="text-[11px] text-zinc-400 font-medium tracking-wide">Fotografía Profesional • Deportes & Eventos</span>
+        </div>
+      </a>
+
+      <!-- Navegación Minimalista -->
+      <div class="flex items-center gap-2.5 flex-wrap">
+        <div class="bg-zinc-200/70 p-1 rounded-2xl flex items-center text-xs font-semibold">
+          <button id="navBtnHome" onclick="showSection('home')" class="px-3.5 py-1.5 rounded-xl bg-white text-zinc-900 shadow-sm transition flex items-center gap-1.5">
+            <i data-lucide="user" class="w-3.5 h-3.5"></i>
+            Portfolio & Álbumes
+          </button>
+          <button id="navBtnAdmin" onclick="showSection('admin')" class="px-3.5 py-1.5 rounded-xl text-zinc-600 hover:text-zinc-950 transition flex items-center gap-1.5">
+            <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i>
+            Panel Fotógrafa
+          </button>
+        </div>
+
+        <!-- Botón Contacto WhatsApp para Contrataciones -->
+        <a href="https://wa.me/5493804000000?text=Hola!%20Me%20gustar%C3%ADa%20consultar%20por%20cobertura%20fotogr%C3%A1fica%20para%20un%20evento" target="_blank" class="px-3.5 py-2 rounded-2xl bg-white hover:bg-zinc-100 border border-black/[0.06] flex items-center gap-2 text-zinc-800 text-xs font-semibold shadow-sm transition">
+          <i data-lucide="message-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
+          <span class="hidden sm:inline">Contratar Cobertura</span>
+        </a>
+      </div>
+
+    </header>
+
+    <!-- ==================================================== -->
+    <!-- SECCIÓN 1: HOME (PRESENTACIÓN FOTÓGRAFA + ÁLBUMES)   -->
+    <!-- ==================================================== -->
+    <div id="homeSection" class="space-y-8">
+      
+      <!-- BENTO GRID DE PRESENTACIÓN DE LA FOTÓGRAFA -->
+      <section class="grid grid-cols-1 md:grid-cols-12 gap-5">
+        
+        <!-- Tarjeta Perfil de la Fotógrafa (Grande) -->
+        <div class="md:col-span-7 bg-white rounded-[32px] p-6 sm:p-8 border border-black/[0.05] shadow-bento flex flex-col sm:flex-row items-center gap-6 relative overflow-hidden">
+          <!-- Foto de la fotógrafa en marco bento -->
+          <div class="w-36 h-36 sm:w-44 sm:h-44 rounded-[26px] overflow-hidden flex-shrink-0 shadow-md border-2 border-white">
+            <img src="../assets/branding/fotografa.jpg" alt="Fotógrafa La Tercera" class="w-full h-full object-cover object-top">
+          </div>
+
+          <div class="flex-1 text-center sm:text-left">
+            <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-100 text-zinc-600 text-[11px] font-semibold mb-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              Disponible para Coberturas en La Rioja
+            </div>
+            
+            <h1 class="font-display font-extrabold text-2xl sm:text-3xl text-zinc-900 tracking-tight leading-tight">
+              Capturando momentos reales en su máxima emoción
+            </h1>
+            
+            <p class="text-xs sm:text-sm text-zinc-500 mt-2 leading-relaxed">
+              Especializada en fotografía deportiva de alto impacto (fútbol, hockey, básquet) y cobertura espontánea de eventos sociales, cumpleaños y festivales.
+            </p>
+
+            <!-- Redes Sociales de la Fotógrafa -->
+            <div class="flex items-center justify-center sm:justify-start gap-2.5 mt-4 pt-3 border-t border-black/[0.04]">
+              <a href="https://instagram.com" target="_blank" class="px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-semibold flex items-center gap-1.5 transition">
+                <i data-lucide="instagram" class="w-3.5 h-3.5 text-pink-600"></i> @latercera.fotos
+              </a>
+              <a href="https://wa.me/5493804000000" target="_blank" class="px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-semibold flex items-center gap-1.5 transition">
+                <i data-lucide="phone" class="w-3.5 h-3.5 text-emerald-600"></i> WhatsApp
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tarjeta Disciplinas & Coberturas (Bento Oscuro) -->
+        <div class="md:col-span-5 bg-surface-darkCard text-white rounded-[32px] p-6 sm:p-8 shadow-bento flex flex-col justify-between">
+          <div>
+            <span class="text-[11px] font-bold text-zinc-400 uppercase tracking-widest block mb-2">Servicios Fotográficos</span>
+            <h3 class="font-display font-bold text-xl sm:text-2xl text-white">¿Qué eventos cubro?</h3>
+            <p class="text-xs text-zinc-400 mt-1.5">
+              Desde partidos oficiales de fin de semana hasta fiestas privadas.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2.5 my-4">
+            <div class="bg-surface-darkPill p-3 rounded-2xl border border-white/5">
+              <span class="text-xs font-bold text-white block">⚽ Fútbol & Cancha</span>
+              <span class="text-[10px] text-zinc-400">Torneos y ligas locales</span>
+            </div>
+            <div class="bg-surface-darkPill p-3 rounded-2xl border border-white/5">
+              <span class="text-xs font-bold text-white block">🏑 Hockey & Básquet</span>
+              <span class="text-[10px] text-zinc-400">Acción y retratos</span>
+            </div>
+            <div class="bg-surface-darkPill p-3 rounded-2xl border border-white/5">
+              <span class="text-xs font-bold text-white block">🎉 Cumpleaños & 15s</span>
+              <span class="text-[10px] text-zinc-400">Momentos inolvidables</span>
+            </div>
+            <div class="bg-surface-darkPill p-3 rounded-2xl border border-white/5">
+              <span class="text-xs font-bold text-white block">🏆 Entregas de Premios</span>
+              <span class="text-[10px] text-zinc-400">Festejos y podios</span>
+            </div>
+          </div>
+
+          <a href="https://wa.me/5493804000000" target="_blank" class="w-full py-2.5 rounded-2xl bg-white hover:bg-zinc-200 text-zinc-950 font-bold text-xs text-center transition">
+            Pedir presupuesto para mi evento →
+          </a>
+        </div>
+
+      </section>
+
+      <!-- BARRA DE CATEGORÍAS DE ÁLBUMES -->
+      <section class="space-y-4 pt-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 class="font-display font-extrabold text-2xl text-zinc-900 tracking-tight">
+              Álbumes Recientes
+            </h2>
+            <p class="text-xs text-zinc-500">Selecciona tu partido o evento para encontrar tus fotos.</p>
+          </div>
+
+          <!-- Filtro de Categorías Bento -->
+          <div class="flex items-center gap-2 overflow-x-auto no-scrollbar">
+            <button onclick="filterAlbumCategory('all')" class="album-category-btn active px-4 py-2 rounded-full bg-zinc-950 text-white font-semibold text-xs transition">
+              Todos los Álbumes (6)
+            </button>
+            <button onclick="filterAlbumCategory('futbol')" class="album-category-btn px-4 py-2 rounded-full bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.05] transition">
+              Fútbol (3)
+            </button>
+            <button onclick="filterAlbumCategory('hockey')" class="album-category-btn px-4 py-2 rounded-full bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.05] transition">
+              Hockey (1)
+            </button>
+            <button onclick="filterAlbumCategory('basquet')" class="album-category-btn px-4 py-2 rounded-full bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.05] transition">
+              Básquet (1)
+            </button>
+            <button onclick="filterAlbumCategory('sociales')" class="album-category-btn px-4 py-2 rounded-full bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.05] transition">
+              Cumpleaños & Fiestas (1)
+            </button>
+          </div>
+        </div>
+
+        <!-- GRILLA BENTO DE ÁLBUMES -->
+        <div id="albumsBentoGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <!-- Renderizado dinámicamente con JavaScript -->
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ==================================================== -->
+    <!-- SECCIÓN 2: DETALLE DEL ÁLBUM (FOTOS DEL EVENTO)     -->
+    <!-- ==================================================== -->
+    <div id="albumDetailSection" class="hidden space-y-6">
+      
+      <!-- Barra de regreso -->
+      <div class="flex items-center justify-between">
+        <button onclick="showSection('home')" class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white hover:bg-zinc-100 border border-black/[0.05] text-xs font-bold text-zinc-800 transition shadow-sm">
+          <i data-lucide="arrow-left" class="w-4 h-4"></i> Volver a Todos los Álbumes
+        </button>
+
+        <button onclick="shareWhatsApp()" class="w-9 h-9 rounded-full bg-white hover:bg-zinc-100 border border-black/[0.05] flex items-center justify-center text-zinc-700 shadow-sm transition">
+          <i data-lucide="share-2" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Hero del Álbum Activo -->
+      <div class="bg-white rounded-[32px] p-6 sm:p-8 border border-black/[0.05] shadow-bento flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div>
+          <div class="flex items-center gap-2 mb-2">
+            <span id="albumDetailCategoryBadge" class="px-3 py-1 rounded-full bg-zinc-950 text-white text-[11px] font-bold uppercase tracking-wider">
+              Fútbol
+            </span>
+            <span id="albumDetailDate" class="text-xs text-zinc-400 font-medium">12 Octubre, 2026</span>
+          </div>
+          <h2 id="albumDetailTitle" class="font-display font-extrabold text-2xl sm:text-3xl text-zinc-900 tracking-tight">
+            Atlético Tesorieri vs Andino SC
+          </h2>
+          <p id="albumDetailDesc" class="text-xs sm:text-sm text-zinc-500 mt-1 max-w-xl">
+            Toca las fotos para ampliarlas o márcalas para descargarlas en calidad original 4K sin marcas de agua.
+          </p>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <button onclick="buyFullAlbumQuick()" class="px-5 py-3 rounded-2xl bg-zinc-950 hover:bg-zinc-800 text-white font-bold text-xs shadow-md transition">
+            Comprar Álbum Completo ($9.500)
+          </button>
+        </div>
+      </div>
+
+      <!-- Grilla Bento de Fotos Protegidas -->
+      <div id="albumPhotosGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+        <!-- Renderizado dinámico -->
+      </div>
+
+    </div>
+
+    <!-- ==================================================== -->
+    <!-- SECCIÓN 3: PANEL DE LA FOTÓGRAFA (ADMIN iDraft)     -->
+    <!-- ==================================================== -->
+    <div id="adminSection" class="hidden space-y-6">
+      
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 class="font-display font-extrabold text-2xl sm:text-3xl text-zinc-900 tracking-tight">
+            Hola, Fotógrafa!
+          </h2>
+          <p class="text-xs text-zinc-500 mt-1">Supervisa descargas de fotos, sube nuevos eventos y gestiona tu catálogo.</p>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button onclick="simulateUpload()" class="px-4 py-2.5 rounded-2xl bg-zinc-950 text-white font-semibold text-xs hover:bg-zinc-800 transition flex items-center gap-2 shadow-sm">
+            <i data-lucide="plus" class="w-4 h-4"></i> Subir Nuevo Álbum
+          </button>
+          <button onclick="openCleanupModal()" class="px-4 py-2.5 rounded-2xl bg-white hover:bg-rose-50 text-rose-600 border border-black/[0.06] font-semibold text-xs transition flex items-center gap-2">
+            <i data-lucide="trash-2" class="w-4 h-4"></i> Limpiar Viejos
+          </button>
+        </div>
+      </div>
+
+      <!-- Tarjetas Bento Métricas (Estilo iDraft) -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+        
+        <!-- Tarjeta Negra: Overall Information -->
+        <div class="bg-surface-darkCard text-white rounded-[28px] p-6 shadow-bento flex flex-col justify-between">
+          <div class="flex items-center justify-between text-zinc-400 text-xs mb-4">
+            <span class="font-semibold">Resumen General</span>
+            <i data-lucide="more-horizontal" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <div class="flex items-baseline gap-2">
+              <span class="font-display font-black text-3xl sm:text-4xl text-white">43</span>
+              <span class="text-xs text-zinc-400">fotos vendidas</span>
+            </div>
+            <p class="text-xs text-emerald-400 mt-1 font-medium">+3 álbumes completos</p>
+          </div>
+          <div class="grid grid-cols-3 gap-2 mt-6 pt-4 border-t border-white/10 text-center">
+            <div class="bg-surface-darkPill p-2 rounded-xl">
+              <span class="font-bold text-sm block">28</span>
+              <span class="text-[9px] text-zinc-400">Deportes</span>
+            </div>
+            <div class="bg-surface-darkPill p-2 rounded-xl">
+              <span class="font-bold text-sm block">15</span>
+              <span class="text-[9px] text-zinc-400">Sociales</span>
+            </div>
+            <div class="bg-surface-darkPill p-2 rounded-xl">
+              <span class="font-bold text-sm block">6</span>
+              <span class="text-[9px] text-zinc-400">Álbumes</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tarjeta Blanca: Ingresos del Mes -->
+        <div class="bg-white rounded-[28px] p-6 border border-black/[0.05] shadow-bento flex flex-col justify-between">
+          <div class="flex items-center justify-between text-zinc-400 text-xs mb-2">
+            <span class="font-semibold text-zinc-700">Ingresos del Mes</span>
+            <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 font-bold text-[10px]">+24%</span>
+          </div>
+          <div class="my-auto py-2">
+            <span class="font-display font-black text-3xl text-zinc-900">$64.200</span>
+            <span class="text-xs text-zinc-400 block mt-0.5">ARS en Mercado Pago</span>
+            <svg class="w-full h-12 mt-3 text-zinc-900" viewBox="0 0 100 30" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M0,25 Q20,10 40,20 T80,5 T100,15" />
+            </svg>
+          </div>
+          <div class="flex justify-between text-[10px] text-zinc-400 pt-2 border-t border-black/[0.04]">
+            <span>Lun</span><span>Mie</span><span>Vie</span><span>Dom</span>
+          </div>
+        </div>
+
+        <!-- Tarjeta Blanca: Espacio en Servidor -->
+        <div class="bg-white rounded-[28px] p-6 border border-black/[0.05] shadow-bento flex flex-col justify-between">
+          <div class="flex items-center justify-between text-zinc-400 text-xs mb-2">
+            <span class="font-semibold text-zinc-700">Espacio en Servidor</span>
+            <i data-lucide="hard-drive" class="w-4 h-4 text-zinc-400"></i>
+          </div>
+          <div class="flex items-center justify-center my-3">
+            <div class="relative w-24 h-24 flex items-center justify-center">
+              <svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                <path class="text-zinc-100" stroke-width="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                <path class="text-zinc-900" stroke-dasharray="18, 100" stroke-width="3.5" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+              </svg>
+              <div class="absolute text-center">
+                <span class="font-display font-bold text-lg text-zinc-900 block leading-tight">18%</span>
+                <span class="text-[9px] text-zinc-400">Ocupado</span>
+              </div>
+            </div>
+          </div>
+          <div class="text-[11px] text-zinc-500 text-center">
+            <strong>1.8 GB</strong> usados de 10 GB
+          </div>
+        </div>
+
+        <!-- Tarjeta Bento: Carga Rápida Drag & Drop -->
+        <div class="bg-white rounded-[28px] p-6 border-2 border-dashed border-zinc-300 hover:border-zinc-950 shadow-bento flex flex-col items-center justify-center text-center cursor-pointer transition group" onclick="simulateUpload()">
+          <div class="w-12 h-12 rounded-2xl bg-zinc-100 text-zinc-900 flex items-center justify-center mb-3 group-hover:scale-110 transition">
+            <i data-lucide="upload-cloud" class="w-6 h-6"></i>
+          </div>
+          <h4 class="font-bold text-sm text-zinc-900">Subir Álbum Nuevo</h4>
+          <p class="text-[11px] text-zinc-400 mt-1 max-w-[180px]">
+            Crea la marca de agua Sharp al vuelo.
+          </p>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- ==================================================== -->
+  <!-- CÁPSULA FLOTANTE DE COMPRA (SOLO APARECE AL ELEGIR)  -->
+  <!-- ==================================================== -->
+  <div id="bentoFloatingCart" class="fixed bottom-6 inset-x-0 z-40 flex justify-center pointer-events-none transition-all duration-300 transform translate-y-24 opacity-0">
+    <div class="pointer-events-auto bg-zinc-950 text-white rounded-full px-5 py-3 shadow-2xl border border-white/20 flex items-center gap-4 sm:gap-6 backdrop-blur-xl animate-float-in">
+      
+      <div class="flex items-center gap-2.5">
+        <span id="floatingCartCount" class="w-6 h-6 rounded-full bg-white text-zinc-950 text-xs font-bold flex items-center justify-center">
+          1
+        </span>
+        <span class="text-xs sm:text-sm font-medium text-zinc-200">
+          fotos seleccionadas
+        </span>
+      </div>
+
+      <div class="h-4 w-px bg-white/20"></div>
+
+      <div>
+        <span id="floatingCartTotal" class="font-display font-extrabold text-sm sm:text-base text-white tracking-wide">
+          $1.200 ARS
+        </span>
+      </div>
+
+      <button onclick="openCheckoutModal()" class="px-4 sm:px-5 py-2 rounded-full bg-white text-zinc-950 hover:bg-zinc-200 font-bold text-xs sm:text-sm transition flex items-center gap-1.5 shadow-md active:scale-95">
+        <span>Comprar</span>
+        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+      </button>
+
+    </div>
+  </div>
+
+  <!-- ==================================================== -->
+  <!-- LIGHTBOX CINEMÁTICO LIMPIO                           -->
+  <!-- ==================================================== -->
+  <div id="bentoLightbox" class="hidden fixed inset-0 z-50 bg-black/90 backdrop-blur-2xl flex flex-col justify-between p-4 sm:p-8 select-none transition-all">
+    <div class="flex items-center justify-between text-white z-10 max-w-6xl mx-auto w-full">
+      <div class="flex items-center gap-3">
+        <span id="lightboxCounter" class="text-xs text-zinc-400 font-medium">Foto 1 de 24</span>
+        <span id="lightboxBadgeHD" class="hidden px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
+          ✦ Muestra HD Original
+        </span>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button id="btnLightboxSelect" onclick="toggleCurrentFromLightbox()" class="px-4 py-2 rounded-full bg-white text-zinc-950 font-bold text-xs flex items-center gap-1.5 transition">
+          <i data-lucide="plus" class="w-3.5 h-3.5"></i> Seleccionar
+        </button>
+        <button onclick="closeLightbox()" class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="relative flex-1 flex items-center justify-center my-3 max-w-6xl mx-auto w-full">
+      <button onclick="prevPhoto()" class="absolute left-2 sm:left-4 z-20 w-11 h-11 rounded-full bg-black/50 hover:bg-white hover:text-zinc-950 text-white flex items-center justify-center transition">
+        <i data-lucide="chevron-left" class="w-5 h-5"></i>
+      </button>
+
+      <div class="relative max-h-full max-w-full flex items-center justify-center">
+        <img id="lightboxMainImg" src="" alt="Foto" class="max-h-[78vh] w-auto max-w-full object-contain rounded-2xl shadow-2xl">
+        <div id="lightboxWatermarkLayer" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div class="bg-black/40 backdrop-blur-md px-6 py-2.5 rounded-full border border-white/20">
+            <span class="font-display font-extrabold text-white/90 tracking-widest text-xs sm:text-sm">LA TERCERA • MUESTRA</span>
+          </div>
+        </div>
+      </div>
+
+      <button onclick="nextPhoto()" class="absolute right-2 sm:right-4 z-20 w-11 h-11 rounded-full bg-black/50 hover:bg-white hover:text-zinc-950 text-white flex items-center justify-center transition">
+        <i data-lucide="chevron-right" class="w-5 h-5"></i>
+      </button>
+    </div>
+
+    <div class="text-center text-[11px] text-zinc-500">
+      Usa las flechas del teclado o desliza con el dedo
+    </div>
+  </div>
+
+  <!-- ==================================================== -->
+  <!-- MODAL DE CHECKOUT MERCADO PAGO                       -->
+  <!-- ==================================================== -->
+  <div id="checkoutModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-[32px] p-6 sm:p-8 max-w-md w-full shadow-2xl border border-black/[0.06] relative">
+      <button onclick="closeCheckoutModal()" class="absolute top-6 right-6 text-zinc-400 hover:text-zinc-900">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <div id="checkoutStepInput">
+        <span class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">Finalizar Entrega</span>
+        <h3 class="font-display font-bold text-xl text-zinc-900">Descarga tus Fotografías</h3>
+        <p class="text-xs text-zinc-500 mt-1 mb-5">Entrega inmediata sin registro.</p>
+
+        <div class="bg-zinc-50 p-4 rounded-2xl mb-4 border border-black/[0.04]">
+          <div class="flex justify-between text-xs text-zinc-600 mb-1">
+            <span id="checkoutSummaryCount">3 fotos seleccionadas</span>
+            <span class="font-bold text-zinc-950" id="checkoutSummaryAmount">$3.600 ARS</span>
+          </div>
+          <p class="text-[10px] text-zinc-400">Archivos JPG originales en 4K sin marcas de agua.</p>
+        </div>
+
+        <div class="mb-5">
+          <label class="block text-xs font-semibold text-zinc-700 mb-1.5">Tu Email o WhatsApp</label>
+          <input type="text" placeholder="ej: 3804-123456 o tunombre@gmail.com" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-2.5 text-xs text-zinc-900 focus:outline-none focus:border-zinc-950 transition">
+        </div>
+
+        <button onclick="simulatePaymentApproval()" class="w-full py-3.5 px-4 rounded-2xl bg-zinc-950 hover:bg-zinc-800 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md transition active:scale-95">
+          <i data-lucide="shield-check" class="w-4 h-4"></i> Pagar con Mercado Pago
+        </button>
+      </div>
+
+      <div id="checkoutStepSuccess" class="hidden text-center py-4">
+        <div class="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-3">
+          <i data-lucide="check" class="w-6 h-6 stroke-[3]"></i>
+        </div>
+        <h4 class="font-display font-bold text-lg text-zinc-900">¡Pago Confirmado!</h4>
+        <p class="text-xs text-zinc-500 mt-1 mb-5">Tus fotos originales ya están listas para guardar:</p>
+
+        <div class="space-y-2 mb-6 text-left">
+          <a href="../assets/branding/fotografa.jpg" download="LaTercera_FotoOriginal_1.jpg" class="p-3 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 hover:bg-zinc-100 flex items-center justify-between text-xs font-semibold transition">
+            <span class="flex items-center gap-2"><i data-lucide="download" class="w-4 h-4"></i> Descargar Foto 1 (4K)</span>
+            <span class="text-[10px] text-zinc-400">4.2 MB</span>
+          </a>
+          <a href="../assets/branding/fotografa.jpg" download="LaTercera_AlbumCompleto.zip" class="p-3 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 hover:bg-zinc-100 flex items-center justify-between text-xs font-semibold transition">
+            <span class="flex items-center gap-2"><i data-lucide="archive" class="w-4 h-4"></i> Álbum Completo (.ZIP)</span>
+            <span class="text-[10px] text-zinc-400">185 MB</span>
+          </a>
+        </div>
+
+        <button onclick="closeCheckoutModal()" class="w-full py-2.5 rounded-xl bg-zinc-100 text-zinc-700 hover:bg-zinc-200 font-semibold text-xs transition">
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL LIMPIEZA -->
+  <div id="cleanupModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-[32px] p-6 max-w-md w-full shadow-2xl border border-black/[0.06] relative">
+      <button onclick="closeCleanupModal()" class="absolute top-6 right-6 text-zinc-400 hover:text-zinc-900">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <h3 class="font-display font-bold text-lg text-zinc-900 mb-1">Limpieza de Álbumes Viejos</h3>
+      <p class="text-xs text-zinc-500 mb-4">Elimina fotos pesadas de eventos pasados para liberar espacio.</p>
+
+      <div class="p-3.5 rounded-2xl bg-zinc-50 border border-zinc-200 flex items-center justify-between text-xs mb-4">
+        <div>
+          <span class="font-bold text-zinc-900 block">Torneo Clausura 2025</span>
+          <span class="text-[10px] text-zinc-400">62 fotos • 1.4 GB</span>
+        </div>
+        <button onclick="alert('Álbum eliminado. 1.4 GB liberados.')" class="px-3 py-1.5 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 font-bold text-[11px] transition">
+          Eliminar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================================================== -->
+  <!-- JAVASCRIPT: DATOS MULTIDISCIPLINA Y ESTADO           -->
+  <!-- ==================================================== -->
+  <script>
+    lucide.createIcons();
+
+    // Catálogo de Álbumes Multidisciplina (Fútbol, Hockey, Básquet, Fiestas)
+    const albums = [
+      {
+        id: 1,
+        category: 'futbol',
+        title: 'Atlético Tesorieri vs Andino SC',
+        subtitle: 'Liga Riojana de Fútbol • Fecha 7',
+        date: '12 Octubre, 2026',
+        photosCount: 48,
+        coverUrl: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=800&q=80',
+        badge: '⚽ Fútbol'
+      },
+      {
+        id: 2,
+        category: 'hockey',
+        title: 'Torneo Provincial de Hockey Femenino',
+        subtitle: 'Polideportivo Evita • Semifinales',
+        date: '5 Octubre, 2026',
+        photosCount: 36,
+        coverUrl: 'https://images.unsplash.com/photo-1589487391730-58f20eb2c308?auto=format&fit=crop&w=800&q=80',
+        badge: '🏑 Hockey'
+      },
+      {
+        id: 3,
+        category: 'basquet',
+        title: 'Facundo vs Banco Rioja (Primera Básquet)',
+        subtitle: 'Torneo Clausura de Básquetbol',
+        date: '28 Septiembre, 2026',
+        photosCount: 42,
+        coverUrl: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=800&q=80',
+        badge: '🏀 Básquet'
+      },
+      {
+        id: 4,
+        category: 'sociales',
+        title: 'Cumpleaños de 15 de Martina',
+        subtitle: 'Salón Las Retamas • Festejo & Baile',
+        date: '20 Septiembre, 2026',
+        photosCount: 85,
+        coverUrl: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=800&q=80',
+        badge: '🎉 Cumpleaños & Social'
+      },
+      {
+        id: 5,
+        category: 'futbol',
+        title: 'Defensores de la Boca vs Rioja Juniors',
+        subtitle: 'Clásico de Barrio • Torneo Apertura',
+        date: '15 Septiembre, 2026',
+        photosCount: 54,
+        coverUrl: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=800&q=80',
+        badge: '⚽ Fútbol'
+      },
+      {
+        id: 6,
+        category: 'futbol',
+        title: 'San Martín vs Américo Tesorieri',
+        subtitle: 'División Reserva • Cancha Oficial',
+        date: '8 Septiembre, 2026',
+        photosCount: 38,
+        coverUrl: 'https://images.unsplash.com/photo-1517927033932-b3d18e61fb3a?auto=format&fit=crop&w=800&q=80',
+        badge: '⚽ Fútbol'
+      }
+    ];
+
+    // Fotos de muestra para el detalle del álbum
+    const samplePhotos = [
+      { id: 1, isHD: true, title: 'Disparo al arco', url: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80', span: 'col-span-1 sm:col-span-2 aspect-[16/10]' },
+      { id: 2, isHD: true, title: 'Retrato en cancha', url: 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?auto=format&fit=crop&w=1200&q=80', span: 'col-span-1 aspect-[4/5]' },
+      { id: 3, isHD: false, title: 'Festejo con el equipo', url: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80', span: 'col-span-1 aspect-square' },
+      { id: 4, isHD: false, title: 'Atajada espectacular', url: 'https://images.unsplash.com/photo-1560272564-c83b66b1ad12?auto=format&fit=crop&w=1200&q=80', span: 'col-span-1 aspect-square' },
+      { id: 5, isHD: false, title: 'Disputa de balón', url: 'https://images.unsplash.com/photo-1517927033932-b3d18e61fb3a?auto=format&fit=crop&w=1200&q=80', span: 'col-span-1 sm:col-span-2 aspect-[16/10]' },
+      { id: 6, isHD: false, title: 'Acción defensiva', url: 'https://images.unsplash.com/photo-1522778119026-d647f0596c20?auto=format&fit=crop&w=1200&q=80', span: 'col-span-1 aspect-[4/5]' }
+    ];
+
+    let currentAlbumCategory = 'all';
+    let selectedPhotos = new Set();
+    const PHOTO_PRICE = 1200;
+    const FULL_ALBUM_PRICE = 9500;
+    let currentLightboxIdx = 0;
+
+    // Renderizar Grilla de Álbumes
+    function renderAlbumsGrid() {
+      const container = document.getElementById('albumsBentoGrid');
+      container.innerHTML = '';
+
+      const filtered = albums.filter(a => currentAlbumCategory === 'all' || a.category === currentAlbumCategory);
+
+      filtered.forEach(album => {
+        const card = document.createElement('div');
+        card.className = 'group bg-white rounded-[28px] overflow-hidden border border-black/[0.05] shadow-bento hover:shadow-bento-hover transition-all duration-300 cursor-pointer flex flex-col justify-between';
+        card.onclick = () => openAlbumDetail(album);
+
+        card.innerHTML = `
+          <div class="relative aspect-[16/10] overflow-hidden bg-zinc-100">
+            <img src="${album.coverUrl}" alt="${album.title}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500 ease-out">
+            <div class="absolute top-3 left-3 px-3 py-1 rounded-full bg-white/90 backdrop-blur-md text-zinc-900 text-[11px] font-bold shadow-sm">
+              ${album.badge}
+            </div>
+            <div class="absolute bottom-3 right-3 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-white text-[10px] font-medium flex items-center gap-1">
+              <i data-lucide="image" class="w-3 h-3"></i> ${album.photosCount} fotos
+            </div>
+          </div>
+
+          <div class="p-5 flex items-center justify-between gap-3">
+            <div>
+              <span class="text-[10px] font-semibold text-zinc-400 block">${album.date}</span>
+              <h3 class="font-display font-bold text-base text-zinc-900 group-hover:text-zinc-600 transition leading-tight mt-0.5">
+                ${album.title}
+              </h3>
+              <p class="text-xs text-zinc-500 mt-0.5">${album.subtitle}</p>
+            </div>
+
+            <div class="w-9 h-9 rounded-full bg-zinc-100 group-hover:bg-zinc-950 group-hover:text-white flex items-center justify-center transition flex-shrink-0">
+              <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
+            </div>
+          </div>
+        `;
+
+        container.appendChild(card);
+      });
+
+      lucide.createIcons();
+    }
+
+    // Filtrar Álbumes por Categoría
+    function filterAlbumCategory(cat) {
+      currentAlbumCategory = cat;
+      document.querySelectorAll('.album-category-btn').forEach(btn => {
+        btn.classList.remove('active', 'bg-zinc-950', 'text-white');
+        btn.classList.add('bg-white', 'text-zinc-600');
+      });
+      event.target.classList.add('active', 'bg-zinc-950', 'text-white');
+      event.target.classList.remove('bg-white', 'text-zinc-600');
+      renderAlbumsGrid();
+    }
+
+    // Abrir Vista Detalle de un Álbum
+    function openAlbumDetail(album) {
+      document.getElementById('albumDetailTitle').textContent = album.title;
+      document.getElementById('albumDetailDate').textContent = album.date + ' • ' + album.subtitle;
+      document.getElementById('albumDetailCategoryBadge').textContent = album.badge;
+
+      renderAlbumPhotos();
+      showSection('albumDetail');
+    }
+
+    // Renderizar Fotos del Álbum Activo
+    function renderAlbumPhotos() {
+      const container = document.getElementById('albumPhotosGrid');
+      container.innerHTML = '';
+
+      samplePhotos.forEach(photo => {
+        const isSelected = selectedPhotos.has(photo.id);
+
+        const card = document.createElement('div');
+        card.className = `group relative rounded-[28px] overflow-hidden bg-white border transition-all duration-300 cursor-pointer shadow-bento hover:shadow-bento-hover ${photo.span} ${isSelected ? 'ring-2 ring-zinc-950 scale-[0.98]' : 'border-black/[0.05]'}`;
+
+        card.innerHTML = `
+          <div class="relative w-full h-full overflow-hidden" onclick="openLightbox(${photo.id})">
+            <img src="${photo.url}" alt="${photo.title}" class="w-full h-full object-cover prevent-save group-hover:scale-105 transition duration-700 ease-out">
+            
+            ${!photo.isHD ? `
+              <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40 group-hover:opacity-70 transition">
+                <span class="px-3 py-1 rounded-full bg-black/40 backdrop-blur-md text-white/90 text-[10px] font-bold tracking-widest uppercase border border-white/10">
+                  LA TERCERA • MUESTRA
+                </span>
+              </div>
+            ` : `
+              <div class="absolute top-3 left-3 z-10 px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-md text-zinc-900 text-[10px] font-bold tracking-wide flex items-center gap-1 shadow-sm">
+                <span>✦</span> HD Master
+              </div>
+            `}
+
+            <div class="absolute inset-0 z-10" oncontextmenu="return false;"></div>
+          </div>
+
+          <div class="absolute bottom-3 right-3 z-20">
+            <button onclick="toggleSelect(${photo.id}, event)" class="w-9 h-9 rounded-full flex items-center justify-center transition shadow-md ${isSelected ? 'bg-zinc-950 text-white' : 'bg-white/90 hover:bg-white text-zinc-800 backdrop-blur-md'}">
+              <i data-lucide="${isSelected ? 'check' : 'plus'}" class="w-4 h-4 stroke-[2.5]"></i>
+            </button>
+          </div>
+
+          <div class="absolute bottom-3 left-3 z-10 opacity-0 group-hover:opacity-100 transition duration-200 pointer-events-none">
+            <span class="px-3 py-1 rounded-full bg-black/60 backdrop-blur-md text-white text-[11px] font-medium">
+              ${photo.title}
+            </span>
+          </div>
+        `;
+
+        container.appendChild(card);
+      });
+
+      lucide.createIcons();
+    }
+
+    // Toggle Selección
+    function toggleSelect(id, event) {
+      if (event) event.stopPropagation();
+
+      if (selectedPhotos.has(id)) {
+        selectedPhotos.delete(id);
+      } else {
+        selectedPhotos.add(id);
+      }
+
+      updateFloatingCart();
+      renderAlbumPhotos();
+    }
+
+    function updateFloatingCart() {
+      const count = selectedPhotos.size;
+      const cart = document.getElementById('bentoFloatingCart');
+      const countEl = document.getElementById('floatingCartCount');
+      const totalEl = document.getElementById('floatingCartTotal');
+
+      if (count === 0) {
+        cart.classList.add('translate-y-24', 'opacity-0');
+        cart.classList.remove('translate-y-0', 'opacity-100');
+      } else {
+        countEl.textContent = count;
+        const total = count * PHOTO_PRICE;
+        totalEl.textContent = `$${total.toLocaleString('es-AR')} ARS`;
+
+        cart.classList.remove('translate-y-24', 'opacity-0');
+        cart.classList.add('translate-y-0', 'opacity-100');
+      }
+    }
+
+    // Navegación entre Vistas
+    function showSection(section) {
+      const home = document.getElementById('homeSection');
+      const albumDetail = document.getElementById('albumDetailSection');
+      const admin = document.getElementById('adminSection');
+      const btnHome = document.getElementById('navBtnHome');
+      const btnAdmin = document.getElementById('navBtnAdmin');
+
+      home.classList.add('hidden');
+      albumDetail.classList.add('hidden');
+      admin.classList.add('hidden');
+
+      if (section === 'home') {
+        home.classList.remove('hidden');
+        btnHome.className = 'px-3.5 py-1.5 rounded-xl bg-white text-zinc-900 shadow-sm transition flex items-center gap-1.5';
+        btnAdmin.className = 'px-3.5 py-1.5 rounded-xl text-zinc-600 hover:text-zinc-950 transition flex items-center gap-1.5';
+      } else if (section === 'albumDetail') {
+        albumDetail.classList.remove('hidden');
+      } else if (section === 'admin') {
+        admin.classList.remove('hidden');
+        btnAdmin.className = 'px-3.5 py-1.5 rounded-xl bg-white text-zinc-900 shadow-sm transition flex items-center gap-1.5';
+        btnHome.className = 'px-3.5 py-1.5 rounded-xl text-zinc-600 hover:text-zinc-950 transition flex items-center gap-1.5';
+      }
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Lightbox
+    function openLightbox(id) {
+      currentLightboxIdx = samplePhotos.findIndex(p => p.id === id);
+      if (currentLightboxIdx === -1) currentLightboxIdx = 0;
+      updateLightboxView();
+      document.getElementById('bentoLightbox').classList.remove('hidden');
+      document.body.classList.add('overflow-hidden');
+    }
+    function closeLightbox() {
+      document.getElementById('bentoLightbox').classList.add('hidden');
+      document.body.classList.remove('overflow-hidden');
+    }
+    function updateLightboxView() {
+      const p = samplePhotos[currentLightboxIdx];
+      document.getElementById('lightboxMainImg').src = p.url;
+      document.getElementById('lightboxCounter').textContent = `Foto ${currentLightboxIdx + 1} de ${samplePhotos.length}`;
+
+      const watermark = document.getElementById('lightboxWatermarkLayer');
+      const hdBadge = document.getElementById('lightboxBadgeHD');
+      if (p.isHD) {
+        watermark.classList.add('hidden');
+        hdBadge.classList.remove('hidden');
+      } else {
+        watermark.classList.remove('hidden');
+        hdBadge.classList.add('hidden');
+      }
+      updateLightboxBtn();
+    }
+    function updateLightboxBtn() {
+      const p = samplePhotos[currentLightboxIdx];
+      const btn = document.getElementById('btnLightboxSelect');
+      const isSelected = selectedPhotos.has(p.id);
+      if (isSelected) {
+        btn.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5"></i> Seleccionada`;
+        btn.className = 'px-4 py-2 rounded-full bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition';
+      } else {
+        btn.innerHTML = `<i data-lucide="plus" class="w-3.5 h-3.5"></i> Seleccionar ($${PHOTO_PRICE})`;
+        btn.className = 'px-4 py-2 rounded-full bg-white text-zinc-950 font-bold text-xs flex items-center gap-1.5 transition';
+      }
+      lucide.createIcons();
+    }
+    function toggleCurrentFromLightbox() {
+      const p = samplePhotos[currentLightboxIdx];
+      toggleSelect(p.id);
+      updateLightboxBtn();
+    }
+    function nextPhoto() {
+      currentLightboxIdx = (currentLightboxIdx + 1) % samplePhotos.length;
+      updateLightboxView();
+    }
+    function prevPhoto() {
+      currentLightboxIdx = (currentLightboxIdx - 1 + samplePhotos.length) % samplePhotos.length;
+      updateLightboxView();
+    }
+    window.addEventListener('keydown', (e) => {
+      if (document.getElementById('bentoLightbox').classList.contains('hidden')) return;
+      if (e.key === 'ArrowRight') nextPhoto();
+      if (e.key === 'ArrowLeft') prevPhoto();
+      if (e.key === 'Escape') closeLightbox();
+    });
+
+    // Checkout
+    function openCheckoutModal() {
+      const count = selectedPhotos.size;
+      const total = count * PHOTO_PRICE;
+      document.getElementById('checkoutSummaryCount').textContent = `${count} foto${count > 1 ? 's' : ''} seleccionada${count > 1 ? 's' : ''}`;
+      document.getElementById('checkoutSummaryAmount').textContent = `$${total.toLocaleString('es-AR')} ARS`;
+      document.getElementById('checkoutStepInput').classList.remove('hidden');
+      document.getElementById('checkoutStepSuccess').classList.add('hidden');
+      document.getElementById('checkoutModal').classList.remove('hidden');
+    }
+    function buyFullAlbumQuick() {
+      document.getElementById('checkoutSummaryCount').textContent = 'Álbum Completo (Todas las fotos en 4K)';
+      document.getElementById('checkoutSummaryAmount').textContent = `$${FULL_ALBUM_PRICE.toLocaleString('es-AR')} ARS`;
+      document.getElementById('checkoutStepInput').classList.remove('hidden');
+      document.getElementById('checkoutStepSuccess').classList.add('hidden');
+      document.getElementById('checkoutModal').classList.remove('hidden');
+    }
+    function closeCheckoutModal() { document.getElementById('checkoutModal').classList.add('hidden'); }
+    function simulatePaymentApproval() {
+      document.getElementById('checkoutStepInput').classList.add('hidden');
+      document.getElementById('checkoutStepSuccess').classList.remove('hidden');
+    }
+
+    function openCleanupModal() { document.getElementById('cleanupModal').classList.remove('hidden'); }
+    function closeCleanupModal() { document.getElementById('cleanupModal').classList.add('hidden'); }
+    function simulateUpload() {
+      alert('Simulación: Arrastra hasta 200 fotos. Sharp creará miniaturas protegidas y resguardará las originales.');
+    }
+    function shareWhatsApp() {
+      const url = encodeURIComponent(window.location.href);
+      window.open('https://api.whatsapp.com/send?text=¡Mirá las fotos en La Tercera! ' + url, '_blank');
+    }
+
+    // Inicializar
+    renderAlbumsGrid();
+  </script>
+</body>
+</html>
