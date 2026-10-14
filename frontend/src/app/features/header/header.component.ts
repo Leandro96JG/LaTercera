@@ -67,7 +67,7 @@ import { Component, ChangeDetectionStrategy, output, input } from '@angular/core
   `
 })
 export class HeaderComponent {
-  public readonly currentView = input<'portfolio' | 'album' | 'admin' | 'admin-login'>('portfolio');
+  public readonly currentView = input<'portfolio' | 'album' | 'admin' | 'admin-login' | 'payment-success'>('portfolio');
   public readonly isAuthenticated = input<boolean>(false);
   public readonly goHome = output<void>();
   public readonly changeView = output<'portfolio' | 'admin'>();

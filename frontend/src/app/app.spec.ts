@@ -77,4 +77,15 @@ describe('App Root Component - LA TERCERA', () => {
     expect(app.currentView()).toBe('portfolio');
     expect(app.adminAuthStore.isAuthenticated()).toBe(false);
   });
+
+  it('debe transicionar a la vista payment-success y regresar al catálogo con goHome()', () => {
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+
+    app.currentView.set('payment-success');
+    expect(app.currentView()).toBe('payment-success');
+
+    app.goHome();
+    expect(app.currentView()).toBe('portfolio');
+  });
 });

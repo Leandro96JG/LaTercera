@@ -7,6 +7,7 @@ import { LightboxComponent } from './features/lightbox/lightbox.component';
 import { CheckoutModalComponent } from './features/checkout/checkout-modal.component';
 import { AdminLoginComponent } from './features/admin-login/admin-login.component';
 import { AdminPanelComponent } from './features/admin-panel/admin-panel.component';
+import { PaymentSuccessComponent } from './features/payment-success/payment-success.component';
 import { AlbumService } from './core/services/album.service';
 import { CartStore } from './core/state/cart.store';
 import { AdminAuthStore } from './core/state/admin-auth.store';
@@ -24,7 +25,8 @@ import { Photo } from './core/models/photo.model';
     LightboxComponent,
     CheckoutModalComponent,
     AdminLoginComponent,
-    AdminPanelComponent
+    AdminPanelComponent,
+    PaymentSuccessComponent
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './app.html',
@@ -35,8 +37,8 @@ export class App implements OnInit {
   public readonly cartStore = inject(CartStore);
   public readonly adminAuthStore = inject(AdminAuthStore);
 
-  // Vistas activas: 'portfolio' | 'album' | 'admin' | 'admin-login'
-  public readonly currentView = signal<'portfolio' | 'album' | 'admin' | 'admin-login'>('portfolio');
+  // Vistas activas: 'portfolio' | 'album' | 'admin' | 'admin-login' | 'payment-success'
+  public readonly currentView = signal<'portfolio' | 'album' | 'admin' | 'admin-login' | 'payment-success'>('portfolio');
 
   // Filtro de categoría en portfolio
   public readonly selectedCategory = signal<string>('all');
@@ -151,8 +153,20 @@ export class App implements OnInit {
       }
     });
 
-    // Atajo administrativo discreto: Ctrl + Shift + A
+    // Detección de retorno de pasarela de pagos (Mercado Pago Checkout Pro) o enlaces directos
     if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const isPaymentReturn =
+        params.has('collection_status') ||
+        params.has('external_reference') ||
+        params.has('token') ||
+        window.location.pathname.includes('pago-exitoso');
+
+      if (isPaymentReturn) {
+        this.currentView.set('payment-success');
+      }
+
+      // Atajo administrativo discreto: Ctrl + Shift + A
       window.addEventListener('keydown', (e: KeyboardEvent) => {
         if (e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
           e.preventDefault();

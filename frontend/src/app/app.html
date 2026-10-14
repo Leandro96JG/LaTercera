@@ -265,6 +265,11 @@
     />
   }
 
+  <!-- VISTA 5: PAGO EXITOSO Y DESCARGA DE FOTOGRAFÍAS -->
+  @else if (currentView() === 'payment-success') {
+    <app-payment-success (goHome)="goHome()" />
+  }
+
   <!-- Pie de Página Bento Minimalista con Acceso Privado -->
   <footer class="mt-12 pt-6 border-t border-black/[0.05] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-400">
     <div class="flex items-center gap-2">
@@ -290,8 +295,10 @@
 
 </div>
 
-<!-- Cápsula Flotante de Compra Reactiva -->
-<app-floating-cart (checkout)="openCheckout()" />
+<!-- Cápsula Flotante de Compra Reactiva (Oculta en pago exitoso y administración) -->
+@if (currentView() === 'portfolio' || currentView() === 'album') {
+  <app-floating-cart (checkout)="openCheckout()" />
+}
 
 <!-- Lightbox Cinemático -->
 <app-lightbox

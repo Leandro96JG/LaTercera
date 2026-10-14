@@ -58,6 +58,20 @@ Plataforma web e-commerce mobile-first orientada a la venta de fotografías de p
 - [x] Seguridad y Autenticación Criptográfica del Panel Administrativo (**Ocultamiento público, Scrypt + JWT RFC 7519, Middleware requireAdminAuth, AdminAuthStore con Signals, y suite de 87 tests pasando**).
 - [x] Importador de carpetas compartidas de Google Drive con Sharp (Anti-OOM worker pool concurrente, validación de magic bytes y generación de WebP 800px protegidos).
 - [x] Panel administrativo completo con subida masiva drag-and-drop, métricas en vivo y registro de fotógrafos colaboradores para escalabilidad futura.
+- [x] Flujo de Entrega Post-Pago, Streaming de Descargas y Pantalla de Éxito (`/pago-exitoso`) con **127 tests unitarios pasando en total** (88 backend + 39 frontend).
+
+### ADR-013: Flujo de Entrega Post-Pago, Streaming de Descargas y Pantalla de Éxito (/pago-exitoso)
+- **Endpoints de Entrega y Streaming:**
+  - `GET /api/downloads/:token/info`: Retorna metadatos de la orden, fotos adquiridas, URLs firmadas de descarga, tiempo restante de 72 horas y enlace oficial de WhatsApp con mensaje pre-armado.
+  - `GET /api/downloads/:token/file`: Streaming binario de foto original con `Content-Disposition: attachment`, validación de pertenencia (`belongsToOrder`) y sanitización estricta contra Path Traversal (`path.posix.basename`).
+  - `GET /api/downloads/:token/zip`: Empaquetado en streaming al vuelo mediante `archiver` con compresión balanceada (nivel 6) directamente conectado a la respuesta HTTP sin escribir archivos temporales en disco.
+  - `GET /api/downloads/order/:orderId/status`: Consulta reactiva del estado de la orden para sincronización con webhooks de Mercado Pago.
+- **Frontend Angular 21 Standalone (`PaymentSuccessComponent`):**
+  - Captura reactiva de query parameters de Mercado Pago (`collection_status`, `external_reference`, `token`).
+  - Polling suave con backoff ante pagos en proceso de impacto (`PENDING` -> `PAID`).
+  - Cuenta regresiva dinámica de 72 horas con limpieza de intervalos y timeouts en `ngOnDestroy`.
+  - Tarjeta Bento con halo dorado solar (`#FDB813`), descarga individual y masiva en 1 clic, botón de copiado de enlace y contacto directo a WhatsApp oficial de Jenifer "Yuyo" Espeche (`+54 9 380 486-8714`).
+- **Auditoría y Evidencia:** 88 tests en backend (Vitest) y 39 tests en frontend (Angular 21 + Vitest). Aprobado con distinción por el Guardian Angel Reviewer.
 
 ### ADR-012: Ingesta Masiva, Importador de Google Drive y Worker Pool Concurrente Anti-OOM con Sharp
 - **Extracción de Identificadores Drive:** Algoritmo multi-patrón en `drive-parser.service.ts` compatible con carpetas `/drive/folders/{id}`, `/u/0/folders/{id}`, query parameters `?id={id}`, formato legacy `/open?id=` y validación de dominios autorizados de Google (`drive.google.com`, `docs.google.com`).
