@@ -11,7 +11,11 @@ import {
   BulkUploadResponse,
   RegisterPhotographerResponse,
   CreateAlbumRequest,
-  UpdateAlbumRequest
+  UpdateAlbumRequest,
+  TrashAlbum,
+  AdminOrder,
+  AdminOrderStatus,
+  AdminAlbumPhoto
 } from '../../core/models/admin.model';
 
 @Component({
@@ -32,12 +36,77 @@ export class AdminPanelComponent implements OnInit {
   public readonly goHome = output<void>();
   public readonly logout = output<void>();
 
-  // Pestaña activa: 'albums' | 'drive' | 'upload' | 'photographers'
-  public readonly activeTab = signal<'albums' | 'drive' | 'upload' | 'photographers'>('albums');
+  // Pestaña activa: 'albums' | 'orders' | 'trash' | 'drive' | 'upload' | 'photographers'
+  public readonly activeTab = signal<'albums' | 'orders' | 'trash' | 'drive' | 'upload' | 'photographers'>('albums');
+
+  // Órdenes y Entregas (Ventas Mercado Pago)
+  public readonly orders = signal<readonly AdminOrder[]>([]);
+  public readonly isLoadingOrders = signal<boolean>(false);
+  public readonly ordersError = signal<string | null>(null);
+  public readonly renewingOrderId = signal<string | null>(null);
+  public readonly copiedTokenOrderId = signal<string | null>(null);
+  public readonly renewFeedback = signal<{ orderId: string; message: string; success: boolean } | null>(null);
+  public readonly orderStatusFilter = signal<'ALL' | AdminOrderStatus>('ALL');
+  public readonly orderSearchQuery = signal<string>('');
+
+  public readonly filteredOrders = computed(() => {
+    let list = this.orders();
+    const filter = this.orderStatusFilter();
+    const query = this.orderSearchQuery().toLowerCase().trim();
+
+    if (filter !== 'ALL') {
+      list = list.filter(o => o.status === filter);
+    }
+
+    if (query) {
+      list = list.filter(o =>
+        o.id.toLowerCase().includes(query) ||
+        o.customer.email.toLowerCase().includes(query) ||
+        (o.customer.name && o.customer.name.toLowerCase().includes(query)) ||
+        (o.albumTitle && o.albumTitle.toLowerCase().includes(query)) ||
+        (o.customer.phone && o.customer.phone.includes(query))
+      );
+    }
+
+    return list;
+  });
+
+  public readonly totalPaidRevenue = computed(() => {
+    return this.orders()
+      .filter(o => o.status === 'PAID')
+      .reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+  });
+
+  public readonly paidOrdersCount = computed(() => {
+    return this.orders().filter(o => o.status === 'PAID').length;
+  });
 
   // Álbumes disponibles en el sistema (vista administrativa y formularios)
   public readonly albums = signal<readonly Album[]>([]);
   public readonly isLoadingAlbums = signal<boolean>(false);
+
+  // Papelera de reciclaje (30 días de gracia)
+  public readonly trashAlbums = signal<readonly TrashAlbum[]>([]);
+  public readonly isLoadingTrash = signal<boolean>(false);
+  public readonly isRestoringId = signal<string | null>(null);
+  public readonly isPurgingId = signal<string | null>(null);
+  public readonly albumToPurge = signal<TrashAlbum | null>(null);
+  public readonly isPurgeModalOpen = signal<boolean>(false);
+  public readonly isMovingToTrashId = signal<string | null>(null);
+  public readonly isTogglingCourtesyId = signal<string | null>(null);
+  public readonly isUpdatingPrivacyId = signal<string | null>(null);
+  public readonly editingPrivacyAlbumId = signal<string | null>(null);
+  public readonly privacyAccessCodeInput = signal<string>('');
+
+  // Modal de Gestión de Fotos del Álbum
+  public readonly isPhotosModalOpen = signal<boolean>(false);
+  public readonly selectedAlbumForPhotos = signal<Album | null>(null);
+  public readonly albumPhotos = signal<readonly AdminAlbumPhoto[]>([]);
+  public readonly isLoadingAlbumPhotos = signal<boolean>(false);
+  public readonly photosModalError = signal<string | null>(null);
+  public readonly photosModalFeedback = signal<{ message: string; success: boolean } | null>(null);
+  public readonly updatingPhotoId = signal<string | null>(null);
+  public readonly deletingPhotoId = signal<string | null>(null);
 
   // Estado de actualización de visibilidad (Ocultar/Publicar) por tarjeta
   public readonly isTogglingPublishId = signal<string | null>(null);
@@ -134,19 +203,61 @@ export class AdminPanelComponent implements OnInit {
   // Archivos seleccionados para subida masiva
   public readonly selectedFiles = signal<File[]>([]);
   public readonly hdIndices = signal<number[]>([0, 1]);
+  public readonly MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB límite Supabase Storage
+
+  public readonly oversizedFiles = computed(() =>
+    this.selectedFiles().filter(f => f.size > this.MAX_FILE_SIZE_BYTES)
+  );
+
+  public readonly hasOversizedFiles = computed(() => this.oversizedFiles().length > 0);
+
+  // Helper para fecha ISO de hoy (YYYY-MM-DD)
+  public getTodayIsoDate(): string {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  // Helper para previsualización amigable de fecha y hora
+  public formatEventDatePreview(dateIso?: string, time?: string): string {
+    if (!dateIso) return '';
+    try {
+      const parts = dateIso.split('-');
+      if (parts.length === 3) {
+        const [year, month, day] = parts.map(Number);
+        const dateObj = new Date(year, month - 1, day);
+        const formatted = dateObj.toLocaleDateString('es-AR', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric'
+        });
+        return time ? `${formatted} • ${time} hs` : formatted;
+      }
+      return dateIso;
+    } catch {
+      return dateIso;
+    }
+  }
 
   // Formulario de Creación de Nuevo Álbum
   public readonly createAlbumForm = this.fb.nonNullable.group({
     title: ['', [Validators.required, Validators.minLength(4)]],
     category: ['futbol' as AlbumCategory, [Validators.required]],
     subtitle: ['', [Validators.required]],
-    date: [new Date().toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' }), [Validators.required]],
+    date: [''],
+    eventDate: [this.getTodayIsoDate(), [Validators.required]],
+    eventTime: ['16:30', [Validators.required]],
     location: ['Estadio Carlos A. Mercado Luna, La Rioja', [Validators.required]],
     unitPrice: [1200, [Validators.required, Validators.min(100)]],
     fullAlbumPrice: [9500, [Validators.required, Validators.min(500)]],
     badge: ['⚽ Fútbol', [Validators.required]],
     coverUrl: [''],
-    isPublished: [true]
+    isPublished: [true],
+    isFreeDownload: [false],
+    isPrivate: [false],
+    accessCode: ['']
   });
 
   // Formulario de Importación de Google Drive
@@ -175,7 +286,114 @@ export class AdminPanelComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadAlbums();
+    this.loadTrashAlbums();
     this.loadStats();
+    this.loadOrders();
+  }
+
+  public loadOrders(): void {
+    this.isLoadingOrders.set(true);
+    this.ordersError.set(null);
+    this.adminService.getAdminOrders().subscribe({
+      next: (res) => {
+        this.isLoadingOrders.set(false);
+        if (res.success && res.orders) {
+          this.orders.set(res.orders);
+        }
+      },
+      error: (err) => {
+        this.isLoadingOrders.set(false);
+        this.ordersError.set(err.error?.error || 'Error al sincronizar las ventas.');
+      }
+    });
+  }
+
+  public renewOrderToken(order: AdminOrder): void {
+    this.renewingOrderId.set(order.id);
+    this.renewFeedback.set(null);
+
+    this.adminService.regenerateOrderToken(order.id).subscribe({
+      next: (res) => {
+        this.renewingOrderId.set(null);
+        if (res.success) {
+          this.orders.update(list =>
+            list.map(o =>
+              o.id === order.id
+                ? { ...o, downloadToken: res.downloadToken, downloadUrl: res.downloadUrl }
+                : o
+            )
+          );
+
+          if (typeof navigator !== 'undefined' && navigator.clipboard && res.downloadUrl) {
+            navigator.clipboard.writeText(res.downloadUrl).catch(() => {});
+          }
+
+          this.copiedTokenOrderId.set(order.id);
+          this.renewFeedback.set({
+            orderId: order.id,
+            message: '¡Enlace renovado por 72h y copiado al portapapeles! 📋',
+            success: true
+          });
+
+          setTimeout(() => {
+            if (this.copiedTokenOrderId() === order.id) {
+              this.copiedTokenOrderId.set(null);
+            }
+          }, 4000);
+        }
+      },
+      error: (err) => {
+        this.renewingOrderId.set(null);
+        this.renewFeedback.set({
+          orderId: order.id,
+          message: err.error?.error || 'Error al renovar el enlace de descarga.',
+          success: false
+        });
+      }
+    });
+  }
+
+  public sendWhatsApp(order: AdminOrder): void {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:4200';
+    const downloadUrl = order.downloadUrl || `${origin}/pago-exitoso?token=${order.downloadToken}`;
+    const customerName = order.customer.name ? ` ${order.customer.name}` : '';
+    const albumName = order.albumTitle || 'tus fotos';
+
+    const message = `¡Hola${customerName}! Te compartimos el enlace para descargar tus fotos en máxima calidad de "${albumName}" en La Tercera:\n\n${downloadUrl}\n\n⚠️ El enlace tiene una vigencia de 72 horas. ¡Muchas gracias por tu compra! 📸⚽`;
+    const encodedMessage = encodeURIComponent(message);
+
+    if (order.customer.phone) {
+      const cleanPhone = order.customer.phone.replace(/[^0-9]/g, '');
+      if (typeof window !== 'undefined') {
+        window.open(`https://wa.me/${cleanPhone}?text=${encodedMessage}`, '_blank');
+      }
+    } else {
+      if (typeof window !== 'undefined') {
+        window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
+      }
+    }
+  }
+
+  public copyDownloadLink(order: AdminOrder): void {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:4200';
+    const downloadUrl = order.downloadUrl || `${origin}/pago-exitoso?token=${order.downloadToken}`;
+    if (typeof navigator !== 'undefined' && navigator.clipboard && downloadUrl) {
+      navigator.clipboard.writeText(downloadUrl).then(() => {
+        this.copiedTokenOrderId.set(order.id);
+        setTimeout(() => {
+          if (this.copiedTokenOrderId() === order.id) {
+            this.copiedTokenOrderId.set(null);
+          }
+        }, 3000);
+      }).catch(() => {});
+    }
+  }
+
+  public openCustomerWhatsApp(phone: string): void {
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    if (typeof window !== 'undefined' && cleanPhone) {
+      window.open(`https://wa.me/${cleanPhone}`, '_blank');
+    }
   }
 
   public loadAlbums(): void {
@@ -324,17 +542,26 @@ export class AdminPanelComponent implements OnInit {
     this.createAlbumError.set(null);
     this.createAlbumSuccess.set(null);
 
+    const displayDate = val.date?.trim()
+      ? val.date.trim()
+      : this.formatEventDatePreview(val.eventDate, val.eventTime);
+
     this.adminService.createAlbum({
       title: val.title,
       category: val.category,
       subtitle: val.subtitle,
-      date: val.date,
+      date: displayDate,
+      eventDate: val.eventDate,
+      eventTime: val.eventTime,
       location: val.location,
       unitPrice: Number(val.unitPrice),
       fullAlbumPrice: Number(val.fullAlbumPrice),
       badge: val.badge,
       coverUrl: val.coverUrl || undefined,
-      isPublished: val.isPublished
+      isPublished: val.isPublished,
+      isFreeDownload: val.isFreeDownload,
+      isPrivate: val.isPrivate,
+      accessCode: val.isPrivate && val.accessCode?.trim() ? val.accessCode.trim() : null
     }).subscribe({
       next: (res) => {
         this.isCreatingAlbum.set(false);
@@ -460,6 +687,323 @@ export class AdminPanelComponent implements OnInit {
     });
   }
 
+  // --- Métodos de Papelera de Reciclaje (Soft Delete, Restore y Hard Delete) ---
+  public loadTrashAlbums(): void {
+    this.isLoadingTrash.set(true);
+    this.adminService.getTrashAlbums().subscribe({
+      next: (res) => {
+        this.isLoadingTrash.set(false);
+        if (res.success && res.trashAlbums) {
+          this.trashAlbums.set(res.trashAlbums);
+        }
+      },
+      error: () => {
+        this.isLoadingTrash.set(false);
+      }
+    });
+  }
+
+  public moveToTrash(album: Album): void {
+    if (!confirm(`¿Estás seguro de mover el álbum "${album.title}" a la papelera de reciclaje?\n\nTendrás 30 días para restaurarlo antes de que se purgue permanentemente.`)) {
+      return;
+    }
+
+    this.isMovingToTrashId.set(album.id);
+    this.adminService.moveToTrash(album.id).subscribe({
+      next: (res) => {
+        this.isMovingToTrashId.set(null);
+        if (res.success) {
+          this.albums.set(this.albums().filter(a => a.id !== album.id));
+          this.loadTrashAlbums();
+          this.updateFeedback.set({
+            albumId: album.id,
+            message: 'Álbum movido a la papelera (se purgará en 30 días)',
+            success: true
+          });
+        }
+      },
+      error: (err) => {
+        this.isMovingToTrashId.set(null);
+        this.updateFeedback.set({
+          albumId: album.id,
+          message: err.error?.error || 'Error al mover a papelera',
+          success: false
+        });
+      }
+    });
+  }
+
+  public restoreAlbum(trashAlbum: TrashAlbum): void {
+    this.isRestoringId.set(trashAlbum.id);
+    this.adminService.restoreFromTrash(trashAlbum.id).subscribe({
+      next: (res) => {
+        this.isRestoringId.set(null);
+        if (res.success) {
+          this.trashAlbums.set(this.trashAlbums().filter(a => a.id !== trashAlbum.id));
+          this.loadAlbums();
+        }
+      },
+      error: () => {
+        this.isRestoringId.set(null);
+      }
+    });
+  }
+
+  public openPurgeModal(trashAlbum: TrashAlbum): void {
+    this.albumToPurge.set(trashAlbum);
+    this.isPurgeModalOpen.set(true);
+  }
+
+  public closePurgeModal(): void {
+    this.albumToPurge.set(null);
+    this.isPurgeModalOpen.set(false);
+  }
+
+  public confirmPermanentDelete(): void {
+    const alb = this.albumToPurge();
+    if (!alb) return;
+
+    this.isPurgingId.set(alb.id);
+    this.adminService.permanentDeleteAlbum(alb.id).subscribe({
+      next: (res) => {
+        this.isPurgingId.set(null);
+        if (res.success) {
+          this.trashAlbums.set(this.trashAlbums().filter(a => a.id !== alb.id));
+          this.closePurgeModal();
+        }
+      },
+      error: () => {
+        this.isPurgingId.set(null);
+      }
+    });
+  }
+
+  // --- Cortesía Oficial (Descarga Gratuita Máxima Calidad) ---
+  public toggleCourtesyDownload(album: Album): void {
+    const newStatus = !album.isFreeDownload;
+    this.isTogglingCourtesyId.set(album.id);
+    this.adminService.toggleCourtesyDownload(album.id, newStatus).subscribe({
+      next: (res) => {
+        this.isTogglingCourtesyId.set(null);
+        if (res.success && res.album) {
+          this.albums.set(this.albums().map(a => a.id === album.id ? res.album : a));
+          this.updateFeedback.set({
+            albumId: album.id,
+            message: newStatus ? '🎁 ¡Álbum liberado gratis en máxima calidad!' : 'Descarga gratuita desactivada',
+            success: true
+          });
+          setTimeout(() => {
+            if (this.updateFeedback()?.albumId === album.id) {
+              this.updateFeedback.set(null);
+            }
+          }, 3500);
+        }
+      },
+      error: (err) => {
+        this.isTogglingCourtesyId.set(null);
+        this.updateFeedback.set({
+          albumId: album.id,
+          message: err.error?.error || 'Error al cambiar descarga gratuita',
+          success: false
+        });
+      }
+    });
+  }
+
+  // --- Privacidad y Código PIN ---
+  public startEditPrivacy(album: Album): void {
+    this.editingPrivacyAlbumId.set(album.id);
+    this.privacyAccessCodeInput.set(album.accessCode === '********' ? '' : (album.accessCode || ''));
+  }
+
+  public cancelEditPrivacy(): void {
+    this.editingPrivacyAlbumId.set(null);
+    this.privacyAccessCodeInput.set('');
+  }
+
+  public savePrivacy(album: Album, makePrivate: boolean): void {
+    const code = this.privacyAccessCodeInput().trim();
+    if (makePrivate && !code) {
+      alert('Debes ingresar un código PIN o clave de acceso para el álbum privado.');
+      return;
+    }
+
+    this.isUpdatingPrivacyId.set(album.id);
+    this.adminService.updateAlbumPrivacy(album.id, makePrivate, makePrivate ? code : null).subscribe({
+      next: (res) => {
+        this.isUpdatingPrivacyId.set(null);
+        this.editingPrivacyAlbumId.set(null);
+        if (res.success && res.album) {
+          this.albums.set(this.albums().map(a => a.id === album.id ? res.album : a));
+          this.updateFeedback.set({
+            albumId: album.id,
+            message: makePrivate ? '🔒 Álbum protegido con PIN' : 'Álbum configurado como público',
+            success: true
+          });
+          setTimeout(() => {
+            if (this.updateFeedback()?.albumId === album.id) {
+              this.updateFeedback.set(null);
+            }
+          }, 3500);
+        }
+      },
+      error: (err) => {
+        this.isUpdatingPrivacyId.set(null);
+        this.updateFeedback.set({
+          albumId: album.id,
+          message: err.error?.error || 'Error al actualizar privacidad',
+          success: false
+        });
+      }
+    });
+  }
+
+  // --- Métodos de Gestión de Fotos del Álbum ---
+  public openPhotosModal(album: Album): void {
+    this.selectedAlbumForPhotos.set(album);
+    this.isPhotosModalOpen.set(true);
+    this.photosModalError.set(null);
+    this.photosModalFeedback.set(null);
+    this.loadAlbumPhotos(album.id);
+  }
+
+  public closePhotosModal(): void {
+    this.isPhotosModalOpen.set(false);
+    this.selectedAlbumForPhotos.set(null);
+    this.albumPhotos.set([]);
+    this.photosModalError.set(null);
+    this.photosModalFeedback.set(null);
+  }
+
+  public loadAlbumPhotos(albumId: string): void {
+    this.isLoadingAlbumPhotos.set(true);
+    this.photosModalError.set(null);
+
+    this.adminService.getAlbumPhotos(albumId).subscribe({
+      next: (res) => {
+        this.isLoadingAlbumPhotos.set(false);
+        if (res.success && res.photos) {
+          this.albumPhotos.set(res.photos);
+        } else {
+          this.albumPhotos.set([]);
+        }
+      },
+      error: (err) => {
+        this.isLoadingAlbumPhotos.set(false);
+        this.photosModalError.set(
+          err.error?.error || err.error?.message || 'Error al cargar las fotos del álbum'
+        );
+      }
+    });
+  }
+
+  public setPhotoAsCover(photo: AdminAlbumPhoto): void {
+    const album = this.selectedAlbumForPhotos();
+    if (!album) return;
+
+    this.updatingPhotoId.set(photo.id);
+    this.photosModalFeedback.set(null);
+
+    this.adminService.updateAlbumPhoto(album.id, photo.id, { setAsCover: true }).subscribe({
+      next: (res) => {
+        this.updatingPhotoId.set(null);
+        const newCover = res.coverUrl || photo.previewUrl;
+        this.selectedAlbumForPhotos.set({ ...album, coverUrl: newCover });
+        this.albums.set(
+          this.albums().map(a => a.id === album.id ? { ...a, coverUrl: newCover } : a)
+        );
+        this.photosModalFeedback.set({
+          message: 'Foto establecida como portada principal del álbum',
+          success: true
+        });
+      },
+      error: (err) => {
+        this.updatingPhotoId.set(null);
+        this.photosModalFeedback.set({
+          message: err.error?.error || err.message || 'Error al actualizar portada',
+          success: false
+        });
+      }
+    });
+  }
+
+  public toggleSampleHd(photo: AdminAlbumPhoto): void {
+    const album = this.selectedAlbumForPhotos();
+    if (!album) return;
+
+    this.updatingPhotoId.set(photo.id);
+    this.photosModalFeedback.set(null);
+    const newSampleHd = !photo.isSampleHd;
+
+    this.adminService.updateAlbumPhoto(album.id, photo.id, { isSampleHD: newSampleHd }).subscribe({
+      next: () => {
+        this.updatingPhotoId.set(null);
+        this.albumPhotos.set(
+          this.albumPhotos().map(p => p.id === photo.id ? { ...p, isSampleHd: newSampleHd } : p)
+        );
+        this.photosModalFeedback.set({
+          message: newSampleHd ? 'Foto marcada como Muestra HD (⭐)' : 'Muestra HD removida',
+          success: true
+        });
+      },
+      error: (err) => {
+        this.updatingPhotoId.set(null);
+        this.photosModalFeedback.set({
+          message: err.error?.error || err.message || 'Error al actualizar muestra HD',
+          success: false
+        });
+      }
+    });
+  }
+
+  public deleteAlbumPhoto(photo: AdminAlbumPhoto): void {
+    const album = this.selectedAlbumForPhotos();
+    if (!album) return;
+
+    if (typeof confirm === 'function' && !confirm(`¿Eliminar esta fotografía del álbum "${album.title}"?\n\nEsta acción quitará el archivo del almacenamiento y actualizará el total de fotos.`)) {
+      return;
+    }
+
+    this.deletingPhotoId.set(photo.id);
+    this.photosModalFeedback.set(null);
+
+    this.adminService.deleteAlbumPhoto(album.id, photo.id).subscribe({
+      next: () => {
+        this.deletingPhotoId.set(null);
+        const remaining = this.albumPhotos().filter(p => p.id !== photo.id);
+        this.albumPhotos.set(remaining);
+
+        const newCount = Math.max(0, (album.photosCount || 1) - 1);
+        const isCover = album.coverUrl === photo.previewUrl;
+        const newCover = isCover ? (remaining[0]?.previewUrl || '') : album.coverUrl;
+
+        this.selectedAlbumForPhotos.set({
+          ...album,
+          photosCount: newCount,
+          coverUrl: newCover
+        });
+
+        this.albums.set(
+          this.albums().map(a =>
+            a.id === album.id ? { ...a, photosCount: newCount, coverUrl: newCover } : a
+          )
+        );
+
+        this.photosModalFeedback.set({
+          message: 'Fotografía eliminada correctamente del álbum',
+          success: true
+        });
+      },
+      error: (err) => {
+        this.deletingPhotoId.set(null);
+        this.photosModalFeedback.set({
+          message: err.error?.error || err.message || 'Error al eliminar la foto',
+          success: false
+        });
+      }
+    });
+  }
+
   // --- Navegación Rápida a Subida ---
   public navigateToUploadWithAlbum(albumId: string): void {
     this.bulkForm.patchValue({ albumId });
@@ -522,6 +1066,35 @@ export class AdminPanelComponent implements OnInit {
       f.type.startsWith('image/') || /\.(jpe?g|png|webp)$/i.test(f.name)
     );
     this.selectedFiles.set(validImageFiles);
+
+    const oversized = validImageFiles.filter(f => f.size > this.MAX_FILE_SIZE_BYTES);
+    if (oversized.length > 0) {
+      this.bulkError.set(
+        `Atención: ${oversized.length} archivo(s) superan el límite de 50 MB de Supabase Storage. Quítalos de la lista antes de procesar.`
+      );
+    } else {
+      this.bulkError.set(null);
+    }
+  }
+
+  public removeSelectedFile(index: number): void {
+    const current = this.selectedFiles();
+    const updated = current.filter((_, i) => i !== index);
+    this.selectedFiles.set(updated);
+    this.hdIndices.set(
+      this.hdIndices()
+        .filter(i => i !== index)
+        .map(i => (i > index ? i - 1 : i))
+    );
+    if (!this.hasOversizedFiles() && this.bulkError()?.includes('50 MB')) {
+      this.bulkError.set(null);
+    }
+  }
+
+  public clearSelectedFiles(): void {
+    this.selectedFiles.set([]);
+    this.hdIndices.set([]);
+    this.bulkError.set(null);
   }
 
   public toggleHdIndex(index: number): void {
@@ -540,6 +1113,13 @@ export class AdminPanelComponent implements OnInit {
   public submitBulkUpload(): void {
     if (this.selectedFiles().length === 0) {
       this.bulkError.set('Selecciona al menos una fotografía para subir');
+      return;
+    }
+
+    if (this.hasOversizedFiles()) {
+      this.bulkError.set(
+        `No es posible subir el lote: Hay ${this.oversizedFiles().length} archivo(s) que superan los 50 MB permitidos por Supabase Storage. Elimínalos para continuar.`
+      );
       return;
     }
 
@@ -563,7 +1143,8 @@ export class AdminPanelComponent implements OnInit {
       },
       error: (err) => {
         this.isBulkUploading.set(false);
-        this.bulkError.set(err.error?.error || err.message || 'Error durante la subida masiva');
+        const errorMsg = err.error?.error || err.error?.message || err.message || 'Error durante la subida masiva';
+        this.bulkError.set(errorMsg);
       }
     });
   }

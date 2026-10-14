@@ -125,4 +125,53 @@ describe('CartStore - Lógica Reactiva de Precios y Descuentos con Signals', () 
     expect(store.hasItems()).toBe(false);
     expect(store.pricing().finalTotal).toBe(0);
   });
+
+  it('debe permitir remover fotos individualmente con removePhoto', () => {
+    store.togglePhoto(createDummyPhoto('foto-1'));
+    store.togglePhoto(createDummyPhoto('foto-2'));
+    expect(store.totalItemsCount()).toBe(2);
+
+    store.removePhoto('foto-1');
+    expect(store.totalItemsCount()).toBe(1);
+    expect(store.isPhotoSelected('foto-1')).toBe(false);
+    expect(store.isPhotoSelected('foto-2')).toBe(true);
+
+    store.removePhoto('foto-2');
+    expect(store.hasItems()).toBe(false);
+  });
+
+  it('debe soportar precios dinámicos por álbum con setAlbumPricing', () => {
+    store.setAlbumPricing('album-custom', 15000, 2000);
+    store.togglePhoto(createDummyPhoto('foto-custom', 'album-custom'));
+
+    const p = store.pricing();
+    expect(p.unitPrice).toBe(2000);
+    expect(p.finalTotal).toBe(2000);
+
+    store.setFullAlbumMode('album-custom', 15000, 2000);
+    const pFull = store.pricing();
+    expect(pFull.rawSubtotal).toBe(15000);
+    expect(pFull.finalTotal).toBe(15000);
+  });
+
+  it('debe recomendar automáticamente el Pack Completo cuando el subtotal individual se acerca o supera el pack', () => {
+    // Configurar álbum con unitPrice: 1200, fullAlbumPrice: 9500
+    store.setAlbumPricing('album-1', 9500, 1200);
+
+    // 1 foto ($1.200) -> No recomienda
+    store.togglePhoto(createDummyPhoto('foto-1', 'album-1'));
+    expect(store.shouldRecommendFullAlbum()).toBe(false);
+
+    // 7 fotos (7 * 1200 = 8400 - 15% desc = 7140) -> 8400 >= 9500 * 0.8 (7600) -> Recomienda
+    for (let i = 2; i <= 7; i++) {
+      store.togglePhoto(createDummyPhoto(`foto-${i}`, 'album-1'));
+    }
+    expect(store.shouldRecommendFullAlbum()).toBe(true);
+
+    // Al cambiar al pack completo, deja de recomendar porque ya está en modo pack
+    store.switchToFullAlbum();
+    expect(store.isFullAlbum()).toBe(true);
+    expect(store.shouldRecommendFullAlbum()).toBe(false);
+    expect(store.pricing().finalTotal).toBe(9500);
+  });
 });

@@ -17,6 +17,17 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
     getAdminAlbums: ReturnType<typeof vi.fn>;
     createAlbum: ReturnType<typeof vi.fn>;
     updateAlbum: ReturnType<typeof vi.fn>;
+    getTrashAlbums: ReturnType<typeof vi.fn>;
+    moveToTrash: ReturnType<typeof vi.fn>;
+    restoreFromTrash: ReturnType<typeof vi.fn>;
+    permanentDeleteAlbum: ReturnType<typeof vi.fn>;
+    toggleCourtesyDownload: ReturnType<typeof vi.fn>;
+    updateAlbumPrivacy: ReturnType<typeof vi.fn>;
+    getAdminOrders: ReturnType<typeof vi.fn>;
+    regenerateOrderToken: ReturnType<typeof vi.fn>;
+    getAlbumPhotos: ReturnType<typeof vi.fn>;
+    updateAlbumPhoto: ReturnType<typeof vi.fn>;
+    deleteAlbumPhoto: ReturnType<typeof vi.fn>;
   };
 
   const initialMockAlbum = {
@@ -57,7 +68,87 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
       updateAlbum: vi.fn(),
       importFromDrive: vi.fn(),
       bulkUpload: vi.fn(),
-      registerPhotographer: vi.fn()
+      registerPhotographer: vi.fn(),
+      getTrashAlbums: vi.fn().mockReturnValue(of({ success: true, count: 0, trash: [] })),
+      moveToTrash: vi.fn().mockReturnValue(of({ success: true, message: 'Álbum movido a la papelera' })),
+      restoreFromTrash: vi.fn().mockReturnValue(of({ success: true, message: 'Álbum restaurado' })),
+      permanentDeleteAlbum: vi.fn().mockReturnValue(of({ success: true, message: 'Álbum eliminado' })),
+      toggleCourtesyDownload: vi.fn().mockReturnValue(of({ success: true, album: initialMockAlbum })),
+      updateAlbumPrivacy: vi.fn().mockReturnValue(of({ success: true, album: initialMockAlbum })),
+      getAdminOrders: vi.fn().mockReturnValue(of({
+        success: true,
+        total: 1,
+        orders: [
+          {
+            id: 'ord_mock_1',
+            albumId: 'album-1',
+            albumTitle: 'Atlético Tesorieri vs Andino SC',
+            photoIds: ['p1'],
+            isFullAlbum: false,
+            photoCount: 1,
+            unitPrice: 1200,
+            subtotal: 1200,
+            discount: 0,
+            discountPercentage: 0,
+            totalAmount: 1200,
+            currency: 'ARS',
+            customer: { email: 'cliente@test.com', name: 'Laura', phone: '+5493804556677' },
+            status: 'PAID',
+            downloadToken: 'valid_token_123',
+            downloadUrl: 'http://localhost:4200/pago-exitoso?token=valid_token_123',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }
+        ]
+      })),
+      regenerateOrderToken: vi.fn().mockReturnValue(of({
+        success: true,
+        orderId: 'ord_mock_1',
+        downloadToken: 'new_token_456',
+        downloadUrl: 'http://localhost:4200/pago-exitoso?token=new_token_456',
+        expiresInHours: 72
+      })),
+      getAlbumPhotos: vi.fn().mockReturnValue(of({
+        success: true,
+        albumId: 'album-1',
+        total: 2,
+        photos: [
+          {
+            id: 'photo-1',
+            albumId: 'album-1',
+            filename: 'tesorieri_01.jpg',
+            originalPath: 'originals/album-1/photo-1.jpg',
+            previewUrl: 'https://cdn.example.com/photo-1.webp',
+            isSampleHd: false
+          },
+          {
+            id: 'photo-2',
+            albumId: 'album-1',
+            filename: 'tesorieri_02.jpg',
+            originalPath: 'originals/album-1/photo-2.jpg',
+            previewUrl: 'https://cdn.example.com/photo-2.webp',
+            isSampleHd: true
+          }
+        ]
+      })),
+      updateAlbumPhoto: vi.fn().mockReturnValue(of({
+        success: true,
+        photo: {
+          id: 'photo-1',
+          albumId: 'album-1',
+          filename: 'tesorieri_01.jpg',
+          originalPath: 'originals/album-1/photo-1.jpg',
+          previewUrl: 'https://cdn.example.com/photo-1.webp',
+          isSampleHd: true
+        },
+        coverUrl: 'https://cdn.example.com/photo-1.webp',
+        message: 'Foto actualizada'
+      })),
+      deleteAlbumPhoto: vi.fn().mockReturnValue(of({
+        success: true,
+        photoId: 'photo-1',
+        message: 'Foto eliminada correctamente'
+      }))
     };
 
     await TestBed.configureTestingModule({
@@ -384,6 +475,225 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
 
     component.prevPage();
     expect(component.currentPage()).toBe(2);
+  });
+
+  it('debe detectar archivos que superan el límite de 50 MB de Supabase Storage y bloquear la subida', () => {
+    // Archivo de 52 MB simulado
+    const oversizedFile = new File(['x'.repeat(100)], 'foto_upscaled_4x.png', { type: 'image/png' });
+    Object.defineProperty(oversizedFile, 'size', { value: 52.5 * 1024 * 1024 });
+
+    const normalFile = new File(['normal'], 'foto_normal.jpg', { type: 'image/jpeg' });
+    Object.defineProperty(normalFile, 'size', { value: 3.5 * 1024 * 1024 });
+
+    component.selectedFiles.set([normalFile, oversizedFile]);
+
+    expect(component.hasOversizedFiles()).toBe(true);
+    expect(component.oversizedFiles().length).toBe(1);
+    expect(component.oversizedFiles()[0].name).toBe('foto_upscaled_4x.png');
+
+    // Intentar subir debe bloquearse
+    component.submitBulkUpload();
+
+    expect(mockAdminService.bulkUpload).not.toHaveBeenCalled();
+    expect(component.bulkError()).toContain('superan los 50 MB permitidos');
+  });
+
+  it('debe permitir eliminar un archivo puntual de la selección o limpiar todos los archivos', () => {
+    const file1 = new File(['1'], 'foto1.jpg', { type: 'image/jpeg' });
+    const file2 = new File(['2'], 'foto2.jpg', { type: 'image/jpeg' });
+
+    component.selectedFiles.set([file1, file2]);
+    component.hdIndices.set([0, 1]);
+
+    expect(component.selectedFiles().length).toBe(2);
+
+    // Quitar el primer archivo
+    component.removeSelectedFile(0);
+    expect(component.selectedFiles().length).toBe(1);
+    expect(component.selectedFiles()[0].name).toBe('foto2.jpg');
+
+    // Limpiar todos
+    component.clearSelectedFiles();
+    expect(component.selectedFiles().length).toBe(0);
+    expect(component.hdIndices().length).toBe(0);
+  });
+
+  describe('Pestaña Ventas & Entregas y Regeneración de Enlaces de 72 Horas', () => {
+    it('debe inicializar cargando las órdenes y calculando métricas de ventas reactivas', () => {
+      expect(component.orders().length).toBe(1);
+      expect(component.paidOrdersCount()).toBe(1);
+      expect(component.totalPaidRevenue()).toBe(1200);
+      expect(mockAdminService.getAdminOrders).toHaveBeenCalled();
+    });
+
+    it('debe filtrar las órdenes por estado y por texto de búsqueda', () => {
+      const extraOrders = [
+        {
+          id: 'ord_pending_99',
+          albumId: 'album-1',
+          albumTitle: 'Atlético Tesorieri vs Andino SC',
+          photoIds: ['p1', 'p2'],
+          isFullAlbum: false,
+          photoCount: 2,
+          unitPrice: 1200,
+          subtotal: 2400,
+          discount: 0,
+          discountPercentage: 0,
+          totalAmount: 2400,
+          currency: 'ARS',
+          customer: { email: 'pedro@pendiente.com', name: 'Pedro' },
+          status: 'PENDING' as const,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        },
+        {
+          id: 'ord_fraud_88',
+          albumId: 'album-2',
+          albumTitle: 'Hockey Polideportivo',
+          photoIds: [],
+          isFullAlbum: true,
+          photoCount: 36,
+          unitPrice: 1200,
+          subtotal: 9500,
+          discount: 0,
+          discountPercentage: 0,
+          totalAmount: 9500,
+          currency: 'ARS',
+          customer: { email: 'estafador@alerta.com', name: 'Estafador' },
+          status: 'FRAUD_ALERT_PRICE_MISMATCH' as const,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+      ];
+
+      component.orders.set([...component.orders(), ...extraOrders]);
+
+      expect(component.orders().length).toBe(3);
+
+      // Filtro por PAID
+      component.orderStatusFilter.set('PAID');
+      expect(component.filteredOrders().length).toBe(1);
+      expect(component.filteredOrders()[0].id).toBe('ord_mock_1');
+
+      // Filtro por PENDING
+      component.orderStatusFilter.set('PENDING');
+      expect(component.filteredOrders().length).toBe(1);
+      expect(component.filteredOrders()[0].id).toBe('ord_pending_99');
+
+      // Filtro por Búsqueda
+      component.orderStatusFilter.set('ALL');
+      component.orderSearchQuery.set('estafador');
+      expect(component.filteredOrders().length).toBe(1);
+      expect(component.filteredOrders()[0].id).toBe('ord_fraud_88');
+    });
+
+    it('debe regenerar el token de descarga en 1 clic, actualizar la orden y copiar al portapapeles', () => {
+      // Mock clipboard
+      const writeTextMock = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, {
+        clipboard: {
+          writeText: writeTextMock
+        }
+      });
+
+      const orderToRenew = component.orders()[0];
+      component.renewOrderToken(orderToRenew);
+
+      expect(mockAdminService.regenerateOrderToken).toHaveBeenCalledWith('ord_mock_1');
+      expect(writeTextMock).toHaveBeenCalledWith('http://localhost:4200/pago-exitoso?token=new_token_456');
+
+      const updated = component.orders().find(o => o.id === 'ord_mock_1');
+      expect(updated?.downloadToken).toBe('new_token_456');
+      expect(updated?.downloadUrl).toBe('http://localhost:4200/pago-exitoso?token=new_token_456');
+      expect(component.renewFeedback()?.success).toBe(true);
+    });
+
+    it('debe abrir enlace de WhatsApp pre-armado con el token de descarga del cliente', () => {
+      const windowOpenMock = vi.fn();
+      vi.stubGlobal('open', windowOpenMock);
+
+      const order = component.orders()[0];
+      component.sendWhatsApp(order);
+
+      expect(windowOpenMock).toHaveBeenCalledWith(
+        expect.stringContaining('https://wa.me/5493804556677?text='),
+        '_blank'
+      );
+
+      vi.unstubAllGlobals();
+    });
+  });
+
+  describe('Modal Bento: Gestión de Fotos del Álbum', () => {
+    it('debe abrir el modal de fotos y cargar las fotografías del álbum seleccionado', () => {
+      component.openPhotosModal(initialMockAlbum);
+
+      expect(component.isPhotosModalOpen()).toBe(true);
+      expect(component.selectedAlbumForPhotos()?.id).toBe('album-1');
+      expect(mockAdminService.getAlbumPhotos).toHaveBeenCalledWith('album-1');
+      expect(component.albumPhotos().length).toBe(2);
+      expect(component.albumPhotos()[0].id).toBe('photo-1');
+    });
+
+    it('debe cerrar el modal de fotos y resetear el estado', () => {
+      component.openPhotosModal(initialMockAlbum);
+      expect(component.isPhotosModalOpen()).toBe(true);
+
+      component.closePhotosModal();
+
+      expect(component.isPhotosModalOpen()).toBe(false);
+      expect(component.selectedAlbumForPhotos()).toBeNull();
+      expect(component.albumPhotos().length).toBe(0);
+      expect(component.photosModalFeedback()).toBeNull();
+    });
+
+    it('debe definir una foto como portada del álbum y actualizar el estado local', () => {
+      component.openPhotosModal(initialMockAlbum);
+      const photoToCover = component.albumPhotos()[0];
+
+      component.setPhotoAsCover(photoToCover);
+
+      expect(mockAdminService.updateAlbumPhoto).toHaveBeenCalledWith(
+        'album-1',
+        'photo-1',
+        { setAsCover: true }
+      );
+      expect(component.selectedAlbumForPhotos()?.coverUrl).toBe('https://cdn.example.com/photo-1.webp');
+      expect(component.albums().find(a => a.id === 'album-1')?.coverUrl).toBe('https://cdn.example.com/photo-1.webp');
+      expect(component.photosModalFeedback()?.success).toBe(true);
+    });
+
+    it('debe alternar el estado de muestra HD de una foto', () => {
+      component.openPhotosModal(initialMockAlbum);
+      const photo = component.albumPhotos()[0]; // isSampleHd is false
+
+      component.toggleSampleHd(photo);
+
+      expect(mockAdminService.updateAlbumPhoto).toHaveBeenCalledWith(
+        'album-1',
+        'photo-1',
+        { isSampleHD: true }
+      );
+      expect(component.albumPhotos().find(p => p.id === 'photo-1')?.isSampleHd).toBe(true);
+      expect(component.photosModalFeedback()?.success).toBe(true);
+    });
+
+    it('debe eliminar una foto del álbum, actualizar la lista y decrementar el contador', () => {
+      vi.stubGlobal('confirm', vi.fn().mockReturnValue(true));
+
+      component.openPhotosModal(initialMockAlbum);
+      const photoToDelete = component.albumPhotos()[0];
+
+      component.deleteAlbumPhoto(photoToDelete);
+
+      expect(mockAdminService.deleteAlbumPhoto).toHaveBeenCalledWith('album-1', 'photo-1');
+      expect(component.albumPhotos().some(p => p.id === 'photo-1')).toBe(false);
+      expect(component.selectedAlbumForPhotos()?.photosCount).toBe(47);
+      expect(component.albums().find(a => a.id === 'album-1')?.photosCount).toBe(47);
+      expect(component.photosModalFeedback()?.success).toBe(true);
+
+      vi.unstubAllGlobals();
+    });
   });
 });
 

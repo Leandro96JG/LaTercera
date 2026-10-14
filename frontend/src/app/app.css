@@ -1,0 +1,26 @@
+/* 3D Tilted Fan Deck & Portfolio Animations (60-120fps GPU Accelerated) */
+
+.photo-deck-container {
+  perspective: 1200px;
+  transform-style: preserve-3d;
+}
+
+.photo-deck-card {
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  will-change: transform, box-shadow;
+  transition: transform 340ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 340ms ease;
+}
+
+.photo-deck-card-left {
+  transform: perspective(1000px) rotateY(-5deg) rotateX(2deg) translateZ(0);
+}
+
+.photo-deck-card-right {
+  transform: perspective(1000px) rotateY(5deg) rotateX(2deg) translateZ(0);
+}
+
+.photo-deck-card:hover {
+  transform: perspective(1000px) rotateY(0deg) rotateX(0deg) scale(1.05) translateZ(28px) !important;
+  z-index: 30;
+}

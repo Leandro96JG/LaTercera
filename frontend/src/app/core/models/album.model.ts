@@ -8,6 +8,9 @@ export interface Album {
   readonly title: string;
   readonly subtitle: string;
   readonly date: string;
+  readonly eventDate?: string;
+  readonly eventTime?: string;
+  readonly eventDateTime?: string;
   readonly photosCount: number;
   readonly unitPrice: number;
   readonly fullAlbumPrice: number;
@@ -15,6 +18,11 @@ export interface Album {
   readonly badge: string;
   readonly location?: string;
   readonly isPublished?: boolean;
+  readonly deletedAt?: string | null;
+  readonly isFreeDownload?: boolean;
+  readonly freeDownloadUnlockedAt?: string | null;
+  readonly isPrivate?: boolean;
+  readonly accessCode?: string | null;
   readonly photos?: readonly Photo[];
 }
 

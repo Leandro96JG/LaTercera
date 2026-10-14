@@ -6,13 +6,14 @@ import {
   CreatePreferenceResponse,
   OrderStatusResponse
 } from '../models/order.model';
+import { environment } from '../../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class PaymentService {
   private readonly http = inject(HttpClient);
-  private readonly apiUrl = 'http://localhost:4000/api';
+  private readonly apiUrl = environment.apiUrl;
 
   public createPreference(request: CreatePreferenceRequest): Observable<CreatePreferenceResponse> {
     return this.http.post<CreatePreferenceResponse>(

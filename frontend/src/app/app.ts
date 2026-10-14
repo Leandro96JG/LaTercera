@@ -8,9 +8,13 @@ import { CheckoutModalComponent } from './features/checkout/checkout-modal.compo
 import { AdminLoginComponent } from './features/admin-login/admin-login.component';
 import { AdminPanelComponent } from './features/admin-panel/admin-panel.component';
 import { PaymentSuccessComponent } from './features/payment-success/payment-success.component';
+import { AlbumCard3dComponent } from './features/album-card-3d/album-card-3d.component';
+import { PhotoCardPolaroidComponent } from './features/photo-card-polaroid/photo-card-polaroid.component';
+import { PinUnlockModalComponent } from './features/pin-unlock/pin-unlock-modal.component';
 import { AlbumService } from './core/services/album.service';
 import { CartStore } from './core/state/cart.store';
 import { AdminAuthStore } from './core/state/admin-auth.store';
+import { AlbumAccessStore } from './core/state/album-access.store';
 import { Album, AlbumCategory } from './core/models/album.model';
 import { Photo } from './core/models/photo.model';
 
@@ -26,7 +30,10 @@ import { Photo } from './core/models/photo.model';
     CheckoutModalComponent,
     AdminLoginComponent,
     AdminPanelComponent,
-    PaymentSuccessComponent
+    PaymentSuccessComponent,
+    AlbumCard3dComponent,
+    PhotoCardPolaroidComponent,
+    PinUnlockModalComponent
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './app.html',
@@ -36,6 +43,11 @@ export class App implements OnInit {
   public readonly albumService = inject(AlbumService);
   public readonly cartStore = inject(CartStore);
   public readonly adminAuthStore = inject(AdminAuthStore);
+  public readonly albumAccessStore = inject(AlbumAccessStore);
+
+  // Modal de desbloqueo de álbum privado con PIN
+  public readonly selectedPrivateAlbum = signal<Album | null>(null);
+  public readonly isPinModalOpen = signal<boolean>(false);
 
   // Vistas activas: 'portfolio' | 'album' | 'admin' | 'admin-login' | 'payment-success'
   public readonly currentView = signal<'portfolio' | 'album' | 'admin' | 'admin-login' | 'payment-success'>('portfolio');
@@ -57,12 +69,40 @@ export class App implements OnInit {
   public readonly isCheckoutOpen = signal<boolean>(false);
 
   // Álbumes filtrados
+  public readonly searchQuery = signal<string>('');
+
   public readonly filteredAlbums = computed(() => {
     const cat = this.selectedCategory();
-    const list = this.albums();
-    if (cat === 'all') return list;
-    return list.filter(a => a.category === cat);
+    const query = this.searchQuery().trim().toLowerCase();
+    let list = this.albums();
+
+    if (cat !== 'all') {
+      list = list.filter(a => a.category === cat);
+    }
+
+    if (query) {
+      list = list.filter(a =>
+        a.title.toLowerCase().includes(query) ||
+        (a.subtitle && a.subtitle.toLowerCase().includes(query)) ||
+        (a.location && a.location.toLowerCase().includes(query)) ||
+        (a.date && a.date.toLowerCase().includes(query)) ||
+        (a.badge && a.badge.toLowerCase().includes(query))
+      );
+    }
+
+    return list;
   });
+
+  public onSearchInput(event: Event): void {
+    const target = event.target as HTMLInputElement;
+    this.searchQuery.set(target.value);
+    this.currentPage.set(1);
+  }
+
+  public clearSearch(): void {
+    this.searchQuery.set('');
+    this.currentPage.set(1);
+  }
 
   // Paginación en portfolio público
   public readonly currentPage = signal<number>(1);
@@ -97,13 +137,24 @@ export class App implements OnInit {
     return Math.min(this.currentPage() * this.pageSize(), total);
   });
 
+  // Fotos reales dinámicas del álbum actual
+  public readonly activeAlbumPhotos = signal<readonly Photo[]>([]);
+
   // Fotos del álbum actual
   public readonly currentPhotos = computed<readonly Photo[]>(() => {
     const album = this.currentAlbum();
     if (!album) return [];
+
+    // 1. Fotos reales dinámicas consultadas desde la API (/api/albums/:id/photos)
+    const fetched = this.activeAlbumPhotos();
+    if (fetched.length > 0 && fetched[0].albumId === album.id) {
+      return fetched;
+    }
+
+    // 2. Fotos presentes directamente en el modelo de álbum
     if (album.photos && album.photos.length > 0) return album.photos;
 
-    // Generar fotos de demostración basadas en el álbum
+    // 3. Fallback de fotos de demostración basadas en el conteo del álbum
     return Array.from({ length: Math.min(album.photosCount, 24) }, (_, i) => ({
       id: `${album.id}-photo-${i + 1}`,
       albumId: album.id,
@@ -200,56 +251,132 @@ export class App implements OnInit {
         window.location.pathname.includes('pago-exitoso');
 
       if (isPaymentReturn) {
-        this.currentView.set('payment-success');
+        this.transitionView(() => this.currentView.set('payment-success'));
       }
 
       // Atajo administrativo discreto: Ctrl + Shift + A
       window.addEventListener('keydown', (e: KeyboardEvent) => {
         if (e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
           e.preventDefault();
-          if (this.adminAuthStore.isAuthenticated()) {
-            this.currentView.set(this.currentView() === 'admin' ? 'portfolio' : 'admin');
-          } else {
-            this.currentView.set(this.currentView() === 'admin-login' ? 'portfolio' : 'admin-login');
-          }
+          this.transitionView(() => {
+            if (this.adminAuthStore.isAuthenticated()) {
+              this.currentView.set(this.currentView() === 'admin' ? 'portfolio' : 'admin');
+            } else {
+              this.currentView.set(this.currentView() === 'admin-login' ? 'portfolio' : 'admin-login');
+            }
+          });
         }
       });
+    }
+  }
+
+  /**
+   * Helper seguro para animar cambios de vista con la View Transitions API nativa
+   * Cuenta con fallback transparente en navegadores no compatibles o entornos de prueba
+   */
+  public transitionView(updateFn: () => void): void {
+    if (
+      typeof document !== 'undefined' &&
+      'startViewTransition' in document &&
+      typeof (document as any).startViewTransition === 'function'
+    ) {
+      (document as any).startViewTransition(() => {
+        updateFn();
+      });
+    } else {
+      updateFn();
     }
   }
 
   public switchView(view: 'portfolio' | 'admin'): void {
     if (view === 'admin') {
       if (!this.adminAuthStore.isAuthenticated()) {
-        this.currentView.set('admin-login');
+        this.transitionView(() => this.currentView.set('admin-login'));
         return;
       }
     } else if (view === 'portfolio') {
       this.loadPublicAlbums();
     }
-    this.currentView.set(view);
+    this.transitionView(() => this.currentView.set(view));
   }
 
   public onAdminLoginSuccess(): void {
-    this.currentView.set('admin');
+    this.transitionView(() => this.currentView.set('admin'));
   }
 
   public logoutAdmin(): void {
     this.adminAuthStore.logout();
     if (this.currentView() === 'admin' || this.currentView() === 'admin-login') {
-      this.loadPublicAlbums();
-      this.currentView.set('portfolio');
+      this.transitionView(() => {
+        this.loadPublicAlbums();
+        this.currentView.set('portfolio');
+      });
+    }
+  }
+
+  public openPinModal(album: Album): void {
+    this.selectedPrivateAlbum.set(album);
+    this.isPinModalOpen.set(true);
+  }
+
+  public closePinModal(): void {
+    this.isPinModalOpen.set(false);
+    this.selectedPrivateAlbum.set(null);
+  }
+
+  public onAlbumUnlocked(event: { albumId: string; accessToken?: string }): void {
+    this.albumAccessStore.unlockAlbum(event.albumId, event.accessToken);
+    const album = this.albums().find(a => a.id === event.albumId) || this.selectedPrivateAlbum();
+    this.closePinModal();
+    if (album) {
+      this.openAlbum(album);
+    }
+  }
+
+  public downloadCourtesyZip(album: Album): void {
+    const url = this.albumService.getFreeAlbumZipUrl(album.id);
+    if (typeof window !== 'undefined') {
+      window.open(url, '_blank');
     }
   }
 
   public openAlbum(album: Album): void {
-    this.currentAlbum.set(album);
-    this.currentView.set('album');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Si el álbum es privado y no está desbloqueado, abrir modal de PIN
+    if (album.isPrivate && !this.albumAccessStore.isUnlocked(album.id)) {
+      this.openPinModal(album);
+      return;
+    }
+
+    this.transitionView(() => {
+      this.currentAlbum.set(album);
+      this.cartStore.setAlbumPricing(album.id, album.fullAlbumPrice, album.unitPrice);
+      this.activeAlbumPhotos.set([]); // Limpiar fotos anteriores
+      this.currentView.set('album');
+    });
+
+    // Cargar fotos reales del álbum desde el backend / Supabase
+    this.albumService.getAlbumPhotos(album.id).subscribe({
+      next: (photos) => {
+        if (photos && photos.length > 0) {
+          this.activeAlbumPhotos.set(photos);
+        }
+      },
+      error: (err) => {
+        console.warn('[App] No se pudieron cargar fotos desde el backend, usando fallback:', err);
+      }
+    });
+
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }
 
   public goHome(): void {
-    this.loadPublicAlbums();
-    this.currentView.set('portfolio');
+    this.transitionView(() => {
+      this.activeAlbumPhotos.set([]);
+      this.loadPublicAlbums();
+      this.currentView.set('portfolio');
+    });
   }
 
   public setCategory(cat: string): void {
@@ -278,7 +405,7 @@ export class App implements OnInit {
   public buyFullAlbum(): void {
     const album = this.currentAlbum();
     if (!album) return;
-    this.cartStore.setFullAlbumMode(album.id, album.fullAlbumPrice);
+    this.cartStore.setFullAlbumMode(album.id, album.fullAlbumPrice, album.unitPrice);
     this.isCheckoutOpen.set(true);
   }
 

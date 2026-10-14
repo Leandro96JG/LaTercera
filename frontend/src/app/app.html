@@ -5,8 +5,10 @@
   </div>
 </div>
 
-<!-- Contenedor Principal Bento Grid Flotante -->
-<div class="relative z-10 max-w-[1440px] mx-auto bg-white/60 backdrop-blur-3xl rounded-[32px] sm:rounded-[42px] border border-white/80 shadow-glass p-4 sm:p-6 lg:p-10 transition-all">
+<!-- Contenedor Principal Bento Grid Flotante (sin backdrop-blur directo para permitir centrado de modales fixed) -->
+<div class="relative z-10 max-w-[1440px] mx-auto p-4 sm:p-6 lg:p-10 transition-all">
+  <!-- Capa de fondo vítreo aislada -->
+  <div class="absolute inset-0 bg-white/60 backdrop-blur-3xl rounded-[32px] sm:rounded-[42px] border border-white/80 shadow-glass -z-10 pointer-events-none" aria-hidden="true"></div>
 
   <!-- Header Bento Standalone -->
   <app-header
@@ -25,7 +27,7 @@
 
       <!-- Barra de Filtros y Álbumes -->
       <section class="space-y-4 pt-4">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
             <h2 class="font-display font-extrabold text-2xl text-zinc-900 tracking-tight">
               Álbumes Recientes
@@ -35,97 +37,98 @@
             </p>
           </div>
 
-          <!-- Filtro de Categorías -->
-          <div class="flex items-center gap-2 overflow-x-auto no-scrollbar">
-            <button
-              (click)="setCategory('all')"
-              [class]="selectedCategory() === 'all'
-                ? 'px-4 py-2 rounded-full bg-zinc-950 text-white font-semibold text-xs shadow-sm transition'
-                : 'px-4 py-2 rounded-full bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.05] transition'"
-            >
-              Todos ({{ albums().length }})
-            </button>
-            <button
-              (click)="setCategory('futbol')"
-              [class]="selectedCategory() === 'futbol'
-                ? 'px-4 py-2 rounded-full bg-zinc-950 text-white font-semibold text-xs shadow-sm transition'
-                : 'px-4 py-2 rounded-full bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.05] transition'"
-            >
-              ⚽ Fútbol
-            </button>
-            <button
-              (click)="setCategory('hockey')"
-              [class]="selectedCategory() === 'hockey'
-                ? 'px-4 py-2 rounded-full bg-zinc-950 text-white font-semibold text-xs shadow-sm transition'
-                : 'px-4 py-2 rounded-full bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.05] transition'"
-            >
-              🏑 Hockey
-            </button>
-            <button
-              (click)="setCategory('basquet')"
-              [class]="selectedCategory() === 'basquet'
-                ? 'px-4 py-2 rounded-full bg-zinc-950 text-white font-semibold text-xs shadow-sm transition'
-                : 'px-4 py-2 rounded-full bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.05] transition'"
-            >
-              🏀 Básquet
-            </button>
-            <button
-              (click)="setCategory('sociales')"
-              [class]="selectedCategory() === 'sociales'
-                ? 'px-4 py-2 rounded-full bg-zinc-950 text-white font-semibold text-xs shadow-sm transition'
-                : 'px-4 py-2 rounded-full bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.05] transition'"
-            >
-              🎉 Cumpleaños & 15s
-            </button>
+          <!-- Buscador Bento y Filtro de Categorías -->
+          <div class="flex flex-col sm:flex-row sm:items-center gap-3 w-full lg:w-auto">
+            <!-- Buscador por Texto Libre -->
+            <div class="relative w-full sm:w-64">
+              <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 text-xs pointer-events-none">🔍</span>
+              <input
+                type="text"
+                [value]="searchQuery()"
+                (input)="onSearchInput($event)"
+                placeholder="Buscar equipo, estadio, fecha..."
+                class="w-full pl-9 pr-8 py-2 rounded-2xl bg-white border border-black/[0.06] text-xs font-medium text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-950 shadow-xs transition"
+              />
+              @if (searchQuery()) {
+                <button
+                  type="button"
+                  (click)="clearSearch()"
+                  class="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 text-xs font-bold transition"
+                  title="Limpiar búsqueda"
+                >
+                  ✕
+                </button>
+              }
+            </div>
+
+            <!-- Filtro de Categorías con Scroll Elástico y Zero-Wrap -->
+            <div class="w-full sm:w-auto overflow-x-auto no-scrollbar scroll-smooth -mx-1 px-1 sm:mx-0 sm:px-0 pb-1 touch-pan-x">
+              <div class="flex items-center gap-2 min-w-max">
+                <button
+                  type="button"
+                  (click)="setCategory('all')"
+                  [class]="selectedCategory() === 'all'
+                    ? 'px-4 py-2 rounded-full bg-zinc-950 text-white font-semibold text-xs shadow-sm transition-all duration-200 whitespace-nowrap shrink-0 active:scale-95'
+                    : 'px-4 py-2 rounded-full bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.05] transition-all duration-200 whitespace-nowrap shrink-0 active:scale-95'"
+                >
+                  Todos ({{ albums().length }})
+                </button>
+                <button
+                  type="button"
+                  (click)="setCategory('futbol')"
+                  [class]="selectedCategory() === 'futbol'
+                    ? 'px-4 py-2 rounded-full bg-zinc-950 text-white font-semibold text-xs shadow-sm transition-all duration-200 whitespace-nowrap shrink-0 active:scale-95'
+                    : 'px-4 py-2 rounded-full bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.05] transition-all duration-200 whitespace-nowrap shrink-0 active:scale-95'"
+                >
+                  ⚽ Fútbol
+                </button>
+                <button
+                  type="button"
+                  (click)="setCategory('hockey')"
+                  [class]="selectedCategory() === 'hockey'
+                    ? 'px-4 py-2 rounded-full bg-zinc-950 text-white font-semibold text-xs shadow-sm transition-all duration-200 whitespace-nowrap shrink-0 active:scale-95'
+                    : 'px-4 py-2 rounded-full bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.05] transition-all duration-200 whitespace-nowrap shrink-0 active:scale-95'"
+                >
+                  🏑 Hockey
+                </button>
+                <button
+                  type="button"
+                  (click)="setCategory('basquet')"
+                  [class]="selectedCategory() === 'basquet'
+                    ? 'px-4 py-2 rounded-full bg-zinc-950 text-white font-semibold text-xs shadow-sm transition-all duration-200 whitespace-nowrap shrink-0 active:scale-95'
+                    : 'px-4 py-2 rounded-full bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.05] transition-all duration-200 whitespace-nowrap shrink-0 active:scale-95'"
+                >
+                  🏀 Básquet
+                </button>
+                <button
+                  type="button"
+                  (click)="setCategory('sociales')"
+                  [class]="selectedCategory() === 'sociales'
+                    ? 'px-4 py-2 rounded-full bg-zinc-950 text-white font-semibold text-xs shadow-sm transition-all duration-200 whitespace-nowrap shrink-0 active:scale-95'
+                    : 'px-4 py-2 rounded-full bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.05] transition-all duration-200 whitespace-nowrap shrink-0 active:scale-95'"
+                >
+                  🎉 Cumpleaños & 15s
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- Grilla Bento de Álbumes -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <!-- Grilla Bento de Portafolios / Carpetas 3D con Entreabierto y Aceleración GPU -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           @for (album of paginatedAlbums(); track album.id) {
-            <div
-              (click)="openAlbum(album)"
-              class="group bg-white rounded-[30px] p-5 border border-black/[0.05] shadow-bento hover:shadow-bento-hover transition-all duration-300 cursor-pointer flex flex-col justify-between"
-            >
-              <div>
-                <div class="relative w-full h-56 rounded-[22px] overflow-hidden mb-4 bg-zinc-100">
-                  <img
-                    [src]="album.coverUrl"
-                    [alt]="album.title"
-                    class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  >
-                  <!-- Badge de Disciplina -->
-                  <div class="absolute top-3 left-3 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md text-white text-[11px] font-bold">
-                    {{ album.badge }}
-                  </div>
-                  <!-- Conteo de fotos -->
-                  <div class="absolute bottom-3 right-3 px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-md text-zinc-900 text-[11px] font-bold shadow-sm">
-                    {{ album.photosCount }} fotos
-                  </div>
-                </div>
-
-                <div class="flex items-center gap-2 text-xs text-zinc-400 mb-1">
-                  <span>{{ album.date }}</span>
-                  <span>•</span>
-                  <span>{{ album.subtitle }}</span>
-                </div>
-                <h3 class="font-display font-bold text-lg text-zinc-900 group-hover:text-zinc-600 transition leading-snug">
-                  {{ album.title }}
-                </h3>
-              </div>
-
-              <!-- Footer de la Tarjeta Bento -->
-              <div class="flex items-center justify-between pt-4 mt-3 border-t border-black/[0.04]">
-                <div>
-                  <span class="text-[10px] text-zinc-400 block font-medium">Desde</span>
-                  <span class="font-display font-extrabold text-sm text-zinc-900">
-                    ${{ album.unitPrice.toLocaleString('es-AR') }} ARS
-                  </span>
-                </div>
-                <span class="px-3.5 py-1.5 rounded-xl bg-zinc-100 group-hover:bg-zinc-950 group-hover:text-white text-zinc-800 text-xs font-bold transition">
-                  Ver Fotos →
-                </span>
-              </div>
+            <app-album-card-3d
+              [album]="album"
+              [isSelected]="currentAlbum()?.id === album.id"
+              [isUnlocked]="albumAccessStore.isUnlocked(album.id)"
+              (selectAlbum)="openAlbum($event)"
+              (openPinModal)="openPinModal($event)"
+            />
+          } @empty {
+            <div class="col-span-full py-16 text-center bg-white rounded-3xl border border-black/[0.05] p-8">
+              <span class="text-4xl block mb-3">📁</span>
+              <h3 class="text-lg font-bold text-zinc-800">No se encontraron carpetas</h3>
+              <p class="text-xs text-zinc-500 mt-1">Prueba con otra disciplina o término de búsqueda.</p>
             </div>
           }
         </div>
@@ -196,92 +199,89 @@
       </div>
 
       <!-- Hero del Álbum Activo -->
-      <div class="bg-white rounded-[32px] p-6 sm:p-8 border border-black/[0.05] shadow-bento flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div
+        [style.view-transition-name]="'album-cover-' + album.id"
+        class="bg-white rounded-[32px] p-6 sm:p-8 border border-black/[0.05] shadow-bento flex flex-col md:flex-row md:items-center justify-between gap-6"
+      >
         <div>
-          <div class="flex items-center gap-2 mb-2">
+          <div class="flex flex-wrap items-center gap-2 mb-2">
             <span class="px-3 py-1 rounded-full bg-zinc-950 text-white text-[11px] font-bold uppercase tracking-wider">
               {{ album.badge }}
             </span>
             <span class="text-xs text-zinc-400 font-medium">{{ album.date }}</span>
+
+            @if (album.isFreeDownload) {
+              <span class="px-3 py-1 rounded-full bg-amber-400 text-zinc-950 text-[11px] font-extrabold flex items-center gap-1 shadow-sm animate-pulse">
+                <span>🎁</span> <span>Cortesía Gratuita • Máxima Calidad</span>
+              </span>
+            }
+
+            @if (album.isPrivate) {
+              <span class="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 text-[11px] font-bold flex items-center gap-1">
+                <span>🔓</span> <span>Desbloqueado con PIN</span>
+              </span>
+            }
           </div>
           <h2 class="font-display font-extrabold text-2xl sm:text-3xl text-zinc-900 tracking-tight">
             {{ album.title }}
           </h2>
           <p class="text-xs sm:text-sm text-zinc-500 mt-1 max-w-xl">
-            Toca las fotos para ampliarlas en el visor cinemático o márcalas para descargarlas en calidad original 4K sin marcas de agua.
+            @if (album.isFreeDownload) {
+              Álbum liberado de cortesía en resolución 4K original por Jenifer Espeche. Puedes descargar el álbum completo en ZIP gratis o elegir fotos individuales.
+            } @else {
+              Toca las fotos para ampliarlas en el visor cinemático o márcalas para descargarlas en calidad original 4K sin marcas de agua.
+            }
           </p>
         </div>
 
-        <div class="flex items-center gap-3">
-          <button
-            (click)="buyFullAlbum()"
-            class="px-5 py-3 rounded-2xl bg-zinc-950 hover:bg-zinc-800 text-white font-bold text-xs shadow-md transition active:scale-95 flex items-center gap-2"
-          >
-            <span>Comprar Álbum Completo (${{ album.fullAlbumPrice.toLocaleString('es-AR') }})</span>
-            <span>⚡</span>
-          </button>
+        <div class="flex flex-wrap items-center gap-3">
+          @if (album.isFreeDownload) {
+            <button
+              (click)="downloadCourtesyZip(album)"
+              class="px-5 py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-zinc-950 font-extrabold text-xs shadow-md shadow-amber-500/20 transition active:scale-95 flex items-center gap-2"
+              title="Descargar todas las fotos originales en un archivo ZIP sin costo"
+            >
+              <span>🎁 Descargar Álbum Completo Gratis (Original HD ZIP)</span>
+              <span>⚡</span>
+            </button>
+          } @else {
+            <button
+              (click)="buyFullAlbum()"
+              class="px-5 py-3 rounded-2xl bg-zinc-950 hover:bg-zinc-800 text-white font-bold text-xs shadow-md transition active:scale-95 flex items-center gap-2"
+            >
+              <span>Comprar Álbum Completo (${{ album.fullAlbumPrice.toLocaleString('es-AR') }})</span>
+              <span>⚡</span>
+            </button>
+          }
         </div>
       </div>
 
-      <!-- Grilla Bento de Fotos Protegidas -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+      <!-- Grilla Polaroid 3D de Fotos Protegidas con Carga Progresiva @defer (on viewport) -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 sm:gap-6 py-2">
         @for (photo of currentPhotos(); track photo.id; let idx = $index) {
-          <div
-            class="group bg-white rounded-[26px] p-3 border border-black/[0.05] shadow-bento hover:shadow-bento-hover transition-all duration-300 relative flex flex-col justify-between"
-            [class.ring-2]="cartStore.isPhotoSelected(photo.id)"
-            [class.ring-zinc-950]="cartStore.isPhotoSelected(photo.id)"
-          >
-            <!-- Imagen con Capa Anti-Descarga -->
-            <div
-              (click)="openLightbox(photo, idx)"
-              class="relative w-full h-64 rounded-[20px] overflow-hidden bg-zinc-100 cursor-pointer"
-            >
-              <img
-                [src]="photo.previewUrl"
-                [alt]="photo.title"
-                class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 prevent-save"
-                (contextmenu)="$event.preventDefault()"
-                draggable="false"
-              >
-
-              <!-- Marca de Agua Diagonal Repetida en la Grilla -->
-              <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40 group-hover:opacity-60 transition-opacity">
-                <span class="font-display font-extrabold text-white text-xs tracking-widest bg-black/40 px-3 py-1 rounded-full backdrop-blur-sm -rotate-12">
-                  LA TERCERA • MUESTRA
-                </span>
-              </div>
-
-              <!-- Badge de Muestra HD -->
-              @if (photo.isSampleHD) {
-                <div class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-full bg-emerald-500 text-zinc-950 font-bold text-[9px] shadow-sm">
-                  ✦ Muestra HD
+          @defer (on viewport) {
+            <app-photo-card-polaroid
+              [photo]="photo"
+              [index]="idx"
+              [unitPrice]="album.unitPrice"
+              [isFreeDownload]="album.isFreeDownload || false"
+              [isSelected]="cartStore.isPhotoSelected(photo.id)"
+              (toggleSelect)="cartStore.togglePhoto($event)"
+              (openViewer)="openLightbox($event.photo, $event.index)"
+            />
+          } @placeholder {
+            <!-- Skeleton Shimmer Placeholder con proporción idéntica a la tarjeta Polaroid -->
+            <div class="bg-white rounded-[26px] p-3 pb-4 border border-black/[0.06] shadow-sm animate-pulse flex flex-col justify-between">
+              <div class="w-full aspect-[4/3] rounded-[20px] bg-gradient-to-r from-zinc-200 via-zinc-100 to-zinc-200 animate-shimmer-sweep"></div>
+              <div class="flex items-center justify-between pt-3 px-1 mt-1">
+                <div class="space-y-1">
+                  <div class="h-3 w-16 bg-zinc-200 rounded-md"></div>
+                  <div class="h-2.5 w-24 bg-zinc-100 rounded-md"></div>
                 </div>
-              }
-            </div>
-
-            <!-- Acciones de la Foto -->
-            <div class="flex items-center justify-between pt-3 px-1">
-              <div>
-                <span class="text-[11px] font-bold text-zinc-800 block">Foto #{{ idx + 1 }}</span>
-                <span class="text-[10px] text-zinc-400">4K Original • ${{ album.unitPrice.toLocaleString('es-AR') }} ARS</span>
+                <div class="h-8 w-20 bg-zinc-200 rounded-xl"></div>
               </div>
-
-              <!-- Botón Toggle Selección -->
-              <button
-                (click)="cartStore.togglePhoto(photo)"
-                [class]="cartStore.isPhotoSelected(photo.id)
-                  ? 'px-3 py-1.5 rounded-xl bg-zinc-950 text-white font-bold text-xs flex items-center gap-1 shadow-sm transition active:scale-90 animate-check-pop'
-                  : 'px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 font-bold text-xs flex items-center gap-1 transition active:scale-90'"
-                aria-label="Seleccionar foto"
-              >
-                @if (cartStore.isPhotoSelected(photo.id)) {
-                  <span>✓ Elegida</span>
-                } @else {
-                  <span>+ Elegir</span>
-                }
-              </button>
             </div>
-          </div>
+          }
         }
       </div>
     </div>
@@ -352,6 +352,7 @@
   [currentIndex]="lightboxIndex()"
   [totalCount]="currentPhotos().length"
   [isSelected]="isCurrentLightboxPhotoSelected()"
+  [isFreeDownload]="currentAlbum()?.isFreeDownload || false"
   (close)="closeLightbox()"
   (next)="nextLightboxPhoto()"
   (prev)="prevLightboxPhoto()"
@@ -363,3 +364,14 @@
   [isOpen]="isCheckoutOpen()"
   (close)="closeCheckout()"
 />
+
+<!-- Modal de Desbloqueo de Álbum Privado con PIN -->
+@if (selectedPrivateAlbum(); as privAlbum) {
+  <app-pin-unlock-modal
+    [album]="privAlbum"
+    [isOpen]="isPinModalOpen()"
+    (closed)="closePinModal()"
+    (unlocked)="onAlbumUnlocked($event)"
+  />
+}
+

@@ -98,49 +98,87 @@
     </div>
   </div>
 
-  <!-- Selector de Pestañas Bento -->
-  <div class="flex items-center gap-2 border-b border-black/[0.05] pb-2 overflow-x-auto no-scrollbar">
-    <button
-      (click)="activeTab.set('albums')"
-      [class]="activeTab() === 'albums'
-        ? 'px-4 py-2.5 rounded-2xl bg-zinc-950 text-white font-bold text-xs shadow-sm transition flex items-center gap-1.5'
-        : 'px-4 py-2.5 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.04] transition flex items-center gap-1.5'"
-    >
-      <span>📁</span>
-      <span>Álbumes & Precios</span>
-    </button>
-
-    <button
-      (click)="activeTab.set('drive')"
-      [class]="activeTab() === 'drive'
-        ? 'px-4 py-2.5 rounded-2xl bg-zinc-950 text-white font-bold text-xs shadow-sm transition flex items-center gap-1.5'
-        : 'px-4 py-2.5 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.04] transition flex items-center gap-1.5'"
-    >
-      <span>☁️</span>
-      <span>Importar de Google Drive</span>
-    </button>
-
-    <button
-      (click)="activeTab.set('upload')"
-      [class]="activeTab() === 'upload'
-        ? 'px-4 py-2.5 rounded-2xl bg-zinc-950 text-white font-bold text-xs shadow-sm transition flex items-center gap-1.5'
-        : 'px-4 py-2.5 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.04] transition flex items-center gap-1.5'"
-    >
-      <span>📤</span>
-      <span>Subida Masiva de Fotos</span>
-    </button>
-
-    @if (adminAuthStore.userRole() === 'admin') {
+  <!-- Selector de Pestañas Bento: Scroll Horizontal Elástico y Zero-Wrap -->
+  <div class="w-full overflow-x-auto no-scrollbar scroll-smooth -mx-1 px-1 sm:mx-0 sm:px-0 pb-2 border-b border-black/[0.05] touch-pan-x">
+    <div class="flex items-center gap-2 min-w-max">
       <button
-        (click)="activeTab.set('photographers')"
-        [class]="activeTab() === 'photographers'
-          ? 'px-4 py-2.5 rounded-2xl bg-zinc-950 text-white font-bold text-xs shadow-sm transition flex items-center gap-1.5'
-          : 'px-4 py-2.5 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.04] transition flex items-center gap-1.5'"
+        type="button"
+        (click)="activeTab.set('albums')"
+        [class]="activeTab() === 'albums'
+          ? 'px-4 py-2.5 rounded-2xl bg-zinc-950 text-white font-bold text-xs shadow-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap shrink-0 active:scale-95'
+          : 'px-4 py-2.5 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.04] transition-all duration-200 flex items-center gap-2 whitespace-nowrap shrink-0 active:scale-95'"
       >
-        <span>👥</span>
-        <span>Registro de Fotógrafos</span>
+        <span class="text-sm">📁</span>
+        <span class="tracking-tight">Álbumes & Precios</span>
       </button>
-    }
+
+      <button
+        type="button"
+        (click)="activeTab.set('orders'); loadOrders()"
+        [class]="activeTab() === 'orders'
+          ? 'px-4 py-2.5 rounded-2xl bg-zinc-950 text-white font-bold text-xs shadow-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap shrink-0 active:scale-95'
+          : 'px-4 py-2.5 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.04] transition-all duration-200 flex items-center gap-2 whitespace-nowrap shrink-0 active:scale-95'"
+      >
+        <span class="text-sm">💳</span>
+        <span class="tracking-tight">Ventas & Entregas</span>
+        @if (orders().length > 0) {
+          <span class="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-400 text-zinc-950">
+            {{ orders().length }}
+          </span>
+        }
+      </button>
+
+      <button
+        type="button"
+        (click)="activeTab.set('trash'); loadTrashAlbums()"
+        [class]="activeTab() === 'trash'
+          ? 'px-4 py-2.5 rounded-2xl bg-zinc-950 text-white font-bold text-xs shadow-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap shrink-0 active:scale-95'
+          : 'px-4 py-2.5 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.04] transition-all duration-200 flex items-center gap-2 whitespace-nowrap shrink-0 active:scale-95'"
+      >
+        <span class="text-sm">🗑️</span>
+        <span class="tracking-tight">Papelera (30 días)</span>
+        @if (trashAlbums().length > 0) {
+          <span class="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white">
+            {{ trashAlbums().length }}
+          </span>
+        }
+      </button>
+
+      <button
+        type="button"
+        (click)="activeTab.set('drive')"
+        [class]="activeTab() === 'drive'
+          ? 'px-4 py-2.5 rounded-2xl bg-zinc-950 text-white font-bold text-xs shadow-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap shrink-0 active:scale-95'
+          : 'px-4 py-2.5 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.04] transition-all duration-200 flex items-center gap-2 whitespace-nowrap shrink-0 active:scale-95'"
+      >
+        <span class="text-sm">☁️</span>
+        <span class="tracking-tight">Importar de Google Drive</span>
+      </button>
+
+      <button
+        type="button"
+        (click)="activeTab.set('upload')"
+        [class]="activeTab() === 'upload'
+          ? 'px-4 py-2.5 rounded-2xl bg-zinc-950 text-white font-bold text-xs shadow-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap shrink-0 active:scale-95'
+          : 'px-4 py-2.5 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.04] transition-all duration-200 flex items-center gap-2 whitespace-nowrap shrink-0 active:scale-95'"
+      >
+        <span class="text-sm">📤</span>
+        <span class="tracking-tight">Subida Masiva de Fotos</span>
+      </button>
+
+      @if (adminAuthStore.userRole() === 'admin') {
+        <button
+          type="button"
+          (click)="activeTab.set('photographers')"
+          [class]="activeTab() === 'photographers'
+            ? 'px-4 py-2.5 rounded-2xl bg-zinc-950 text-white font-bold text-xs shadow-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap shrink-0 active:scale-95'
+            : 'px-4 py-2.5 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.04] transition-all duration-200 flex items-center gap-2 whitespace-nowrap shrink-0 active:scale-95'"
+        >
+          <span class="text-sm">👥</span>
+          <span class="tracking-tight">Registro de Fotógrafos</span>
+        </button>
+      }
+    </div>
   </div>
 
   <!-- PESTAÑA 0: GESTIÓN DE ÁLBUMES & EDICIÓN DE PRECIOS -->
@@ -305,40 +343,144 @@
 
               <!-- Acciones Rápidas del Álbum -->
               <div class="flex items-center justify-between pt-1 text-xs border-t border-black/[0.04]">
-                <div class="flex items-center gap-2">
-                  <button
-                    type="button"
-                    (click)="navigateToUploadWithAlbum(album.id)"
-                    class="px-3 py-1.5 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-700 font-bold text-[11px] transition flex items-center gap-1 active:scale-95"
-                  >
-                    <span>📤 Subir Fotos</span>
-                  </button>
+                <div class="flex flex-wrap items-center gap-1.5 pt-2 border-t border-black/[0.04] justify-between">
+                  <!-- Acciones Principales -->
+                  <div class="flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      (click)="openPhotosModal(album)"
+                      class="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-extrabold text-[11px] shadow-sm transition flex items-center gap-1 active:scale-95"
+                      title="Gestionar fotos, portadas y muestras HD de este álbum"
+                    >
+                      <span>🖼️ Ver / Editar Fotos ({{ album.photosCount }})</span>
+                    </button>
 
-                  <button
-                    type="button"
-                    (click)="navigateToDriveWithAlbum(album.id)"
-                    class="px-3 py-1.5 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-700 font-bold text-[11px] transition flex items-center gap-1 active:scale-95"
-                  >
-                    <span>☁️ Drive</span>
-                  </button>
+                    <button
+                      type="button"
+                      (click)="navigateToUploadWithAlbum(album.id)"
+                      class="px-2.5 py-1.5 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-700 font-bold text-[11px] transition flex items-center gap-1 active:scale-95"
+                    >
+                      <span>📤 Fotos</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      (click)="navigateToDriveWithAlbum(album.id)"
+                      class="px-2.5 py-1.5 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-700 font-bold text-[11px] transition flex items-center gap-1 active:scale-95"
+                    >
+                      <span>☁️ Drive</span>
+                    </button>
+
+                    <!-- Toggle Cortesía / Gratuito HD -->
+                    <button
+                      type="button"
+                      (click)="toggleCourtesyDownload(album)"
+                      [disabled]="isTogglingCourtesyId() === album.id"
+                      [class]="album.isFreeDownload
+                        ? 'px-2.5 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 text-[11px] font-bold transition flex items-center gap-1 active:scale-95'
+                        : 'px-2.5 py-1.5 rounded-xl bg-white hover:bg-zinc-100 text-zinc-600 border border-zinc-200 text-[11px] font-medium transition flex items-center gap-1 active:scale-95'"
+                      title="Habilitar descarga gratuita de cortesía en máxima calidad para este evento"
+                    >
+                      @if (isTogglingCourtesyId() === album.id) {
+                        <span class="w-2.5 h-2.5 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
+                      } @else {
+                        <span>{{ album.isFreeDownload ? '🎁 Gratis HD' : '🎁 Cortesía' }}</span>
+                      }
+                    </button>
+
+                    <!-- Toggle Privacidad PIN -->
+                    <button
+                      type="button"
+                      (click)="startEditPrivacy(album)"
+                      [class]="album.isPrivate
+                        ? 'px-2.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-amber-400 border border-zinc-800 text-[11px] font-bold transition flex items-center gap-1 active:scale-95'
+                        : 'px-2.5 py-1.5 rounded-xl bg-white hover:bg-zinc-100 text-zinc-600 border border-zinc-200 text-[11px] font-medium transition flex items-center gap-1 active:scale-95'"
+                      title="Configurar código PIN para este álbum"
+                    >
+                      <span>{{ album.isPrivate ? '🔒 PIN' : '🔓 Público' }}</span>
+                    </button>
+                  </div>
+
+                  <!-- Visibilidad y Papelera -->
+                  <div class="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      (click)="togglePublishStatus(album)"
+                      [disabled]="isTogglingPublishId() === album.id"
+                      [class]="album.isPublished !== false
+                        ? 'px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold transition flex items-center gap-1 active:scale-95 disabled:opacity-50'
+                        : 'px-2.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border border-zinc-200 text-[11px] font-bold transition flex items-center gap-1 active:scale-95 disabled:opacity-50'"
+                    >
+                      @if (isTogglingPublishId() === album.id) {
+                        <span class="w-2.5 h-2.5 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
+                      } @else {
+                        <span>{{ album.isPublished !== false ? '🟢 Visible' : '⚪ Oculto' }}</span>
+                      }
+                    </button>
+
+                    <button
+                      type="button"
+                      (click)="moveToTrash(album)"
+                      [disabled]="isMovingToTrashId() === album.id"
+                      class="px-2 py-1.5 rounded-xl bg-white hover:bg-rose-50 text-rose-600 hover:text-rose-700 border border-zinc-200 hover:border-rose-200 text-[11px] font-bold transition flex items-center gap-1 active:scale-95"
+                      title="Mover a papelera de reciclaje (30 días de retención)"
+                    >
+                      @if (isMovingToTrashId() === album.id) {
+                        <span class="w-2.5 h-2.5 border-2 border-rose-600 border-t-transparent rounded-full animate-spin"></span>
+                      } @else {
+                        <span>🗑️</span>
+                      }
+                    </button>
+                  </div>
                 </div>
 
-                <!-- Botón de Estado / Visibilidad con Spinner y Feedback -->
-                <button
-                  type="button"
-                  (click)="togglePublishStatus(album)"
-                  [disabled]="isTogglingPublishId() === album.id"
-                  [class]="album.isPublished !== false
-                    ? 'px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold transition flex items-center gap-1 active:scale-95 disabled:opacity-50'
-                    : 'px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border border-zinc-200 text-[11px] font-bold transition flex items-center gap-1 active:scale-95 disabled:opacity-50'"
-                >
-                  @if (isTogglingPublishId() === album.id) {
-                    <span class="w-2.5 h-2.5 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
-                    <span>Actualizando...</span>
-                  } @else {
-                    <span>{{ album.isPublished !== false ? '🟢 Público (Ocultar)' : '⚪ Oculto (Publicar)' }}</span>
-                  }
-                </button>
+                <!-- Panel Flotante Inline de Edición de Privacidad PIN -->
+                @if (editingPrivacyAlbumId() === album.id) {
+                  <div class="mt-3 p-3.5 rounded-2xl bg-zinc-950 text-white border border-zinc-800 space-y-2.5 animate-fadeIn">
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                        <span>🔒</span> <span>Configurar Código PIN de Acceso</span>
+                      </span>
+                      <button
+                        type="button"
+                        (click)="cancelEditPrivacy()"
+                        class="text-xs text-zinc-400 hover:text-white"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <p class="text-[10px] text-zinc-400">
+                      Solo los usuarios que ingresen este código podrán ver y adquirir las fotos de este álbum.
+                    </p>
+                    <div class="flex gap-2">
+                      <input
+                        type="text"
+                        [value]="privacyAccessCodeInput()"
+                        (input)="privacyAccessCodeInput.set($any($event.target).value)"
+                        placeholder="Ej: ANDINO2026"
+                        class="flex-1 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-700 text-white text-xs font-mono font-bold tracking-wider uppercase focus:outline-none focus:border-amber-400"
+                      />
+                      <button
+                        type="button"
+                        (click)="savePrivacy(album, true)"
+                        [disabled]="isUpdatingPrivacyId() === album.id"
+                        class="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold text-xs transition active:scale-95 disabled:opacity-50"
+                      >
+                        Proteger
+                      </button>
+                      @if (album.isPrivate) {
+                        <button
+                          type="button"
+                          (click)="savePrivacy(album, false)"
+                          [disabled]="isUpdatingPrivacyId() === album.id"
+                          class="px-2.5 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold text-xs transition"
+                        >
+                          Hacer Público
+                        </button>
+                      }
+                    </div>
+                  </div>
+                }
               </div>
             </div>
           }
@@ -388,6 +530,473 @@
             }
           </div>
         }
+      }
+    </div>
+  }
+
+  <!-- PESTAÑA VENTAS & ENTREGAS (MERCADO PAGO & LINKS 72H) -->
+  @else if (activeTab() === 'orders') {
+    <div class="space-y-6 animate-fadeIn">
+      <!-- Cabecera de la sección Ventas & Entregas -->
+      <div class="bg-white rounded-[32px] p-6 sm:p-8 border border-black/[0.05] shadow-bento flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px] uppercase tracking-wider">
+              💳 Ventas & Cobros
+            </span>
+            <span class="text-xs text-zinc-400 font-mono">• Mercado Pago Live</span>
+          </div>
+          <h3 class="font-display font-extrabold text-xl sm:text-2xl text-zinc-900 tracking-tight">
+            Ventas, Cobros & Entregas de Fotos
+          </h3>
+          <p class="text-xs text-zinc-500 mt-0.5">
+            Supervisa tus cobros en pesos argentinos, consulta los datos de los compradores y renueva los links de descarga de 72 horas en 1 clic.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          (click)="loadOrders()"
+          [disabled]="isLoadingOrders()"
+          class="px-5 py-3 rounded-2xl bg-zinc-950 hover:bg-zinc-800 text-white font-display font-extrabold text-xs shadow-md transition active:scale-95 disabled:opacity-50 flex items-center gap-2 self-start sm:self-auto"
+        >
+          @if (isLoadingOrders()) {
+            <span class="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+            <span>Sincronizando...</span>
+          } @else {
+            <span>🔄 Sincronizar Ventas</span>
+          }
+        </button>
+      </div>
+
+      <!-- Resumen Bento de Métricas de Ventas -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="bg-white rounded-[24px] p-5 border border-black/[0.05] shadow-bento flex flex-col justify-between">
+          <span class="text-zinc-500 text-xs font-semibold">Total de Transacciones</span>
+          <div class="my-2">
+            <span class="font-display font-black text-2xl sm:text-3xl text-zinc-900">{{ orders().length }}</span>
+            <span class="text-xs text-zinc-400 block">registradas en el sistema</span>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-[24px] p-5 border border-black/[0.05] shadow-bento flex flex-col justify-between">
+          <span class="text-zinc-500 text-xs font-semibold">Órdenes Acreditadas</span>
+          <div class="my-2">
+            <span class="font-display font-black text-2xl sm:text-3xl text-emerald-600">{{ paidOrdersCount() }}</span>
+            <span class="text-xs text-zinc-400 block">con pago completado</span>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-[24px] p-5 border border-black/[0.05] shadow-bento flex flex-col justify-between">
+          <span class="text-zinc-500 text-xs font-semibold">Total Recaudado (ARS)</span>
+          <div class="my-2">
+            <span class="font-display font-black text-2xl sm:text-3xl text-zinc-900">${{ totalPaidRevenue().toLocaleString('es-AR') }}</span>
+            <span class="text-xs text-zinc-400 block">pesos argentinos cobrados</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Barra de Filtros y Búsqueda -->
+      <div class="bg-white rounded-[28px] p-4 sm:p-5 border border-black/[0.05] shadow-bento flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+        <!-- Buscador Reactivo -->
+        <div class="relative flex-1">
+          <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">🔍</span>
+          <input
+            type="text"
+            [value]="orderSearchQuery()"
+            (input)="orderSearchQuery.set($any($event.target).value)"
+            placeholder="Buscar por ID, email, nombre, álbum o teléfono..."
+            class="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200/80 text-xs text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-white transition"
+          />
+        </div>
+
+        <!-- Filtros por Estado -->
+        <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 md:pb-0">
+          <button
+            type="button"
+            (click)="orderStatusFilter.set('ALL')"
+            [class]="orderStatusFilter() === 'ALL'
+              ? 'px-3 py-1.5 rounded-xl bg-zinc-950 text-white font-bold text-xs whitespace-nowrap'
+              : 'px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-600 font-medium text-xs whitespace-nowrap transition'"
+          >
+            Todas ({{ orders().length }})
+          </button>
+
+          <button
+            type="button"
+            (click)="orderStatusFilter.set('PAID')"
+            [class]="orderStatusFilter() === 'PAID'
+              ? 'px-3 py-1.5 rounded-xl bg-emerald-600 text-white font-bold text-xs whitespace-nowrap'
+              : 'px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-medium text-xs whitespace-nowrap transition'"
+          >
+            ✅ Pagadas ({{ paidOrdersCount() }})
+          </button>
+
+          <button
+            type="button"
+            (click)="orderStatusFilter.set('PENDING')"
+            [class]="orderStatusFilter() === 'PENDING'
+              ? 'px-3 py-1.5 rounded-xl bg-amber-500 text-white font-bold text-xs whitespace-nowrap'
+              : 'px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 font-medium text-xs whitespace-nowrap transition'"
+          >
+            ⏳ Pendientes
+          </button>
+
+          <button
+            type="button"
+            (click)="orderStatusFilter.set('FRAUD_ALERT_PRICE_MISMATCH')"
+            [class]="orderStatusFilter() === 'FRAUD_ALERT_PRICE_MISMATCH'
+              ? 'px-3 py-1.5 rounded-xl bg-rose-600 text-white font-bold text-xs whitespace-nowrap'
+              : 'px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 font-medium text-xs whitespace-nowrap transition'"
+          >
+            ⚠️ Alertas
+          </button>
+        </div>
+      </div>
+
+      <!-- Feedback de Renovación de Enlace -->
+      @if (renewFeedback(); as fb) {
+        <div
+          [class]="fb.success
+            ? 'p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center justify-between gap-3 animate-fadeIn'
+            : 'p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between gap-3 animate-fadeIn'"
+        >
+          <div class="flex items-center gap-2">
+            <span>{{ fb.success ? '✅' : '⚠️' }}</span>
+            <span class="font-medium">{{ fb.message }}</span>
+          </div>
+          <button
+            type="button"
+            (click)="renewFeedback.set(null)"
+            class="text-xs text-zinc-400 hover:text-zinc-600 font-bold"
+          >
+            ✕
+          </button>
+        </div>
+      }
+
+      <!-- Lista / Tarjetas Bento de Órdenes -->
+      @if (isLoadingOrders() && orders().length === 0) {
+        <div class="p-16 text-center text-zinc-400 text-xs bg-white rounded-[32px] border border-black/[0.05] shadow-bento">
+          <span class="inline-block w-8 h-8 border-2 border-zinc-900 border-t-transparent rounded-full animate-spin mb-3"></span>
+          <p class="font-medium text-zinc-600">Cargando ventas y órdenes registradas...</p>
+        </div>
+      } @else if (filteredOrders().length === 0) {
+        <div class="p-16 text-center text-zinc-400 text-xs bg-white rounded-[32px] border border-black/[0.05] shadow-bento">
+          <span class="text-4xl mb-3 block">💳</span>
+          <h4 class="font-display font-bold text-base text-zinc-800 mb-1">No se encontraron ventas</h4>
+          <p class="text-zinc-500 max-w-sm mx-auto">
+            @if (orderSearchQuery() || orderStatusFilter() !== 'ALL') {
+              No hay órdenes que coincidan con los filtros aplicados.
+            } @else {
+              Aún no hay compras registradas en la plataforma.
+            }
+          </p>
+          @if (orderSearchQuery() || orderStatusFilter() !== 'ALL') {
+            <button
+              type="button"
+              (click)="orderSearchQuery.set(''); orderStatusFilter.set('ALL')"
+              class="mt-4 px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-xs transition"
+            >
+              Limpiar Filtros
+            </button>
+          }
+        </div>
+      } @else {
+        <div class="space-y-4">
+          @for (order of filteredOrders(); track order.id) {
+            <div class="bg-white rounded-[28px] border border-black/[0.06] shadow-bento p-5 sm:p-6 space-y-4 hover:border-black/[0.12] transition">
+              <!-- Fila Superior: ID, Fecha y Badge de Estado -->
+              <div class="flex flex-wrap items-center justify-between gap-3 border-b border-black/[0.04] pb-3">
+                <div class="flex items-center gap-2">
+                  <span class="px-2.5 py-1 rounded-xl bg-zinc-100 text-zinc-800 font-mono text-[11px] font-bold">
+                    #{{ order.id.slice(0, 8) }}
+                  </span>
+                  <span class="text-xs text-zinc-400">
+                    {{ order.createdAt | date:'dd/MM/yyyy • HH:mm' }} hs
+                  </span>
+                </div>
+
+                <div>
+                  @if (order.status === 'PAID') {
+                    <span class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 flex items-center gap-1.5">
+                      <span>✅</span>
+                      <span>Pagado</span>
+                    </span>
+                  } @else if (order.status === 'PENDING') {
+                    <span class="px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200/80 flex items-center gap-1.5">
+                      <span>⏳</span>
+                      <span>Pendiente</span>
+                    </span>
+                  } @else if (order.status === 'FRAUD_ALERT_PRICE_MISMATCH') {
+                    <span class="px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200/80 flex items-center gap-1.5">
+                      <span>⚠️</span>
+                      <span>Discrepancia / Alerta</span>
+                    </span>
+                  } @else {
+                    <span class="px-3 py-1 rounded-full text-xs font-bold bg-zinc-100 text-zinc-600 border border-zinc-200 flex items-center gap-1">
+                      <span>•</span>
+                      <span>{{ order.status }}</span>
+                    </span>
+                  }
+                </div>
+              </div>
+
+              <!-- Bloque Principal Bento: Cliente, Álbum e Importe -->
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                <!-- Columna 1: Cliente -->
+                <div class="bg-zinc-50/70 rounded-2xl p-3.5 border border-black/[0.03] space-y-1">
+                  <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Datos del Cliente</span>
+                  <div class="font-bold text-zinc-900 text-sm">
+                    {{ order.customer.name || 'Cliente sin nombre' }}
+                  </div>
+                  <div class="text-zinc-600 font-mono text-[11px]">
+                    ✉️ {{ order.customer.email }}
+                  </div>
+                  <div class="pt-1">
+                    @if (order.customer.phone) {
+                      <button
+                        type="button"
+                        (click)="openCustomerWhatsApp(order.customer.phone)"
+                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-semibold text-[11px] border border-emerald-200/70 transition"
+                        title="Abrir chat de WhatsApp con el cliente"
+                      >
+                        <span>📱</span>
+                        <span>{{ order.customer.phone }}</span>
+                        <span class="text-[10px] text-emerald-600 underline ml-0.5">Chat ↗</span>
+                      </button>
+                    } @else {
+                      <span class="text-zinc-400 text-[11px] italic">Sin teléfono registrado</span>
+                    }
+                  </div>
+                </div>
+
+                <!-- Columna 2: Álbum y Contenido -->
+                <div class="bg-zinc-50/70 rounded-2xl p-3.5 border border-black/[0.03] space-y-1">
+                  <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Evento / Álbum</span>
+                  <div class="font-bold text-zinc-900 text-sm truncate" [title]="order.albumTitle || order.albumId">
+                    📁 {{ order.albumTitle || order.albumId }}
+                  </div>
+                  <div class="pt-1">
+                    @if (order.isFullAlbum) {
+                      <span class="inline-flex items-center gap-1 text-[11px] font-bold text-amber-900 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200/60">
+                        <span>🌟</span>
+                        <span>Pack Álbum Completo</span>
+                      </span>
+                    } @else {
+                      <span class="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-700 bg-zinc-100 px-2 py-0.5 rounded-lg border border-black/[0.04]">
+                        <span>📸</span>
+                        <span>{{ order.photoCount }} foto(s) individual(es)</span>
+                      </span>
+                    }
+                  </div>
+                </div>
+
+                <!-- Columna 3: Monto e Info de Pago -->
+                <div class="bg-zinc-50/70 rounded-2xl p-3.5 border border-black/[0.03] space-y-1">
+                  <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Monto Total</span>
+                  <div class="font-display font-black text-zinc-900 text-lg">
+                    ${{ order.totalAmount.toLocaleString('es-AR') }} <span class="text-xs font-normal text-zinc-500">ARS</span>
+                  </div>
+                  @if (order.paymentId) {
+                    <div class="text-[10px] text-zinc-400 font-mono">
+                      Mercado Pago: #{{ order.paymentId }}
+                    </div>
+                  }
+                  @if (order.couponApplied) {
+                    <div class="text-[10px] text-amber-600 font-semibold">
+                      🏷️ Descuento: {{ order.couponApplied }} (-{{ order.discountPercentage }}%)
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <!-- Fila Inferior: Acciones Disponibles -->
+              <div class="pt-2">
+                @if (order.status === 'PAID') {
+                  <div class="flex flex-wrap items-center gap-2.5">
+                    <!-- Botón 1: Renovar 72h -->
+                    <button
+                      type="button"
+                      (click)="renewOrderToken(order)"
+                      [disabled]="renewingOrderId() === order.id"
+                      class="px-4 py-2.5 rounded-2xl bg-zinc-950 hover:bg-zinc-800 text-white font-bold text-xs shadow-sm transition active:scale-95 disabled:opacity-50 flex items-center gap-2"
+                      title="Genera un nuevo link de descarga válido por otras 72 horas y lo copia"
+                    >
+                      @if (renewingOrderId() === order.id) {
+                        <span class="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                        <span>Renovando...</span>
+                      } @else if (copiedTokenOrderId() === order.id) {
+                        <span>✅ ¡Copiado!</span>
+                      } @else {
+                        <span>🔄 Renovar 72h</span>
+                      }
+                    </button>
+
+                    <!-- Botón 2: Enviar Fotos por WhatsApp -->
+                    <button
+                      type="button"
+                      (click)="sendWhatsApp(order)"
+                      class="px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition active:scale-95 flex items-center gap-2"
+                      title="Abre WhatsApp con el mensaje pre-armado y el enlace directo de descarga"
+                    >
+                      <span>💬 Enviar Fotos por WhatsApp</span>
+                    </button>
+
+                    <!-- Botón 3: Copiar Link Actual -->
+                    @if (order.downloadToken) {
+                      <button
+                        type="button"
+                        (click)="copyDownloadLink(order)"
+                        class="px-3.5 py-2.5 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-700 font-semibold text-xs border border-black/[0.08] shadow-sm transition active:scale-95 flex items-center gap-1.5"
+                        title="Copiar enlace de descarga directa al portapapeles"
+                      >
+                        <span>📋</span>
+                        <span>Copiar Enlace</span>
+                      </button>
+                    }
+                  </div>
+                } @else if (order.status === 'PENDING') {
+                  <div class="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/50 text-amber-900 text-xs flex items-center gap-2">
+                    <span>⏳</span>
+                    <span>Esperando confirmación de cobro de Mercado Pago para habilitar la descarga y emisión del token.</span>
+                  </div>
+                } @else if (order.status === 'FRAUD_ALERT_PRICE_MISMATCH') {
+                  <div class="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
+                    <span>⚠️</span>
+                    <span><strong>Alerta de Discrepancia:</strong> El monto pagado en Mercado Pago no coincide con el total. Verifica el comprobante antes de emitir un enlace.</span>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  <!-- PESTAÑA PAPELERA DE RECICLAJE (30 DÍAS) -->
+  @else if (activeTab() === 'trash') {
+    <div class="bg-white rounded-[32px] p-6 sm:p-8 border border-black/[0.05] shadow-bento space-y-6 animate-fadeIn">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-black/[0.06] pb-5">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold text-[10px] uppercase tracking-wider">
+              Recuperación Segura
+            </span>
+            <span class="text-xs text-zinc-400 font-mono">• 30 días de gracia</span>
+          </div>
+          <h3 class="font-display font-extrabold text-xl sm:text-2xl text-zinc-900 tracking-tight mt-1">
+            Papelera de Reciclaje
+          </h3>
+          <p class="text-xs text-zinc-500 mt-0.5">
+            Los eventos eliminados permanecen en la papelera durante 30 días. Puedes restaurarlos a su estado activo o purgarlos de forma definitiva.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          (click)="loadTrashAlbums()"
+          [disabled]="isLoadingTrash()"
+          class="px-4 py-2 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-xs transition flex items-center gap-2 self-start sm:self-auto active:scale-95"
+        >
+          <span>🔄</span>
+          <span>Actualizar</span>
+        </button>
+      </div>
+
+      <!-- Contenido de la Papelera -->
+      @if (isLoadingTrash()) {
+        <div class="py-16 text-center space-y-3">
+          <div class="w-8 h-8 border-3 border-zinc-900 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p class="text-xs text-zinc-500 font-medium">Cargando papelera de reciclaje...</p>
+        </div>
+      } @else if (trashAlbums().length === 0) {
+        <div class="py-16 text-center bg-zinc-50/60 rounded-3xl border border-zinc-200/60 p-8 space-y-3">
+          <div class="w-14 h-14 rounded-2xl bg-white border border-zinc-200 text-zinc-400 flex items-center justify-center text-2xl mx-auto shadow-sm">
+            ✨
+          </div>
+          <h4 class="font-bold text-zinc-900 text-sm">La papelera está limpia</h4>
+          <p class="text-xs text-zinc-500 max-w-sm mx-auto">
+            No tienes álbumes en la papelera de reciclaje. Todos tus eventos creados se encuentran activos o en el catálogo.
+          </p>
+        </div>
+      } @else {
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          @for (album of trashAlbums(); track album.id) {
+            <div class="bg-zinc-50/90 rounded-[24px] p-5 border border-zinc-200/80 shadow-sm flex flex-col justify-between space-y-4 hover:border-zinc-300 transition">
+              <!-- Cabecera de la tarjeta en papelera -->
+              <div class="space-y-3">
+                <div class="relative w-full aspect-video rounded-2xl overflow-hidden bg-zinc-200 border border-zinc-300/60">
+                  <img
+                    [src]="album.coverUrl"
+                    [alt]="album.title"
+                    class="w-full h-full object-cover grayscale contrast-125 opacity-75"
+                    loading="lazy"
+                  />
+                  <div class="absolute inset-0 bg-rose-950/20 mix-blend-multiply"></div>
+
+                  <!-- Insignia de urgencia / días restantes -->
+                  <div class="absolute top-2.5 left-2.5">
+                    @if (album.daysRemaining <= 5) {
+                      <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-rose-600 text-white shadow-md animate-pulse flex items-center gap-1">
+                        <span>⏰</span> <span>Expira en {{ album.daysRemaining }} días</span>
+                      </span>
+                    } @else {
+                      <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500 text-white shadow-md flex items-center gap-1">
+                        <span>⏳</span> <span>{{ album.daysRemaining }} días restantes</span>
+                      </span>
+                    }
+                  </div>
+
+                  <div class="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md bg-zinc-900/90 text-[10px] font-mono text-zinc-300 border border-zinc-700">
+                    {{ album.photosCount }} fotos
+                  </div>
+                </div>
+
+                <div>
+                  <span class="text-[10px] font-mono uppercase tracking-wider text-zinc-500 font-semibold block">
+                    {{ album.category }} • {{ album.eventDate || album.date }}
+                  </span>
+                  <h4 class="font-bold text-zinc-900 text-base leading-tight mt-0.5 line-clamp-1">
+                    {{ album.title }}
+                  </h4>
+                  @if (album.subtitle) {
+                    <p class="text-xs text-zinc-500 line-clamp-1 mt-0.5">
+                      {{ album.subtitle }}
+                    </p>
+                  }
+                </div>
+              </div>
+
+              <!-- Acciones: Restaurar o Eliminar Permanentemente -->
+              <div class="pt-3 border-t border-zinc-200/80 flex items-center gap-2">
+                <button
+                  type="button"
+                  (click)="restoreAlbum(album)"
+                  [disabled]="isRestoringId() === album.id"
+                  class="flex-1 py-2 px-3 rounded-xl bg-white hover:bg-emerald-50 text-emerald-700 hover:text-emerald-800 border border-emerald-200 text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm active:scale-95 disabled:opacity-50"
+                >
+                  @if (isRestoringId() === album.id) {
+                    <span class="w-3 h-3 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></span>
+                    <span>Restaurando...</span>
+                  } @else {
+                    <span>♻️ Restaurar</span>
+                  }
+                </button>
+
+                <button
+                  type="button"
+                  (click)="openPurgeModal(album)"
+                  class="py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition flex items-center justify-center gap-1 shadow-sm active:scale-95"
+                  title="Eliminar permanentemente de la base de datos"
+                >
+                  <span>🗑️ Purgar</span>
+                </button>
+              </div>
+            </div>
+          }
+        </div>
       }
     </div>
   }
@@ -654,34 +1263,82 @@
         <!-- Lista de Archivos Seleccionados -->
         @if (selectedFiles().length > 0) {
           <div class="space-y-3">
+            @if (hasOversizedFiles()) {
+              <div class="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5">
+                <span class="text-base">🛑</span>
+                <div class="flex-1">
+                  <span class="font-bold">Límite de Supabase Storage excedido:</span>
+                  <p class="mt-0.5 text-[11px] text-rose-700">
+                    {{ oversizedFiles().length }} fotografía(s) superan el tamaño máximo permitido de 50 MB. Quítalas de la lista haciendo clic en la ✕ roja antes de subir el lote.
+                  </p>
+                </div>
+              </div>
+            }
+
             <div class="flex items-center justify-between text-xs">
               <span class="font-bold text-zinc-700">
                 Archivos listos para procesar ({{ selectedFiles().length }} fotos seleccionadas)
               </span>
-              <span class="text-[11px] text-zinc-400">
-                Marca la estrella ⭐ en las fotos que quieras destacar como "Muestra HD"
-              </span>
+              <div class="flex items-center gap-3">
+                <span class="text-[11px] text-zinc-400 hidden sm:inline">
+                  Marca la estrella ⭐ en las fotos que quieras destacar como "Muestra HD"
+                </span>
+                <button
+                  type="button"
+                  (click)="clearSelectedFiles()"
+                  class="text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:underline transition"
+                >
+                  Limpiar selección
+                </button>
+              </div>
             </div>
 
             <div class="max-h-60 overflow-y-auto space-y-2 pr-1 border border-zinc-200 rounded-2xl p-2 bg-zinc-50">
               @for (file of selectedFiles(); track file.name; let idx = $index) {
-                <div class="flex items-center justify-between p-2.5 rounded-xl bg-white border border-black/[0.04] text-xs">
-                  <div class="flex items-center gap-2 truncate">
-                    <span class="text-zinc-400 font-mono text-[10px]">#{{ idx + 1 }}</span>
-                    <span class="font-medium text-zinc-800 truncate">{{ file.name }}</span>
-                    <span class="text-zinc-400 text-[10px]">({{ (file.size / 1024 / 1024).toFixed(2) }} MB)</span>
+                <div
+                  class="flex items-center justify-between p-2.5 rounded-xl border text-xs transition"
+                  [class]="file.size > MAX_FILE_SIZE_BYTES
+                    ? 'bg-rose-50/80 border-rose-300 text-rose-950'
+                    : 'bg-white border-black/[0.04] text-zinc-800'"
+                >
+                  <div class="flex items-center gap-2 truncate flex-1 min-w-0 pr-2">
+                    <span class="text-zinc-400 font-mono text-[10px] shrink-0">#{{ idx + 1 }}</span>
+                    <span class="font-medium truncate" [class.text-rose-900]="file.size > MAX_FILE_SIZE_BYTES">
+                      {{ file.name }}
+                    </span>
+                    <span
+                      class="text-[10px] font-mono shrink-0"
+                      [class]="file.size > MAX_FILE_SIZE_BYTES ? 'text-rose-600 font-bold' : 'text-zinc-400'"
+                    >
+                      ({{ (file.size / 1024 / 1024).toFixed(2) }} MB)
+                    </span>
+                    @if (file.size > MAX_FILE_SIZE_BYTES) {
+                      <span class="px-2 py-0.5 rounded-md bg-rose-200 text-rose-800 font-bold text-[9px] uppercase tracking-wider shrink-0">
+                        ⚠️ Excede 50 MB
+                      </span>
+                    }
                   </div>
 
-                  <button
-                    type="button"
-                    (click)="toggleHdIndex(idx)"
-                    [class]="isHdSelected(idx)
-                      ? 'px-2.5 py-1 rounded-lg bg-emerald-500 text-zinc-950 font-bold text-[10px] flex items-center gap-1 shadow-sm'
-                      : 'px-2.5 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-600 text-[10px] flex items-center gap-1'"
-                  >
-                    <span>⭐</span>
-                    <span>{{ isHdSelected(idx) ? 'Muestra HD' : 'Foto Estándar' }}</span>
-                  </button>
+                  <div class="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      (click)="toggleHdIndex(idx)"
+                      [class]="isHdSelected(idx)
+                        ? 'px-2.5 py-1 rounded-lg bg-emerald-500 text-zinc-950 font-bold text-[10px] flex items-center gap-1 shadow-sm'
+                        : 'px-2.5 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-600 text-[10px] flex items-center gap-1'"
+                    >
+                      <span>⭐</span>
+                      <span>{{ isHdSelected(idx) ? 'Muestra HD' : 'Foto Estándar' }}</span>
+                    </button>
+                    <button
+                      type="button"
+                      (click)="removeSelectedFile(idx)"
+                      class="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-rose-100 text-zinc-400 hover:text-rose-600 font-bold text-xs transition"
+                      title="Quitar foto de la lista"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </div>
               }
             </div>
@@ -692,7 +1349,7 @@
         <div class="flex items-center justify-end gap-3 pt-2">
           <button
             type="submit"
-            [disabled]="selectedFiles().length === 0 || isBulkUploading()"
+            [disabled]="selectedFiles().length === 0 || hasOversizedFiles() || isBulkUploading()"
             class="px-6 py-3.5 rounded-2xl bg-zinc-950 hover:bg-zinc-800 text-white font-display font-extrabold text-xs shadow-md transition active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center gap-2"
           >
             @if (isBulkUploading()) {
@@ -947,31 +1604,50 @@
             />
           </div>
 
-          <!-- Fecha y Lugar -->
+          <!-- Fecha y Horario Estructurados -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
-                Fecha del Evento *
+                📅 Fecha del Evento *
               </label>
               <input
-                type="text"
-                formControlName="date"
-                placeholder="Ej: 20 Octubre, 2026"
-                class="w-full px-4 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
+                type="date"
+                formControlName="eventDate"
+                class="w-full px-4 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-semibold focus:outline-none focus:border-zinc-950 transition"
               />
             </div>
 
             <div>
               <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
-                Lugar / Estadio / Salón *
+                ⏰ Horario del Evento *
               </label>
               <input
-                type="text"
-                formControlName="location"
-                placeholder="Ej: Estadio Carlos Mercado Luna"
-                class="w-full px-4 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
+                type="time"
+                formControlName="eventTime"
+                class="w-full px-4 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-semibold focus:outline-none focus:border-zinc-950 transition"
               />
             </div>
+          </div>
+
+          <!-- Previsualización de Fecha Formateada -->
+          <div class="px-3.5 py-2 rounded-xl bg-zinc-100 border border-zinc-200/80 text-[11px] text-zinc-600 flex items-center justify-between">
+            <span class="font-medium text-zinc-500">Vista en catálogo:</span>
+            <span class="font-bold text-zinc-800">
+              {{ formatEventDatePreview(createAlbumForm.get('eventDate')?.value, createAlbumForm.get('eventTime')?.value) }}
+            </span>
+          </div>
+
+          <!-- Lugar / Estadio / Salón -->
+          <div>
+            <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
+              📍 Lugar / Estadio / Salón *
+            </label>
+            <input
+              type="text"
+              formControlName="location"
+              placeholder="Ej: Estadio Carlos Mercado Luna, La Rioja"
+              class="w-full px-4 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
+            />
           </div>
 
           <!-- Precios Iniciales (Bento Box) -->
@@ -1022,6 +1698,50 @@
               Publicar inmediatamente en el catálogo web
             </label>
           </div>
+
+          <!-- Descarga Gratuita de Cortesía -->
+          <div class="p-3.5 rounded-2xl bg-amber-50/60 border border-amber-200/60 flex items-start gap-2.5">
+            <input
+              type="checkbox"
+              id="modalIsFreeDownload"
+              formControlName="isFreeDownload"
+              class="w-4 h-4 mt-0.5 rounded text-amber-500 focus:ring-amber-400 border-zinc-300"
+            />
+            <label for="modalIsFreeDownload" class="text-xs text-zinc-700 cursor-pointer">
+              <strong class="font-bold text-amber-950 block">🎁 Descarga Gratuita de Cortesía (Máxima Calidad HD)</strong>
+              <span class="text-[11px] text-zinc-500">Permite descargar el álbum completo en alta resolución ZIP sin pasar por Mercado Pago.</span>
+            </label>
+          </div>
+
+          <!-- Álbum Privado con Código PIN -->
+          <div class="p-3.5 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-2.5">
+            <div class="flex items-start gap-2.5">
+              <input
+                type="checkbox"
+                id="modalIsPrivate"
+                formControlName="isPrivate"
+                class="w-4 h-4 mt-0.5 rounded text-zinc-900 focus:ring-zinc-950 border-zinc-300"
+              />
+              <label for="modalIsPrivate" class="text-xs text-zinc-700 cursor-pointer">
+                <strong class="font-bold text-zinc-900 block">🔒 Evento Privado (Protegido por Código PIN)</strong>
+                <span class="text-[11px] text-zinc-500">Muestra un candado en el catálogo. Los clientes deben ingresar el código para ver las fotos.</span>
+              </label>
+            </div>
+
+            @if (createAlbumForm.get('isPrivate')?.value) {
+              <div class="pt-1.5 pl-6">
+                <label class="block text-[10px] font-bold text-zinc-600 uppercase tracking-wider mb-1">
+                  Código PIN o Clave de Acceso *
+                </label>
+                <input
+                  type="text"
+                  formControlName="accessCode"
+                  placeholder="Ej: ANDINO2026 o FIESTA15"
+                  class="w-full px-4 py-2 rounded-xl bg-white border border-zinc-300 text-zinc-900 text-xs font-mono font-bold tracking-wider uppercase focus:outline-none focus:border-zinc-950 transition"
+                />
+              </div>
+            }
+          </div>
         </div>
 
         <!-- Footer Sticky de Botones -->
@@ -1049,6 +1769,254 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+}
+
+<!-- ======================================================================== -->
+<!-- MODAL DE CONFIRMACIÓN: PURGA PERMANENTE DE PAPELERA (HARD DELETE)        -->
+<!-- ======================================================================== -->
+@if (isPurgeModalOpen() && albumToPurge()) {
+  <div
+    class="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-md animate-fadeIn"
+    (click)="closePurgeModal()"
+  >
+    <div
+      class="bg-white rounded-[28px] border border-rose-200 shadow-2xl w-full max-w-md p-6 sm:p-7 text-zinc-900 animate-scale-up"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center text-2xl mb-4">
+        ⚠️
+      </div>
+      <h3 class="font-display font-extrabold text-xl text-zinc-900 mb-2">
+        ¿Eliminar álbum definitivamente?
+      </h3>
+      <p class="text-xs text-zinc-600 mb-4 leading-relaxed">
+        Estás a punto de purgar permanentemente el álbum <strong class="text-zinc-950">{{ albumToPurge()!.title }}</strong> y todas sus fotografías de la base de datos.
+        <strong class="text-rose-600 block mt-1 font-bold">Esta acción es irreversible y no se podrá deshacer.</strong>
+      </p>
+      <div class="p-3 bg-zinc-50 rounded-xl border border-zinc-200/80 text-[11px] text-zinc-500 mb-5">
+        Nota de auditoría: El historial contable de compras previas se mantendrá intacto para tus registros financieros.
+      </div>
+      <div class="flex gap-3">
+        <button
+          type="button"
+          (click)="closePurgeModal()"
+          class="flex-1 py-2.5 px-4 rounded-xl border border-zinc-200 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 transition"
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          (click)="confirmPermanentDelete()"
+          [disabled]="isPurgingId() === albumToPurge()!.id"
+          class="flex-1 py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-lg shadow-rose-500/20 active:scale-95 disabled:opacity-50"
+        >
+          @if (isPurgingId() === albumToPurge()!.id) {
+            <span class="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+            <span>Purgando...</span>
+          } @else {
+            <span>Eliminar Para Siempre</span>
+          }
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ======================================================================== -->
+<!-- MODAL BENTO: GESTIONAR FOTOS DEL ÁLBUM                                   -->
+<!-- ======================================================================== -->
+@if (isPhotosModalOpen() && selectedAlbumForPhotos(); as currentAlbum) {
+  <div
+    class="fixed inset-0 z-[110] flex items-center justify-center p-3 sm:p-6 bg-zinc-950/80 backdrop-blur-md animate-fadeIn"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="manage-photos-title"
+    (click)="closePhotosModal()"
+  >
+    <div
+      class="bg-white rounded-[32px] border border-black/[0.08] shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden text-zinc-900 animate-scale-up"
+      (click)="$event.stopPropagation()"
+    >
+      <!-- Cabecera del Modal -->
+      <div class="p-5 sm:p-6 border-b border-black/[0.06] flex items-center justify-between gap-4 bg-zinc-50/70 shrink-0">
+        <div class="min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-[10px] tracking-wide uppercase">
+              🖼️ Fotos del Álbum
+            </span>
+            <span class="text-xs font-bold text-zinc-500">
+              ({{ albumPhotos().length }} {{ albumPhotos().length === 1 ? 'foto' : 'fotos' }})
+            </span>
+          </div>
+          <h3 id="manage-photos-title" class="font-display font-extrabold text-lg sm:text-xl text-zinc-900 truncate">
+            {{ currentAlbum.title }}
+          </h3>
+          <p class="text-xs text-zinc-500 truncate">
+            Configura la foto de portada, activa muestras HD o elimina fotos movidas.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          (click)="closePhotosModal()"
+          class="w-9 h-9 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 flex items-center justify-center text-sm font-bold transition active:scale-95 shrink-0"
+          aria-label="Cerrar modal de gestión de fotos"
+        >
+          ✕
+        </button>
+      </div>
+
+      <!-- Feedback de acción -->
+      @if (photosModalFeedback(); as fb) {
+        <div
+          [class]="fb.success
+            ? 'mx-5 mt-4 p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2 animate-fadeIn'
+            : 'mx-5 mt-4 p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2 animate-fadeIn'"
+        >
+          <span>{{ fb.success ? '✅' : '⚠️' }}</span>
+          <span>{{ fb.message }}</span>
+        </div>
+      }
+
+      <!-- Cuerpo del Modal: Grilla de Fotos -->
+      <div class="flex-1 overflow-y-auto p-4 sm:p-6">
+        @if (isLoadingAlbumPhotos()) {
+          <div class="py-20 text-center text-zinc-400">
+            <span class="inline-block w-8 h-8 border-2 border-zinc-900 border-t-transparent rounded-full animate-spin mb-3"></span>
+            <p class="text-xs font-semibold">Cargando fotografías del álbum...</p>
+          </div>
+        } @else if (photosModalError()) {
+          <div class="py-12 text-center space-y-3">
+            <div class="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center text-xl mx-auto">
+              ⚠️
+            </div>
+            <p class="text-xs text-rose-600 font-semibold">{{ photosModalError() }}</p>
+            <button
+              type="button"
+              (click)="loadAlbumPhotos(currentAlbum.id)"
+              class="px-4 py-2 rounded-xl bg-zinc-900 text-white text-xs font-bold hover:bg-zinc-800 transition"
+            >
+              Reintentar
+            </button>
+          </div>
+        } @else if (albumPhotos().length === 0) {
+          <div class="py-16 text-center space-y-3 text-zinc-400">
+            <div class="text-4xl">📸</div>
+            <p class="text-xs font-medium text-zinc-600">
+              No hay fotografías cargadas en este álbum todavía.
+            </p>
+            <p class="text-[11px] text-zinc-400 max-w-sm mx-auto">
+              Puedes subir fotos mediante la pestaña "📤 Subida Masiva" o importar desde una carpeta de Google Drive.
+            </p>
+          </div>
+        } @else {
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5 sm:gap-4">
+            @for (photo of albumPhotos(); track photo.id) {
+              <div
+                class="bg-zinc-50 rounded-2xl border border-black/[0.06] overflow-hidden flex flex-col justify-between shadow-sm hover:shadow-md transition group"
+                [class.ring-2]="currentAlbum.coverUrl === photo.previewUrl"
+                [class.ring-amber-500]="currentAlbum.coverUrl === photo.previewUrl"
+              >
+                <!-- Thumbnail con badges -->
+                <div class="relative aspect-square bg-zinc-200 overflow-hidden">
+                  <img
+                    [src]="photo.previewUrl"
+                    [alt]="photo.filename"
+                    loading="lazy"
+                    class="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                  />
+
+                  <!-- Badges superiores -->
+                  <div class="absolute top-2 left-2 right-2 flex flex-wrap gap-1 pointer-events-none">
+                    @if (currentAlbum.coverUrl === photo.previewUrl) {
+                      <span class="px-2 py-0.5 rounded-lg bg-amber-500 text-zinc-950 font-black text-[9px] shadow-sm uppercase tracking-wider">
+                        📌 Portada
+                      </span>
+                    }
+                    @if (photo.isSampleHd) {
+                      <span class="px-2 py-0.5 rounded-lg bg-sky-500 text-white font-bold text-[9px] shadow-sm uppercase tracking-wider">
+                        ⭐ HD
+                      </span>
+                    }
+                  </div>
+
+                  <!-- Overlay de carga durante actualización / borrado -->
+                  @if (updatingPhotoId() === photo.id || deletingPhotoId() === photo.id) {
+                    <div class="absolute inset-0 bg-zinc-950/60 backdrop-blur-xs flex items-center justify-center">
+                      <span class="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    </div>
+                  }
+                </div>
+
+                <!-- Barra de Acciones de la Foto -->
+                <div class="p-2 space-y-1.5 bg-white border-t border-black/[0.04]">
+                  <p class="text-[10px] font-mono text-zinc-500 truncate" [title]="photo.filename">
+                    {{ photo.filename }}
+                  </p>
+
+                  <div class="flex items-center gap-1">
+                    <!-- Botón 1: Definir como Portada -->
+                    <button
+                      type="button"
+                      (click)="setPhotoAsCover(photo)"
+                      [disabled]="currentAlbum.coverUrl === photo.previewUrl || updatingPhotoId() === photo.id"
+                      [class]="currentAlbum.coverUrl === photo.previewUrl
+                        ? 'flex-1 py-1 px-1.5 rounded-lg bg-amber-50 text-amber-800 font-bold text-[9px] border border-amber-200 text-center cursor-default'
+                        : 'flex-1 py-1 px-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-semibold text-[9px] transition active:scale-95 disabled:opacity-50 text-center'"
+                      title="Definir esta foto como portada de la carpeta 3D"
+                      aria-label="Definir foto como portada"
+                    >
+                      {{ currentAlbum.coverUrl === photo.previewUrl ? '✓ Portada' : '📌 Portada' }}
+                    </button>
+
+                    <!-- Botón 2: Alternar Muestra HD -->
+                    <button
+                      type="button"
+                      (click)="toggleSampleHd(photo)"
+                      [disabled]="updatingPhotoId() === photo.id"
+                      [class]="photo.isSampleHd
+                        ? 'py-1 px-1.5 rounded-lg bg-sky-100 hover:bg-sky-200 text-sky-800 font-bold text-[9px] border border-sky-300 transition active:scale-95'
+                        : 'py-1 px-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-semibold text-[9px] transition active:scale-95'"
+                      [title]="photo.isSampleHd ? 'Quitar muestra HD' : 'Marcar como muestra de alta definición'"
+                      [attr.aria-label]="photo.isSampleHd ? 'Quitar muestra HD' : 'Marcar como muestra HD'"
+                    >
+                      {{ photo.isSampleHd ? '⭐ HD' : '☆ HD' }}
+                    </button>
+
+                    <!-- Botón 3: Borrar Foto -->
+                    <button
+                      type="button"
+                      (click)="deleteAlbumPhoto(photo)"
+                      [disabled]="deletingPhotoId() === photo.id"
+                      class="py-1 px-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-[9px] border border-rose-200 transition active:scale-95 disabled:opacity-50"
+                      title="Eliminar esta foto del álbum"
+                      aria-label="Eliminar foto del álbum"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- Footer del Modal -->
+      <div class="p-3 sm:p-4 border-t border-black/[0.06] bg-zinc-50 flex items-center justify-between gap-3 shrink-0">
+        <span class="text-[11px] text-zinc-500 hidden sm:inline">
+          Los cambios en portadas y muestras HD impactan de inmediato en la tienda y en la carpeta 3D.
+        </span>
+        <button
+          type="button"
+          (click)="closePhotosModal()"
+          class="px-5 py-2 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white font-extrabold text-xs shadow-sm transition active:scale-95 ml-auto"
+        >
+          Cerrar
+        </button>
+      </div>
     </div>
   </div>
 }

@@ -30,7 +30,7 @@ describe('DeliveryService Frontend (TDD)', () => {
       expect(res.downloadToken).toBe('valid.token.hmac');
     });
 
-    expect(httpMock.get).toHaveBeenCalledWith('/api/downloads/order/order-123/status');
+    expect(httpMock.get).toHaveBeenCalledWith('http://localhost:4000/api/downloads/order/order-123/status');
   });
 
   it('debe obtener la información de entrega usando el token de descarga', async () => {
@@ -65,7 +65,7 @@ describe('DeliveryService Frontend (TDD)', () => {
       expect(info.isExpired).toBe(false);
     });
 
-    expect(httpMock.get).toHaveBeenCalledWith('/api/downloads/sample-token/info');
+    expect(httpMock.get).toHaveBeenCalledWith('http://localhost:4000/api/downloads/sample-token/info');
   });
 
   it('debe formatear el tiempo restante en un formato humano amigable', () => {

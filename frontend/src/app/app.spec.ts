@@ -1,8 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { of } from 'rxjs';
 import { App } from './app';
+import { AlbumService } from './core/services/album.service';
 
 describe('App Root Component - LA TERCERA', () => {
   beforeEach(async () => {
@@ -118,5 +120,124 @@ describe('App Root Component - LA TERCERA', () => {
     app.setCategory('futbol');
     expect(app.currentPage()).toBe(1);
     expect(app.filteredAlbums().length).toBe(2);
+  });
+
+  it('debe interceptar álbumes privados solicitando PIN antes de abrirlos', () => {
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+
+    const privateAlbum = {
+      id: 'album-private-1',
+      category: 'sociales' as const,
+      title: 'Fiesta Privada VIP',
+      subtitle: 'Acceso Restringido',
+      date: '2026',
+      badge: '🔒 Privado',
+      photosCount: 20,
+      unitPrice: 1500,
+      fullAlbumPrice: 12000,
+      coverUrl: '',
+      isPrivate: true
+    };
+
+    expect(app.albumAccessStore.isUnlocked(privateAlbum.id)).toBe(false);
+
+    // Intentar abrir álbum privado
+    app.openAlbum(privateAlbum);
+
+    // Debe abrir modal de PIN y NO la vista de álbum
+    expect(app.isPinModalOpen()).toBe(true);
+    expect(app.selectedPrivateAlbum()?.id).toBe(privateAlbum.id);
+    expect(app.currentView()).toBe('portfolio');
+
+    // Desbloquear álbum
+    app.onAlbumUnlocked({ albumId: privateAlbum.id });
+    expect(app.isPinModalOpen()).toBe(false);
+    expect(app.currentView()).toBe('album');
+    expect(app.currentAlbum()?.id).toBe(privateAlbum.id);
+  });
+
+  it('debe permitir abrir álbumes no privados directamente', () => {
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+
+    const publicAlbum = {
+      id: 'album-pub-1',
+      category: 'futbol' as const,
+      title: 'Fútbol Libre',
+      subtitle: 'Abierto',
+      date: '2026',
+      badge: '⚽',
+      photosCount: 15,
+      unitPrice: 1000,
+      fullAlbumPrice: 8000,
+      coverUrl: '',
+      isPrivate: false
+    };
+
+    app.openAlbum(publicAlbum);
+    expect(app.isPinModalOpen()).toBe(false);
+    expect(app.currentView()).toBe('album');
+    expect(app.currentAlbum()?.id).toBe(publicAlbum.id);
+  });
+
+  it('debe actualizar activeAlbumPhotos y currentPhotos al abrir un álbum', () => {
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+    const albumService = TestBed.inject(AlbumService);
+
+    const mockAlbum = {
+      id: 'album-real-photos',
+      category: 'futbol' as const,
+      title: 'Partido Real',
+      subtitle: 'Liga',
+      date: '2026',
+      badge: '⚽',
+      photosCount: 2,
+      unitPrice: 1200,
+      fullAlbumPrice: 9500,
+      coverUrl: 'https://example.com/cover.jpg',
+      isPrivate: false
+    };
+
+    const mockPhotos = [
+      {
+        id: 'photo-real-1',
+        albumId: 'album-real-photos',
+        title: 'Acción 1',
+        previewUrl: 'https://example.com/p1.webp',
+        originalWidth: 4000,
+        originalHeight: 3000,
+        isSampleHD: true
+      }
+    ];
+
+    vi.spyOn(albumService, 'getAlbumPhotos').mockReturnValue(of(mockPhotos));
+
+    app.openAlbum(mockAlbum);
+
+    expect(app.activeAlbumPhotos()).toEqual(mockPhotos);
+    expect(app.currentPhotos()).toEqual(mockPhotos);
+    expect(app.currentPhotos()[0].id).toBe('photo-real-1');
+  });
+
+  it('debe ejecutar startViewTransition en transitionView si la API nativa está disponible', () => {
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+
+    const startViewTransitionMock = vi.fn((cb: () => void) => {
+      cb();
+    });
+    (document as any).startViewTransition = startViewTransitionMock;
+
+    let executed = false;
+    app.transitionView(() => {
+      executed = true;
+    });
+
+    expect(startViewTransitionMock).toHaveBeenCalled();
+    expect(executed).toBe(true);
+
+    delete (document as any).startViewTransition;
   });
 });

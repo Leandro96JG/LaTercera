@@ -13,8 +13,17 @@ import {
   CreateAlbumResponse,
   UpdateAlbumRequest,
   UpdateAlbumResponse,
-  AdminListAlbumsResponse
+  AdminListAlbumsResponse,
+  AdminTrashListResponse,
+  TrashActionResponse,
+  AdminOrdersResponse,
+  RegenerateTokenResponse,
+  AdminAlbumPhotosResponse,
+  UpdateAlbumPhotoRequest,
+  UpdateAlbumPhotoResponse,
+  DeleteAlbumPhotoResponse
 } from '../models/admin.model';
+import { environment } from '../../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
@@ -22,7 +31,7 @@ import {
 export class AdminService {
   private readonly http = inject(HttpClient);
   private readonly authStore = inject(AdminAuthStore);
-  private readonly baseUrl = 'http://localhost:4000/api/admin';
+  private readonly baseUrl = `${environment.apiUrl}/admin`;
 
   private getAuthHeaders(): HttpHeaders {
     const token = this.authStore.adminToken();
@@ -111,4 +120,121 @@ export class AdminService {
       headers: this.getAuthHeaders()
     });
   }
+
+  /**
+   * Obtiene la lista de álbumes en la papelera de reciclaje con días restantes
+   */
+  public getTrashAlbums(): Observable<AdminTrashListResponse> {
+    return this.http.get<AdminTrashListResponse>(`${this.baseUrl}/albums/trash`, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  /**
+   * Mueve un álbum a la papelera (soft delete de 30 días)
+   */
+  public moveToTrash(albumId: string): Observable<TrashActionResponse> {
+    return this.http.post<TrashActionResponse>(`${this.baseUrl}/albums/${albumId}/trash`, {}, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  /**
+   * Restaura un álbum desde la papelera a activo
+   */
+  public restoreFromTrash(albumId: string): Observable<TrashActionResponse> {
+    return this.http.post<TrashActionResponse>(`${this.baseUrl}/albums/${albumId}/restore`, {}, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  /**
+   * Elimina permanentemente un álbum (hard delete irreversible)
+   */
+  public permanentDeleteAlbum(albumId: string): Observable<TrashActionResponse> {
+    return this.http.delete<TrashActionResponse>(`${this.baseUrl}/albums/${albumId}/permanent`, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  /**
+   * Activa o desactiva la descarga gratuita de cortesía en máxima calidad
+   */
+  public toggleCourtesyDownload(albumId: string, isFreeDownload: boolean): Observable<UpdateAlbumResponse> {
+    return this.http.patch<UpdateAlbumResponse>(
+      `${this.baseUrl}/albums/${albumId}/courtesy-download`,
+      { isFreeDownload },
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  /**
+   * Configura la privacidad del álbum y su código de acceso PIN
+   */
+  public updateAlbumPrivacy(
+    albumId: string,
+    isPrivate: boolean,
+    accessCode?: string | null
+  ): Observable<UpdateAlbumResponse> {
+    return this.http.patch<UpdateAlbumResponse>(
+      `${this.baseUrl}/albums/${albumId}/privacy`,
+      { isPrivate, accessCode },
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  /**
+   * Obtiene la lista completa de órdenes y ventas administrativas
+   */
+  public getAdminOrders(): Observable<AdminOrdersResponse> {
+    return this.http.get<AdminOrdersResponse>(`${this.baseUrl}/orders`, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  /**
+   * Regenera el token de descarga de 72 horas para una orden
+   */
+  public regenerateOrderToken(orderId: string): Observable<RegenerateTokenResponse> {
+    return this.http.post<RegenerateTokenResponse>(
+      `${this.baseUrl}/orders/${orderId}/regenerate-token`,
+      {},
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  /**
+   * Obtiene la lista completa de fotos de un álbum para el panel administrativo
+   */
+  public getAlbumPhotos(albumId: string): Observable<AdminAlbumPhotosResponse> {
+    return this.http.get<AdminAlbumPhotosResponse>(`${this.baseUrl}/albums/${albumId}/photos`, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  /**
+   * Actualiza una foto puntual del álbum (portada o muestra HD)
+   */
+  public updateAlbumPhoto(
+    albumId: string,
+    photoId: string,
+    updates: UpdateAlbumPhotoRequest
+  ): Observable<UpdateAlbumPhotoResponse> {
+    return this.http.patch<UpdateAlbumPhotoResponse>(
+      `${this.baseUrl}/albums/${albumId}/photos/${photoId}`,
+      updates,
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  /**
+   * Elimina una foto individual de un álbum
+   */
+  public deleteAlbumPhoto(albumId: string, photoId: string): Observable<DeleteAlbumPhotoResponse> {
+    return this.http.delete<DeleteAlbumPhotoResponse>(
+      `${this.baseUrl}/albums/${albumId}/photos/${photoId}`,
+      { headers: this.getAuthHeaders() }
+    );
+  }
 }
+

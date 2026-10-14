@@ -12,12 +12,15 @@ export class CartStore {
   private readonly _activeAlbumId = signal<string | null>(null);
   private readonly _isFullAlbum = signal<boolean>(false);
   private readonly _fullAlbumPrice = signal<number>(PRICING_CONFIG.DEFAULT_FULL_ALBUM_PRICE);
+  private readonly _unitPrice = signal<number>(PRICING_CONFIG.DEFAULT_UNIT_PRICE);
   private readonly _couponCode = signal<string | null>(null);
   private readonly _customer = signal<CustomerInfo>({ email: '', name: '', phone: '' });
 
   // --- Selectores Públicos Readonly Signals ---
   public readonly activeAlbumId = this._activeAlbumId.asReadonly();
   public readonly isFullAlbum = this._isFullAlbum.asReadonly();
+  public readonly unitPrice = this._unitPrice.asReadonly();
+  public readonly fullAlbumPrice = this._fullAlbumPrice.asReadonly();
   public readonly couponCode = this._couponCode.asReadonly();
   public readonly customer = this._customer.asReadonly();
 
@@ -37,11 +40,29 @@ export class CartStore {
     return this._isFullAlbum() || this._selectedPhotos().size > 0;
   });
 
+  // --- Recomendación Inteligente de Pack Álbum Completo ---
+  public readonly shouldRecommendFullAlbum = computed<boolean>(() => {
+    if (this._isFullAlbum()) return false;
+    const count = this._selectedPhotos().size;
+    if (count === 0) return false;
+    const currentSubtotal = this.pricing().finalTotal;
+    const fullPrice = this._fullAlbumPrice();
+    // Se recomienda si el total individual iguala o supera el precio del pack completo,
+    // o si el costo individual alcanza el 80% del pack
+    return currentSubtotal >= fullPrice || (count * this._unitPrice()) >= (fullPrice * 0.8);
+  });
+
+  public readonly packRecommendationSavings = computed<number>(() => {
+    const currentTotal = this.pricing().finalTotal;
+    const fullPrice = this._fullAlbumPrice();
+    return Math.max(0, currentTotal - fullPrice);
+  });
+
   // --- Cálculo Reactivo Determinista de Precios (computed) ---
   public readonly pricing = computed<PricingBreakdown>(() => {
     const isFull = this._isFullAlbum();
     const count = this._selectedPhotos().size;
-    const unitPrice = PRICING_CONFIG.DEFAULT_UNIT_PRICE;
+    const unitPrice = this._unitPrice();
     const coupon = this._couponCode()?.trim().toUpperCase() ?? null;
 
     if (isFull) {
@@ -125,10 +146,42 @@ export class CartStore {
     this._selectedPhotos.set(updated);
   }
 
-  public setFullAlbumMode(albumId: string, albumPrice: number = PRICING_CONFIG.DEFAULT_FULL_ALBUM_PRICE): void {
+  public removePhoto(photoId: string): void {
+    if (this._selectedPhotos().has(photoId)) {
+      const updated = new Map(this._selectedPhotos());
+      updated.delete(photoId);
+      this._selectedPhotos.set(updated);
+    }
+  }
+
+  public setAlbumPricing(
+    albumId: string,
+    fullAlbumPrice: number = PRICING_CONFIG.DEFAULT_FULL_ALBUM_PRICE,
+    unitPrice: number = PRICING_CONFIG.DEFAULT_UNIT_PRICE
+  ): void {
+    if (this._activeAlbumId() && this._activeAlbumId() !== albumId) {
+      this._selectedPhotos.set(new Map());
+      this._isFullAlbum.set(false);
+    }
     this._activeAlbumId.set(albumId);
-    this._fullAlbumPrice.set(albumPrice);
+    this._fullAlbumPrice.set(fullAlbumPrice > 0 ? fullAlbumPrice : PRICING_CONFIG.DEFAULT_FULL_ALBUM_PRICE);
+    this._unitPrice.set(unitPrice > 0 ? unitPrice : PRICING_CONFIG.DEFAULT_UNIT_PRICE);
+  }
+
+  public setFullAlbumMode(
+    albumId: string,
+    albumPrice: number = PRICING_CONFIG.DEFAULT_FULL_ALBUM_PRICE,
+    unitPrice?: number
+  ): void {
+    this.setAlbumPricing(albumId, albumPrice, unitPrice);
     this._isFullAlbum.set(true);
+  }
+
+  public switchToFullAlbum(): void {
+    const currentId = this._activeAlbumId();
+    if (currentId) {
+      this.setFullAlbumMode(currentId, this._fullAlbumPrice(), this._unitPrice());
+    }
   }
 
   public applyCoupon(code: string | null): void {

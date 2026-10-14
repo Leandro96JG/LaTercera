@@ -2,13 +2,14 @@ import { Injectable, signal, computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap, catchError, map, of } from 'rxjs';
 import { AdminUser, AdminLoginResponse } from '../models/admin-auth.model';
+import { environment } from '../../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AdminAuthStore {
   private readonly http = inject(HttpClient);
-  private readonly apiUrl = 'http://localhost:4000/api/admin';
+  private readonly apiUrl = `${environment.apiUrl}/admin`;
   private static readonly STORAGE_TOKEN_KEY = 'la_tercera_admin_jwt';
   private static readonly STORAGE_USER_KEY = 'la_tercera_admin_user';
 
