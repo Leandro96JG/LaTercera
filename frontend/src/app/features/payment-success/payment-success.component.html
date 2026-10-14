@@ -25,149 +25,151 @@
   }
 
   <!-- ==================== ESTADO 2: ORDEN PAGADA Y LISTA (READY) ==================== -->
-  @if (state() === 'ready' && orderInfo()) {
-    <div class="space-y-6">
+  @if (state() === 'ready') {
+    @if (orderInfo(); as info) {
+      <div class="space-y-6">
 
-      <!-- Bento Card Superior: Celebración y Resumen -->
-      <div class="bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 text-white rounded-[32px] sm:rounded-[36px] p-6 sm:p-8 shadow-2xl border border-zinc-800 relative overflow-hidden">
-        <!-- Halo Solar Dorado de Fondo -->
-        <div class="absolute -right-20 -bottom-20 w-80 h-80 bg-amber-400/10 rounded-full blur-3xl pointer-events-none"></div>
+        <!-- Bento Card Superior: Celebración y Resumen -->
+        <div class="bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 text-white rounded-[32px] sm:rounded-[36px] p-6 sm:p-8 shadow-2xl border border-zinc-800 relative overflow-hidden">
+          <!-- Halo Solar Dorado de Fondo -->
+          <div class="absolute -right-20 -bottom-20 w-80 h-80 bg-amber-400/10 rounded-full blur-3xl pointer-events-none"></div>
 
-        <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div class="space-y-3">
-            <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold tracking-wide">
-              <span>✓</span>
-              <span>¡PAGO ACREDITADO CON ÉXITO!</span>
+          <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div class="space-y-3">
+              <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold tracking-wide">
+                <span>✓</span>
+                <span>¡PAGO ACREDITADO CON ÉXITO!</span>
+              </div>
+
+              <h1 class="text-2xl sm:text-3xl font-display font-extrabold text-white tracking-tight">
+                {{ info.albumTitle }}
+              </h1>
+
+              <p class="text-xs sm:text-sm text-zinc-400">
+                Orden <span class="font-mono text-amber-400 font-semibold">#{{ info.orderId }}</span> •
+                Comprador: <span class="text-zinc-200">{{ info.customerEmail }}</span>
+              </p>
+
+              <!-- Pill de Expiración 72h -->
+              <div class="inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-zinc-800/80 border border-zinc-700/60 text-xs text-zinc-300">
+                <span class="text-amber-400 font-bold">⏱️ Ventana de descarga:</span>
+                <span class="font-medium">Quedan {{ formattedRemainingTime() }} para descargar</span>
+              </div>
             </div>
 
-            <h1 class="text-2xl sm:text-3xl font-display font-extrabold text-white tracking-tight">
-              {{ orderInfo()!.albumTitle }}
-            </h1>
+            <!-- Botón de Descarga Masiva ZIP -->
+            <div class="flex flex-col sm:flex-row md:flex-col gap-2 shrink-0">
+              <button
+                (click)="downloadAllZip()"
+                [disabled]="downloadingZip()"
+                class="px-6 py-4 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-zinc-950 font-bold text-sm sm:text-base shadow-lg shadow-amber-400/25 transition-all transform active:scale-95 flex items-center justify-center gap-2"
+              >
+                @if (downloadingZip()) {
+                  <span class="inline-block animate-spin">⏳</span>
+                  <span>Iniciando descarga...</span>
+                } @else {
+                  <span>📦</span>
+                  <span>Descargar Todo (.ZIP HD)</span>
+                }
+              </button>
 
-            <p class="text-xs sm:text-sm text-zinc-400">
-              Orden <span class="font-mono text-amber-400 font-semibold">#{{ orderInfo()!.orderId }}</span> •
-              Comprador: <span class="text-zinc-200">{{ orderInfo()!.customerEmail }}</span>
-            </p>
-
-            <!-- Pill de Expiración 72h -->
-            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-zinc-800/80 border border-zinc-700/60 text-xs text-zinc-300">
-              <span class="text-amber-400 font-bold">⏱️ Ventana de descarga:</span>
-              <span class="font-medium">Quedan {{ formattedRemainingTime() }} para descargar</span>
+              <!-- Botón Copiar Enlace -->
+              <button
+                (click)="copyShareLink()"
+                class="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold border border-zinc-700 transition flex items-center justify-center gap-1.5"
+              >
+                @if (copiedLink()) {
+                  <span class="text-emerald-400">✓ Enlace Copiado</span>
+                } @else {
+                  <span>🔗 Copiar Enlace de Descarga</span>
+                }
+              </button>
             </div>
-          </div>
-
-          <!-- Botón de Descarga Masiva ZIP -->
-          <div class="flex flex-col sm:flex-row md:flex-col gap-2 shrink-0">
-            <button
-              (click)="downloadAllZip()"
-              [disabled]="downloadingZip()"
-              class="px-6 py-4 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-zinc-950 font-bold text-sm sm:text-base shadow-lg shadow-amber-400/25 transition-all transform active:scale-95 flex items-center justify-center gap-2"
-            >
-              @if (downloadingZip()) {
-                <span class="inline-block animate-spin">⏳</span>
-                <span>Iniciando descarga...</span>
-              } @else {
-                <span>📦</span>
-                <span>Descargar Todo (.ZIP HD)</span>
-              }
-            </button>
-
-            <!-- Botón Copiar Enlace -->
-            <button
-              (click)="copyShareLink()"
-              class="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold border border-zinc-700 transition flex items-center justify-center gap-1.5"
-            >
-              @if (copiedLink()) {
-                <span class="text-emerald-400">✓ Enlace Copiado</span>
-              } @else {
-                <span>🔗 Copiar Enlace de Descarga</span>
-              }
-            </button>
           </div>
         </div>
-      </div>
 
-      <!-- Bento Card: Grilla de Fotografías Compradas -->
-      <div class="bg-white rounded-[32px] p-6 sm:p-8 border border-black/[0.06] shadow-bento space-y-6">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-100 pb-4">
-          <div>
-            <h2 class="text-xl font-display font-extrabold text-zinc-900 tracking-tight">
-              Tus Fotografías en Calidad Original ({{ orderInfo()!.photos.length }})
-            </h2>
-            <p class="text-xs text-zinc-500">
-              Archivos en máxima resolución sin marcas de agua, listos para imprimir o publicar en redes.
-            </p>
+        <!-- Bento Card: Grilla de Fotografías Compradas -->
+        <div class="bg-white rounded-[32px] p-6 sm:p-8 border border-black/[0.06] shadow-bento space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-100 pb-4">
+            <div>
+              <h2 class="text-xl font-display font-extrabold text-zinc-900 tracking-tight">
+                Tus Fotografías en Calidad Original ({{ info.photos.length }})
+              </h2>
+              <p class="text-xs text-zinc-500">
+                Archivos en máxima resolución sin marcas de agua, listos para imprimir o publicar en redes.
+              </p>
+            </div>
+
+            <a
+              [href]="info.whatsappSupportUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold border border-emerald-200 transition"
+            >
+              <span>💬</span>
+              <span>Ayuda por WhatsApp</span>
+            </a>
+          </div>
+
+          <!-- Grilla de Fotos -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            @for (photo of info.photos; track photo.id) {
+              <div class="group bg-zinc-50 rounded-2xl p-3 border border-black/[0.04] hover:shadow-md transition flex flex-col justify-between">
+                <div class="relative w-full h-44 rounded-xl overflow-hidden bg-zinc-200 mb-3">
+                  <img
+                    [src]="photo.previewUrl"
+                    [alt]="photo.filename"
+                    class="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                    loading="lazy"
+                  >
+                  <div class="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/60 backdrop-blur-md text-white text-[10px] font-mono">
+                    ORIGINAL HD
+                  </div>
+                </div>
+
+                <div class="space-y-2">
+                  <p class="text-xs font-mono text-zinc-600 truncate" [title]="photo.filename">
+                    {{ photo.filename }}
+                  </p>
+
+                  <button
+                    (click)="downloadPhoto(photo)"
+                    class="w-full py-2 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-semibold transition flex items-center justify-center gap-1.5"
+                  >
+                    @if (downloadingPhotoId() === photo.id) {
+                      <span>⏳ Descargando...</span>
+                    } @else {
+                      <span>⬇️ Descargar HD</span>
+                    }
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Tarjeta de Soporte Oficial y Autoría -->
+        <div class="bg-zinc-100/70 rounded-2xl p-5 border border-zinc-200/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-600">
+          <div class="flex items-center gap-3">
+            <img src="assets/branding/fotografa.jpg" alt="Jenifer Espeche" class="w-10 h-10 rounded-full object-cover border border-white shadow-sm">
+            <div>
+              <p class="font-bold text-zinc-900">Jenifer "Yuyo" Espeche • La Tercera Fotografía</p>
+              <p class="text-[11px] text-zinc-500">¿Tienes dudas o necesitas copias en papel fotográfico? Escríbeme directamente.</p>
+            </div>
           </div>
 
           <a
-            [href]="orderInfo()!.whatsappSupportUrl"
+            [href]="info.whatsappSupportUrl"
             target="_blank"
             rel="noopener noreferrer"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold border border-emerald-200 transition"
+            class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition shrink-0"
           >
-            <span>💬</span>
-            <span>Ayuda por WhatsApp</span>
+            WhatsApp Oficial
           </a>
         </div>
 
-        <!-- Grilla de Fotos -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          @for (photo of orderInfo()!.photos; track photo.id) {
-            <div class="group bg-zinc-50 rounded-2xl p-3 border border-black/[0.04] hover:shadow-md transition flex flex-col justify-between">
-              <div class="relative w-full h-44 rounded-xl overflow-hidden bg-zinc-200 mb-3">
-                <img
-                  [src]="photo.previewUrl"
-                  [alt]="photo.filename"
-                  class="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                  loading="lazy"
-                >
-                <div class="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/60 backdrop-blur-md text-white text-[10px] font-mono">
-                  ORIGINAL HD
-                </div>
-              </div>
-
-              <div class="space-y-2">
-                <p class="text-xs font-mono text-zinc-600 truncate" [title]="photo.filename">
-                  {{ photo.filename }}
-                </p>
-
-                <button
-                  (click)="downloadPhoto(photo)"
-                  class="w-full py-2 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-semibold transition flex items-center justify-center gap-1.5"
-                >
-                  @if (downloadingPhotoId() === photo.id) {
-                    <span>⏳ Descargando...</span>
-                  } @else {
-                    <span>⬇️ Descargar HD</span>
-                  }
-                </button>
-              </div>
-            </div>
-          }
-        </div>
       </div>
-
-      <!-- Tarjeta de Soporte Oficial y Autoría -->
-      <div class="bg-zinc-100/70 rounded-2xl p-5 border border-zinc-200/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-600">
-        <div class="flex items-center gap-3">
-          <img src="assets/branding/fotografa.jpg" alt="Jenifer Espeche" class="w-10 h-10 rounded-full object-cover border border-white shadow-sm">
-          <div>
-            <p class="font-bold text-zinc-900">Jenifer "Yuyo" Espeche • La Tercera Fotografía</p>
-            <p class="text-[11px] text-zinc-500">¿Tienes dudas o necesitas copias en papel fotográfico? Escríbeme directamente.</p>
-          </div>
-        </div>
-
-        <a
-          [href]="orderInfo()!.whatsappSupportUrl"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition shrink-0"
-        >
-          WhatsApp Oficial
-        </a>
-      </div>
-
-    </div>
+    }
   }
 
   <!-- ==================== ESTADO 3: ENLACE EXPIRADO (> 72 HORAS) ==================== -->

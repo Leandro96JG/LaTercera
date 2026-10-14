@@ -50,7 +50,7 @@ export class DeliveryService {
    */
   public sanitizeId(id: string): string {
     const normalized = id.replace(/\\/g, '/');
-    return path.posix.basename(normalized);
+    return path.posix.basename(normalized).replace(/[^a-zA-Z0-9_-]/g, '_');
   }
 
   /**
@@ -199,6 +199,12 @@ export class DeliveryService {
       console.error('[Error Streaming ZIP Delivery]', err);
       if (!res.headersSent) {
         res.status(500).json({ error: 'Error al generar archivo ZIP' });
+      }
+    });
+
+    res.on('close', () => {
+      if (!res.writableEnded) {
+        archive.abort();
       }
     });
 

@@ -40,9 +40,9 @@ export function createDownloadsRouter(
     try {
       const rawToken = req.params.token;
       const token = Array.isArray(rawToken) ? rawToken[0] : rawToken;
-      const protocol = req.protocol || 'http';
-      const host = req.get('host') || 'localhost:4000';
-      const baseUrl = `${protocol}://${host}`;
+      const baseUrl =
+        process.env.APP_URL ||
+        `${req.protocol || 'http'}://${req.get('host') || 'localhost:4000'}`;
 
       const result = await deliveryService.getDeliveryInfo(token, baseUrl);
 
@@ -55,8 +55,9 @@ export function createDownloadsRouter(
       }
 
       res.json(result.info);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error desconocido';
+      res.status(500).json({ error: message });
     }
   });
 
@@ -81,8 +82,9 @@ export function createDownloadsRouter(
 
       // En entorno de ejecución, enviamos buffer representativo o el archivo desde storage
       res.send(Buffer.from(`LA_TERCERA_HD_ORIGINAL_${resolved.photoId}`));
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error desconocido';
+      res.status(500).json({ error: message });
     }
   });
 
@@ -95,9 +97,10 @@ export function createDownloadsRouter(
       const rawToken = req.params.token;
       const token = Array.isArray(rawToken) ? rawToken[0] : rawToken;
       await deliveryService.streamOrderZip(token, res);
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (!res.headersSent) {
-        res.status(500).json({ error: error.message });
+        const message = error instanceof Error ? error.message : 'Error desconocido';
+        res.status(500).json({ error: message });
       }
     }
   });

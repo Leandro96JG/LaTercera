@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { TestBed } from '@angular/core/testing';
 import { PaymentSuccessComponent } from './payment-success.component';
+import { DeliveryService } from '../../core/services/delivery.service';
 import { of, throwError } from 'rxjs';
 import { OrderDeliveryInfo, DeliveryStatusResponse } from '../../core/models/delivery.model';
 
@@ -37,7 +39,7 @@ describe('PaymentSuccessComponent (TDD)', () => {
     whatsappSupportUrl: 'https://wa.me/5493804868714?text=test'
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     deliveryServiceMock = {
       getOrderStatus: vi.fn(),
       getDeliveryInfo: vi.fn(),
@@ -45,7 +47,15 @@ describe('PaymentSuccessComponent (TDD)', () => {
       triggerDirectDownload: vi.fn()
     };
 
-    component = new PaymentSuccessComponent(deliveryServiceMock);
+    await TestBed.configureTestingModule({
+      imports: [PaymentSuccessComponent],
+      providers: [
+        { provide: DeliveryService, useValue: deliveryServiceMock }
+      ]
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(PaymentSuccessComponent);
+    component = fixture.componentInstance;
   });
 
   it('debe inicializarse en estado loading', () => {

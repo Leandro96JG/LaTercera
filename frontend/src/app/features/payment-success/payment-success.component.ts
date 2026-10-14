@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, signal, computed, OnInit, OnDestroy, Input, Output, EventEmitter } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, computed, OnInit, OnDestroy, input, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DeliveryService } from '../../core/services/delivery.service';
 import { OrderDeliveryInfo, PhotoDownloadItem, DeliveryStatusResponse } from '../../core/models/delivery.model';
@@ -16,9 +16,9 @@ export type PaymentSuccessState = 'loading' | 'polling' | 'ready' | 'expired' | 
 export class PaymentSuccessComponent implements OnInit, OnDestroy {
   private deliveryService: DeliveryService;
 
-  @Input() initialOrderId?: string;
-  @Input() initialToken?: string;
-  @Output() goHome = new EventEmitter<void>();
+  public readonly initialOrderId = input<string | undefined>(undefined);
+  public readonly initialToken = input<string | undefined>(undefined);
+  public readonly goHome = output<void>();
 
   public readonly state = signal<PaymentSuccessState>('loading');
   public readonly orderInfo = signal<OrderDeliveryInfo | null>(null);
@@ -35,15 +35,16 @@ export class PaymentSuccessComponent implements OnInit, OnDestroy {
   });
 
   private timerInterval?: ReturnType<typeof setInterval>;
-  private pollingTimeout?: ReturnType<typeof setTimeout>;
+  private activeTimeouts: Set<ReturnType<typeof setTimeout>> = new Set();
+  private isDestroyed = false;
 
   constructor(deliveryService?: DeliveryService) {
     this.deliveryService = deliveryService || inject(DeliveryService);
   }
 
   ngOnInit(): void {
-    let orderId = this.initialOrderId;
-    let token = this.initialToken;
+    let orderId = this.initialOrderId();
+    let token = this.initialToken();
 
     // Si estamos en el navegador, inspeccionar queryParams de Mercado Pago
     if (typeof window !== 'undefined' && (!orderId && !token)) {
@@ -74,12 +75,25 @@ export class PaymentSuccessComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.isDestroyed = true;
     if (this.timerInterval) {
       clearInterval(this.timerInterval);
     }
-    if (this.pollingTimeout) {
-      clearTimeout(this.pollingTimeout);
+    for (const timeoutId of this.activeTimeouts) {
+      clearTimeout(timeoutId);
     }
+    this.activeTimeouts.clear();
+  }
+
+  private registerTimeout(fn: () => void, ms: number): ReturnType<typeof setTimeout> {
+    const id = setTimeout(() => {
+      this.activeTimeouts.delete(id);
+      if (!this.isDestroyed) {
+        fn();
+      }
+    }, ms);
+    this.activeTimeouts.add(id);
+    return id;
   }
 
   public loadDeliveryInfo(token: string): void {
@@ -88,12 +102,14 @@ export class PaymentSuccessComponent implements OnInit, OnDestroy {
 
     this.deliveryService.getDeliveryInfo(token).subscribe({
       next: (info) => {
+        if (this.isDestroyed) return;
         this.orderInfo.set(info);
         this.remainingSeconds.set(info.expiresInSeconds);
         this.isExpired.set(info.isExpired);
         this.state.set(info.isExpired ? 'expired' : 'ready');
       },
-      error: (err) => {
+      error: (err: { status?: number; error?: { isExpired?: boolean; error?: string } }) => {
+        if (this.isDestroyed) return;
         if (err?.status === 410 || err?.error?.isExpired) {
           this.state.set('expired');
           this.isExpired.set(true);
@@ -107,7 +123,8 @@ export class PaymentSuccessComponent implements OnInit, OnDestroy {
 
   public loadByOrderId(orderId: string): void {
     this.deliveryService.getOrderStatus(orderId).subscribe({
-      next: (res) => {
+      next: (res: DeliveryStatusResponse) => {
+        if (this.isDestroyed) return;
         if (res.status === 'PAID' && res.downloadToken) {
           this.loadDeliveryInfo(res.downloadToken);
         } else if (res.status === 'PENDING' || res.status === 'PROCESSING') {
@@ -116,11 +133,11 @@ export class PaymentSuccessComponent implements OnInit, OnDestroy {
           if (attempt < 10) {
             this.state.set('polling');
             this.pollingAttempt.set(attempt + 1);
-            this.pollingTimeout = setTimeout(() => {
+            this.registerTimeout(() => {
               this.loadByOrderId(orderId);
             }, 2500);
           } else {
-            this.state.set('ready'); // Dar acceso con los datos disponibles o permitir refrescar
+            this.state.set('ready');
           }
         } else if (res.status === 'FRAUD_ALERT_PRICE_MISMATCH') {
           this.state.set('error');
@@ -131,6 +148,7 @@ export class PaymentSuccessComponent implements OnInit, OnDestroy {
         }
       },
       error: () => {
+        if (this.isDestroyed) return;
         this.state.set('error');
         this.errorMessage.set('No fue posible consultar el estado de la orden.');
       }
@@ -145,7 +163,7 @@ export class PaymentSuccessComponent implements OnInit, OnDestroy {
     const filename = `LA_TERCERA_${info.albumId}_FOTOS_HD.zip`;
     this.deliveryService.triggerDirectDownload(info.zipDownloadUrl, filename);
 
-    setTimeout(() => {
+    this.registerTimeout(() => {
       this.downloadingZip.set(false);
     }, 2000);
   }
@@ -154,7 +172,7 @@ export class PaymentSuccessComponent implements OnInit, OnDestroy {
     this.downloadingPhotoId.set(photo.id);
     this.deliveryService.triggerDirectDownload(photo.downloadUrl, photo.filename);
 
-    setTimeout(() => {
+    this.registerTimeout(() => {
       this.downloadingPhotoId.set(null);
     }, 1500);
   }
@@ -163,8 +181,11 @@ export class PaymentSuccessComponent implements OnInit, OnDestroy {
     if (typeof window === 'undefined') return;
     const url = window.location.href;
     navigator.clipboard?.writeText(url).then(() => {
+      if (this.isDestroyed) return;
       this.copiedLink.set(true);
-      setTimeout(() => this.copiedLink.set(false), 3000);
+      this.registerTimeout(() => {
+        this.copiedLink.set(false);
+      }, 3000);
     });
   }
 
