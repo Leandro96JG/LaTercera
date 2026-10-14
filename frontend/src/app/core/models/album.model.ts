@@ -23,6 +23,7 @@ export interface Album {
   readonly freeDownloadUnlockedAt?: string | null;
   readonly isPrivate?: boolean;
   readonly accessCode?: string | null;
+  readonly customSlug?: string;
   readonly photos?: readonly Photo[];
 }
 

@@ -80,9 +80,30 @@ Plataforma web e-commerce mobile-first orientada a la venta de fotografías de p
 - [x] Conexión de AdminAuthService con IPhotographerRepository (Supabase / Memory), Persistencia de Fotógrafos Colaboradores y Autenticación Post-Reinicio con loginAsync con **238 tests unitarios pasando al 100%** (140 backend + 98 frontend).
 - [x] Conexión de Métricas Reales en `/api/admin/stats` y Pestaña "💳 Ventas & Entregas" con Regeneración de Links de 72h en 1 Clic con **251 tests unitarios pasando al 100%** (147 backend + 104 frontend).
 - [x] Modal Bento "🖼️ Gestionar Fotos del Álbum" (Portadas, Muestras HD y Eliminación Quirúrgica) con **263 tests unitarios pasando al 100%** (151 backend + 112 frontend).
+- [x] Kit de Difusión WhatsApp (enlaces directos ?album=), Miniaturas en Subida Masiva (URL.createObjectURL) y Sistema de Toasts Bento con **270 tests unitarios pasando al 100%** (151 backend + 119 frontend).
 - [ ] Preparación para Despliegue en Producción (CI/CD, Railway/Render para Backend, Vercel/Cloudflare Pages para Frontend).
 
-### ADR-034: Modal Bento "🖼️ Gestionar Fotos del Álbum" (Portadas, Muestras HD y Eliminación Quirúrgica)
+### ADR-035: Kit de Difusión WhatsApp, Miniaturas en Subida Masiva y Sistema de Toasts Bento
+- **Motivación y Diagnóstico:**
+  1. En `frontend/src/app/features/admin-panel/admin-panel.component.html` (pestaña `📤 Subida Masiva`), cuando la fotógrafa seleccionaba archivos locales, solo visualizaba una lista textual de nombres de archivo (`file.name`), impidiendo verificar visualmente qué fotos destacar como `⭐ Muestra HD` antes de la subida masiva.
+  2. En `admin-panel.component.ts`, las acciones críticas de mover a papelera (`moveToTrash`) y validación de clave PIN (`savePrivacy`) recurrían a `confirm()` y `alert()` nativos del navegador, bloqueando el hilo de ejecución y degradando la experiencia visual Bento.
+  3. En `frontend/src/app/app.ts`, la plataforma no admitía enlaces profundos directos mediante el query param `?album=<id_or_slug>`, dificultando la difusión de carpetas específicas en grupos de WhatsApp o redes sociales.
+- **Solución Implementada:**
+  1. **Enlaces Directos y Difusión WhatsApp en 1 Clic (`app.ts` y `admin-panel.component.ts`):**
+     - En `App.ngOnInit()` y `loadPublicAlbums()`, se inspecciona `params.get('album')` vía `URLSearchParams`. Si coincide con un álbum disponible, se dispara automáticamente `openAlbum(album)`.
+     - En cada tarjeta de álbum del panel administrativo, se incorporó el botón **`📲 Copiar Link WhatsApp`** con retroalimentación optimista instantánea (`copiedWhatsAppAlbumId`). Genera un mensaje pre-armado con llamado a la acción, enlace directo, precios (foto suelta y pack completo) y PIN confidencial si el álbum es privado.
+  2. **Miniaturas Visuales Reactivas con `URL.createObjectURL` en Subida Masiva (`admin-panel.component.ts` y `.html`):**
+     - En `handleSelectedFileList()`, se generan URLs temporales de previsualización con `URL.createObjectURL(file)`.
+     - Grilla responsive Bento de tarjetas fotográficas con miniatura real, tamaño en MB, botón para quitar imagen puntual y alternador interactivo `⭐ Muestra HD`.
+     - Ciclo de vida defensivo con liberación de memoria RAM (`URL.revokeObjectURL(url)`) en `removeSelectedFile()`, `clearSelectedFiles()` y `ngOnDestroy()`.
+  3. **Sistema de Toasts Bento Flotante y Modal Bento de Confirmación:**
+     - Eliminación total de `confirm()` nativo, reemplazado por un modal Bento accesible (`isTrashModalOpen()`) con foco y confirmación limpia.
+     - Eliminación total de `alert()` nativo, sustituido por validación inline reactiva (`privacyError()`) y un componente de Toast Bento flotante (`showToast()`, `dismissToast()`) con temporizador automático y badges temáticos (`success`, `warning`, `error`, `info`).
+- **Evidencia y Validación:**
+  - **270 tests unitarios pasando al 100%** (151 backend + 119 frontend).
+  - 1 nuevo test en [`app.spec.ts`](file:///e:/code/IA/fotos/frontend/src/app/app.spec.ts) validando detección y apertura automática de álbumes por query param `?album=`.
+  - 6 nuevos tests en [`admin-panel.component.spec.ts`](file:///e:/code/IA/fotos/frontend/src/app/features/admin-panel/admin-panel.component.spec.ts) validando generación de texto WhatsApp, inclusión de PIN, generación/revocación de blob URLs, modal Bento de papelera, validación sin `alert()` y ciclo de vida de Toasts.
+  - Compilación de producción `ng build` completada con código 0 y `npx tsc --noEmit` en backend exitosa.
 - **Motivación y Diagnóstico:**
   1. En `AdminPanelComponent`, las tarjetas de la pestaña `📁 Álbumes & Precios` indicaban el conteo de fotos de cada álbum (`album.photosCount`), pero la fotógrafa no podía visualizar las fotografías cargadas para definir o cambiar la foto de portada (`coverUrl`), seleccionar cuáles imágenes destacan como muestra de alta resolución (`isSampleHd`), o eliminar una fotografía individual movida o defectuosa sin borrar el álbum completo.
   2. En el backend, no existían endpoints protegidos para listar todas las fotos de un álbum específico ni para alterar individualmente el estado `isSampleHD` o `coverUrl` en `IAlbumRepository`, ni para purgar los binarios de `previews` y `originals` en `IStorageService`.

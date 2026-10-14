@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, signal, computed, OnInit, output } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, computed, OnInit, OnDestroy, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { AdminAuthStore } from '../../core/state/admin-auth.store';
@@ -26,7 +26,7 @@ import {
   templateUrl: './admin-panel.component.html',
   styleUrl: './admin-panel.component.css'
 })
-export class AdminPanelComponent implements OnInit {
+export class AdminPanelComponent implements OnInit, OnDestroy {
   private readonly fb = inject(FormBuilder);
   public readonly adminAuthStore = inject(AdminAuthStore);
   public readonly adminService = inject(AdminService);
@@ -97,6 +97,21 @@ export class AdminPanelComponent implements OnInit {
   public readonly isUpdatingPrivacyId = signal<string | null>(null);
   public readonly editingPrivacyAlbumId = signal<string | null>(null);
   public readonly privacyAccessCodeInput = signal<string>('');
+  public readonly privacyError = signal<string | null>(null);
+
+  // Modal de Confirmación Bento: Mover a Papelera
+  public readonly albumToTrash = signal<Album | null>(null);
+  public readonly isTrashModalOpen = signal<boolean>(false);
+
+  // Difusión WhatsApp en 1 clic
+  public readonly copiedWhatsAppAlbumId = signal<string | null>(null);
+
+  // Previsualizaciones locales de imágenes en Subida Masiva
+  public readonly filePreviewUrls = signal<readonly string[]>([]);
+
+  // Sistema de Toast Bento Flotante
+  public readonly toast = signal<{ message: string; type: 'success' | 'error' | 'warning' | 'info' } | null>(null);
+  private toastTimer: any = null;
 
   // Modal de Gestión de Fotos del Álbum
   public readonly isPhotosModalOpen = signal<boolean>(false);
@@ -289,6 +304,62 @@ export class AdminPanelComponent implements OnInit {
     this.loadTrashAlbums();
     this.loadStats();
     this.loadOrders();
+  }
+
+  ngOnDestroy(): void {
+    this.revokePreviewUrls();
+    if (this.toastTimer) {
+      clearTimeout(this.toastTimer);
+    }
+  }
+
+  // --- Sistema de Toast Bento Flotante ---
+  public showToast(
+    message: string,
+    type: 'success' | 'error' | 'warning' | 'info' = 'info',
+    durationMs: number = 4000
+  ): void {
+    if (this.toastTimer) {
+      clearTimeout(this.toastTimer);
+    }
+    this.toast.set({ message, type });
+    this.toastTimer = setTimeout(() => {
+      this.toast.set(null);
+    }, durationMs);
+  }
+
+  public dismissToast(): void {
+    if (this.toastTimer) {
+      clearTimeout(this.toastTimer);
+    }
+    this.toast.set(null);
+  }
+
+  // --- Difusión de Enlaces para WhatsApp en 1 Clic ---
+  public copyWhatsAppShareText(album: Album): void {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:4200';
+    const albumUrl = `${origin}/?album=${encodeURIComponent(album.id)}`;
+
+    let shareMessage = `📸 ¡Ya están las fotos de ${album.title} en LA TERCERA! Mirá las muestras y descargá las tuyas en 4K acá: ${albumUrl} (Foto suelta: $${album.unitPrice} | Pack completo: $${album.fullAlbumPrice})`;
+
+    if (album.isPrivate && album.accessCode && album.accessCode !== '********') {
+      shareMessage += ` • 🔒 PIN de acceso: ${album.accessCode}`;
+    }
+
+    this.copiedWhatsAppAlbumId.set(album.id);
+    this.showToast('¡Texto para WhatsApp copiado al portapapeles!', 'success');
+    setTimeout(() => {
+      if (this.copiedWhatsAppAlbumId() === album.id) {
+        this.copiedWhatsAppAlbumId.set(null);
+      }
+    }, 2500);
+
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(shareMessage).catch(() => {
+        this.copiedWhatsAppAlbumId.set(null);
+        this.showToast('No se pudo copiar al portapapeles', 'error');
+      });
+    }
   }
 
   public loadOrders(): void {
@@ -704,31 +775,33 @@ export class AdminPanelComponent implements OnInit {
   }
 
   public moveToTrash(album: Album): void {
-    if (!confirm(`¿Estás seguro de mover el álbum "${album.title}" a la papelera de reciclaje?\n\nTendrás 30 días para restaurarlo antes de que se purgue permanentemente.`)) {
-      return;
-    }
+    this.albumToTrash.set(album);
+    this.isTrashModalOpen.set(true);
+  }
+
+  public closeTrashModal(): void {
+    this.isTrashModalOpen.set(false);
+    this.albumToTrash.set(null);
+  }
+
+  public confirmMoveToTrash(): void {
+    const album = this.albumToTrash();
+    if (!album) return;
 
     this.isMovingToTrashId.set(album.id);
     this.adminService.moveToTrash(album.id).subscribe({
       next: (res) => {
         this.isMovingToTrashId.set(null);
+        this.closeTrashModal();
         if (res.success) {
           this.albums.set(this.albums().filter(a => a.id !== album.id));
           this.loadTrashAlbums();
-          this.updateFeedback.set({
-            albumId: album.id,
-            message: 'Álbum movido a la papelera (se purgará en 30 días)',
-            success: true
-          });
+          this.showToast(`Álbum "${album.title}" movido a la papelera (se purgará en 30 días)`, 'success');
         }
       },
       error: (err) => {
         this.isMovingToTrashId.set(null);
-        this.updateFeedback.set({
-          albumId: album.id,
-          message: err.error?.error || 'Error al mover a papelera',
-          success: false
-        });
+        this.showToast(err.error?.error || 'Error al mover a papelera', 'error');
       }
     });
   }
@@ -814,19 +887,23 @@ export class AdminPanelComponent implements OnInit {
   public startEditPrivacy(album: Album): void {
     this.editingPrivacyAlbumId.set(album.id);
     this.privacyAccessCodeInput.set(album.accessCode === '********' ? '' : (album.accessCode || ''));
+    this.privacyError.set(null);
   }
 
   public cancelEditPrivacy(): void {
     this.editingPrivacyAlbumId.set(null);
     this.privacyAccessCodeInput.set('');
+    this.privacyError.set(null);
   }
 
   public savePrivacy(album: Album, makePrivate: boolean): void {
     const code = this.privacyAccessCodeInput().trim();
     if (makePrivate && !code) {
-      alert('Debes ingresar un código PIN o clave de acceso para el álbum privado.');
+      this.privacyError.set('Debes ingresar un código PIN o clave de acceso para el álbum privado.');
+      this.showToast('Debes ingresar un código PIN o clave de acceso', 'warning');
       return;
     }
+    this.privacyError.set(null);
 
     this.isUpdatingPrivacyId.set(album.id);
     this.adminService.updateAlbumPrivacy(album.id, makePrivate, makePrivate ? code : null).subscribe({
@@ -835,25 +912,12 @@ export class AdminPanelComponent implements OnInit {
         this.editingPrivacyAlbumId.set(null);
         if (res.success && res.album) {
           this.albums.set(this.albums().map(a => a.id === album.id ? res.album : a));
-          this.updateFeedback.set({
-            albumId: album.id,
-            message: makePrivate ? '🔒 Álbum protegido con PIN' : 'Álbum configurado como público',
-            success: true
-          });
-          setTimeout(() => {
-            if (this.updateFeedback()?.albumId === album.id) {
-              this.updateFeedback.set(null);
-            }
-          }, 3500);
+          this.showToast(makePrivate ? '🔒 Álbum protegido con PIN' : 'Álbum configurado como público', 'success');
         }
       },
       error: (err) => {
         this.isUpdatingPrivacyId.set(null);
-        this.updateFeedback.set({
-          albumId: album.id,
-          message: err.error?.error || 'Error al actualizar privacidad',
-          success: false
-        });
+        this.showToast(err.error?.error || 'Error al actualizar privacidad', 'error');
       }
     });
   }
@@ -1062,10 +1126,20 @@ export class AdminPanelComponent implements OnInit {
   }
 
   private handleSelectedFileList(files: File[]): void {
+    this.revokePreviewUrls();
+
     const validImageFiles = files.filter(f =>
       f.type.startsWith('image/') || /\.(jpe?g|png|webp)$/i.test(f.name)
     );
     this.selectedFiles.set(validImageFiles);
+
+    const previewUrls = validImageFiles.map(f => {
+      if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+        return URL.createObjectURL(f);
+      }
+      return '';
+    });
+    this.filePreviewUrls.set(previewUrls);
 
     const oversized = validImageFiles.filter(f => f.size > this.MAX_FILE_SIZE_BYTES);
     if (oversized.length > 0) {
@@ -1077,7 +1151,23 @@ export class AdminPanelComponent implements OnInit {
     }
   }
 
+  public revokePreviewUrls(): void {
+    if (typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
+      this.filePreviewUrls().forEach(url => {
+        if (url) URL.revokeObjectURL(url);
+      });
+    }
+    this.filePreviewUrls.set([]);
+  }
+
   public removeSelectedFile(index: number): void {
+    const urls = this.filePreviewUrls();
+    const urlToRemove = urls[index];
+    if (urlToRemove && typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
+      URL.revokeObjectURL(urlToRemove);
+    }
+    this.filePreviewUrls.set(urls.filter((_, i) => i !== index));
+
     const current = this.selectedFiles();
     const updated = current.filter((_, i) => i !== index);
     this.selectedFiles.set(updated);
@@ -1092,6 +1182,7 @@ export class AdminPanelComponent implements OnInit {
   }
 
   public clearSelectedFiles(): void {
+    this.revokePreviewUrls();
     this.selectedFiles.set([]);
     this.hdIndices.set([]);
     this.bulkError.set(null);

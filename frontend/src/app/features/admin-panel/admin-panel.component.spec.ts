@@ -695,5 +695,127 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
       vi.unstubAllGlobals();
     });
   });
+
+  describe('Kit de Difusión WhatsApp, Miniaturas en Subida Masiva y Sistema de Toasts Bento', () => {
+    it('debe generar y copiar el texto de difusión para WhatsApp con enlace directo al portapapeles', async () => {
+      const writeTextMock = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, {
+        clipboard: {
+          writeText: writeTextMock
+        }
+      });
+
+      component.copyWhatsAppShareText(initialMockAlbum);
+
+      expect(writeTextMock).toHaveBeenCalledWith(
+        expect.stringContaining('📸 ¡Ya están las fotos de Atlético Tesorieri vs Andino SC en LA TERCERA!')
+      );
+      expect(writeTextMock).toHaveBeenCalledWith(
+        expect.stringContaining('/?album=album-1')
+      );
+      expect(writeTextMock).toHaveBeenCalledWith(
+        expect.stringContaining('Foto suelta: $1200 | Pack completo: $9500')
+      );
+      expect(component.copiedWhatsAppAlbumId()).toBe('album-1');
+      expect(component.toast()?.type).toBe('success');
+    });
+
+    it('debe incluir el código PIN en el mensaje de WhatsApp si el álbum es privado', () => {
+      const writeTextMock = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, {
+        clipboard: {
+          writeText: writeTextMock
+        }
+      });
+
+      const privateAlbum = {
+        ...initialMockAlbum,
+        isPrivate: true,
+        accessCode: 'SECRETO123'
+      };
+
+      component.copyWhatsAppShareText(privateAlbum);
+
+      expect(writeTextMock).toHaveBeenCalledWith(
+        expect.stringContaining('🔒 PIN de acceso: SECRETO123')
+      );
+    });
+
+    it('debe generar URLs de previsualización con createObjectURL y revocarlas al remover o limpiar', () => {
+      const createObjectURLMock = vi.fn((file: File) => `blob:http://localhost:4200/${file.name}`);
+      const revokeObjectURLMock = vi.fn();
+      vi.stubGlobal('URL', {
+        createObjectURL: createObjectURLMock,
+        revokeObjectURL: revokeObjectURLMock
+      });
+
+      const f1 = new File(['content1'], 'foto1.jpg', { type: 'image/jpeg' });
+      const f2 = new File(['content2'], 'foto2.jpg', { type: 'image/jpeg' });
+
+      // Simular onFilesDropped o handleSelectedFileList
+      (component as any).handleSelectedFileList([f1, f2]);
+
+      expect(component.filePreviewUrls().length).toBe(2);
+      expect(component.filePreviewUrls()[0]).toBe('blob:http://localhost:4200/foto1.jpg');
+      expect(createObjectURLMock).toHaveBeenCalledTimes(2);
+
+      // Quitar la primera foto
+      component.removeSelectedFile(0);
+      expect(revokeObjectURLMock).toHaveBeenCalledWith('blob:http://localhost:4200/foto1.jpg');
+      expect(component.filePreviewUrls().length).toBe(1);
+
+      // Limpiar selección
+      component.clearSelectedFiles();
+      expect(revokeObjectURLMock).toHaveBeenCalledWith('blob:http://localhost:4200/foto2.jpg');
+      expect(component.filePreviewUrls().length).toBe(0);
+
+      vi.unstubAllGlobals();
+    });
+
+    it('debe abrir modal Bento de confirmación para mover a papelera y procesar con confirmMoveToTrash', () => {
+      // Al hacer clic en moveToTrash se abre el modal Bento sin confirm() nativo
+      component.moveToTrash(initialMockAlbum);
+
+      expect(component.isTrashModalOpen()).toBe(true);
+      expect(component.albumToTrash()?.id).toBe('album-1');
+
+      // Confirmar en el modal Bento
+      component.confirmMoveToTrash();
+
+      expect(mockAdminService.moveToTrash).toHaveBeenCalledWith('album-1');
+      expect(component.isTrashModalOpen()).toBe(false);
+      expect(component.albumToTrash()).toBeNull();
+      expect(component.albums().find(a => a.id === 'album-1')).toBeUndefined();
+      expect(component.toast()?.type).toBe('success');
+      expect(component.toast()?.message).toContain('movido a la papelera');
+    });
+
+    it('debe validar inline y mostrar toast si falta el PIN al proteger álbum sin invocar alert nativo', () => {
+      const alertMock = vi.fn();
+      vi.stubGlobal('alert', alertMock);
+
+      component.startEditPrivacy(initialMockAlbum);
+      component.privacyAccessCodeInput.set('');
+
+      component.savePrivacy(initialMockAlbum, true);
+
+      // Debe rechazar sin invocar alert() nativo del navegador
+      expect(alertMock).not.toHaveBeenCalled();
+      expect(component.privacyError()).toContain('código PIN');
+      expect(component.toast()?.type).toBe('warning');
+      expect(mockAdminService.updateAlbumPrivacy).not.toHaveBeenCalled();
+
+      vi.unstubAllGlobals();
+    });
+
+    it('debe gestionar el ciclo de vida del Toast flotante Bento', () => {
+      component.showToast('Operación exitosa', 'success');
+      expect(component.toast()?.message).toBe('Operación exitosa');
+      expect(component.toast()?.type).toBe('success');
+
+      component.dismissToast();
+      expect(component.toast()).toBeNull();
+    });
+  });
 });
 

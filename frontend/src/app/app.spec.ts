@@ -5,6 +5,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of } from 'rxjs';
 import { App } from './app';
 import { AlbumService } from './core/services/album.service';
+import { Album } from './core/models/album.model';
 
 describe('App Root Component - LA TERCERA', () => {
   beforeEach(async () => {
@@ -239,5 +240,34 @@ describe('App Root Component - LA TERCERA', () => {
     expect(executed).toBe(true);
 
     delete (document as any).startViewTransition;
+  });
+
+  it('debe abrir automáticamente el álbum si la URL contiene el query param ?album=<id>', () => {
+    window.history.pushState({}, '', '/?album=album-1');
+
+    const albumService = TestBed.inject(AlbumService);
+    const mockAlbum: Album = {
+      id: 'album-1',
+      category: 'futbol',
+      title: 'Atlético Tesorieri vs Andino SC',
+      subtitle: 'Liga Riojana',
+      date: '12 Octubre, 2026',
+      photosCount: 10,
+      unitPrice: 1200,
+      fullAlbumPrice: 9500,
+      coverUrl: 'https://example.com/cover.webp',
+      badge: '⚽ Fútbol'
+    };
+    vi.spyOn(albumService, 'getAlbums').mockReturnValue(of([mockAlbum]));
+    vi.spyOn(albumService, 'getAlbumPhotos').mockReturnValue(of([]));
+
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+    app.ngOnInit();
+
+    expect(app.currentView()).toBe('album');
+    expect(app.currentAlbum()?.id).toBe('album-1');
+
+    window.history.pushState({}, '', '/');
   });
 });

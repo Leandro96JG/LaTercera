@@ -181,6 +181,7 @@ export class App implements OnInit {
     this.albumService.getAlbums().subscribe({
       next: (albums) => {
         this.albums.set(albums);
+        this.checkDirectAlbumLink();
       },
       error: () => {
         // Fallback local con álbumes oficiales de La Tercera
@@ -234,8 +235,24 @@ export class App implements OnInit {
             badge: '🎉 Cumpleaños & Social'
           }
         ]);
+        this.checkDirectAlbumLink();
       }
     });
+  }
+
+  /**
+   * Abre automáticamente un álbum si la URL contiene el parámetro ?album=<id_o_slug>
+   */
+  public checkDirectAlbumLink(): void {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const albumParam = params.get('album')?.trim();
+    if (!albumParam) return;
+
+    const matched = this.albums().find(a => a.id === albumParam || a.customSlug === albumParam);
+    if (matched) {
+      this.openAlbum(matched);
+    }
   }
 
   ngOnInit(): void {
