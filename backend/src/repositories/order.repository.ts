@@ -100,6 +100,29 @@ export class MemoryOrderRepository implements IOrderRepository {
   }
 }
 
+export interface SupabaseOrderRow {
+  id: string;
+  album_id: string;
+  is_full_album?: boolean | null;
+  photo_count?: number | null;
+  unit_price?: number | string | null;
+  subtotal?: number | string | null;
+  discount?: number | string | null;
+  discount_percentage?: number | string | null;
+  total_amount?: number | string | null;
+  currency?: string | null;
+  customer_email: string;
+  customer_name?: string | null;
+  customer_phone?: string | null;
+  coupon_applied?: string | null;
+  status: string;
+  preference_id?: string | null;
+  payment_id?: string | null;
+  download_token?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 /**
  * Implementación PostgreSQL de IOrderRepository con Supabase
  */
@@ -110,7 +133,7 @@ export class SupabaseOrderRepository implements IOrderRepository {
     this.supabase = supabase;
   }
 
-  private mapRowToOrder(row: any, photoIds: string[] = []): Order {
+  private mapRowToOrder(row: SupabaseOrderRow, photoIds: string[] = []): Order {
     return {
       id: row.id,
       albumId: row.album_id,

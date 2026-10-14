@@ -133,6 +133,21 @@ export class MemoryAlbumRepository implements IAlbumRepository {
   }
 }
 
+export interface SupabaseAlbumRow {
+  id: string;
+  category: 'futbol' | 'hockey' | 'basquet' | 'sociales' | 'otros';
+  title: string;
+  subtitle?: string | null;
+  event_date?: string | null;
+  location?: string | null;
+  photos_count?: number | null;
+  unit_price?: number | string | null;
+  full_album_price?: number | string | null;
+  cover_url: string;
+  badge?: string | null;
+  is_published?: boolean | null;
+}
+
 /**
  * Implementación PostgreSQL de IAlbumRepository con Supabase
  */
@@ -143,7 +158,7 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
     this.supabase = supabase;
   }
 
-  private mapRowToAlbum(row: any): AlbumDTO {
+  private mapRowToAlbum(row: SupabaseAlbumRow): AlbumDTO {
     return {
       id: row.id,
       category: row.category,

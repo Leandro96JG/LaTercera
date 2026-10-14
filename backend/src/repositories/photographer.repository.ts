@@ -65,6 +65,19 @@ export class MemoryPhotographerRepository implements IPhotographerRepository {
   }
 }
 
+export interface SupabasePhotographerRow {
+  id: string;
+  email: string;
+  password_hash: string;
+  full_name?: string | null;
+  display_name?: string | null;
+  phone?: string | null;
+  role: 'admin' | 'photographer';
+  is_active?: boolean | null;
+  created_at: string;
+  updated_at?: string | null;
+}
+
 /**
  * Implementación PostgreSQL de IPhotographerRepository con Supabase
  */
@@ -75,7 +88,7 @@ export class SupabasePhotographerRepository implements IPhotographerRepository {
     this.supabase = supabase;
   }
 
-  private mapRowToPhotographer(row: any): PhotographerAccount {
+  private mapRowToPhotographer(row: SupabasePhotographerRow): PhotographerAccount {
     return {
       id: row.id,
       email: row.email,

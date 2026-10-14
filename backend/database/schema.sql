@@ -223,8 +223,10 @@ CREATE INDEX IF NOT EXISTS idx_download_tokens_order_id ON download_tokens(order
 CREATE INDEX IF NOT EXISTS idx_download_tokens_expires_at ON download_tokens(expires_at);
 
 -- ----------------------------------------------------------------------------
--- 9. VISTA PÚBLICA SEGURA: PUBLIC_PHOTOS (Zero-Trust: Excluye original_path)
+-- 9. VISTAS PÚBLICAS SEGURAS (Zero-Trust: Excluyen columnas sensibles)
 -- ----------------------------------------------------------------------------
+
+-- Vista pública de fotos (excluye original_path)
 CREATE OR REPLACE VIEW public_photos AS
 SELECT 
     p.id,
@@ -239,6 +241,19 @@ SELECT
 FROM photos p
 JOIN albums a ON p.album_id = a.id
 WHERE a.is_published = TRUE;
+
+-- Vista pública de fotógrafos (excluye password_hash)
+CREATE OR REPLACE VIEW public_photographers AS
+SELECT 
+    id,
+    full_name,
+    display_name,
+    phone,
+    role,
+    is_active,
+    created_at
+FROM photographers
+WHERE is_active = TRUE;
 
 -- ----------------------------------------------------------------------------
 -- 10. POLÍTICAS ROW LEVEL SECURITY (RLS)
@@ -283,11 +298,11 @@ CREATE POLICY "Public create orders"
     TO anon, authenticated
     WITH CHECK (TRUE);
 
--- 10.6 Órdenes: Consulta pública de la propia orden
-CREATE POLICY "Public read orders"
+-- 10.6 Órdenes: Consulta directa en Supabase restringida al Administrador (los clientes consultan vía Express API)
+CREATE POLICY "Admin read orders"
     ON orders FOR SELECT
-    TO anon, authenticated
-    USING (TRUE);
+    TO authenticated
+    USING (auth.jwt() ->> 'role' = 'admin');
 
 -- 10.7 Órdenes: Actualización de órdenes prohibida a clientes anónimos (solo Admin / Service Role)
 CREATE POLICY "Admin update orders"
@@ -296,16 +311,16 @@ CREATE POLICY "Admin update orders"
     USING (auth.jwt() ->> 'role' = 'admin')
     WITH CHECK (auth.jwt() ->> 'role' = 'admin');
 
--- 10.8 Order Items: Creación y lectura de items
+-- 10.8 Order Items: Creación pública al pagar y lectura restringida a Admin
 CREATE POLICY "Public insert order items"
     ON order_items FOR INSERT
     TO anon, authenticated
     WITH CHECK (TRUE);
 
-CREATE POLICY "Public read order items"
+CREATE POLICY "Admin read order items"
     ON order_items FOR SELECT
-    TO anon, authenticated
-    USING (TRUE);
+    TO authenticated
+    USING (auth.jwt() ->> 'role' = 'admin');
 
 -- 10.9 Download Tokens: Restringidos a Service Role y Administradores (Zero-Trust)
 CREATE POLICY "Admin read download tokens"
@@ -319,12 +334,7 @@ CREATE POLICY "Admin manage download tokens"
     USING (auth.jwt() ->> 'role' = 'admin')
     WITH CHECK (auth.jwt() ->> 'role' = 'admin');
 
--- 10.10 Fotógrafos: Lectura pública del perfil excluyendo contraseñas mediante vista segura
-CREATE POLICY "Public read photographer profiles"
-    ON photographers FOR SELECT
-    TO anon, authenticated
-    USING (is_active = TRUE);
-
+-- 10.10 Fotógrafos: Acceso a la tabla base con password_hash restringido a Administradores (público usa public_photographers)
 CREATE POLICY "Admin manage photographers"
     ON photographers FOR ALL
     TO authenticated
