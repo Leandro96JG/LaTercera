@@ -59,20 +59,24 @@ Plataforma web e-commerce mobile-first orientada a la venta de fotografías de p
 - [x] Importador de carpetas compartidas de Google Drive con Sharp (Anti-OOM worker pool concurrente, validación de magic bytes y generación de WebP 800px protegidos).
 - [x] Panel administrativo completo con subida masiva drag-and-drop, métricas en vivo y registro de fotógrafos colaboradores para escalabilidad futura.
 - [x] Flujo de Entrega Post-Pago, Streaming de Descargas y Pantalla de Éxito (`/pago-exitoso`) con **127 tests unitarios pasando en total** (88 backend + 39 frontend).
-- [x] Persistencia de Base de Datos Real con **Supabase (PostgreSQL)** y Patrón Repository con **136 tests unitarios pasando en total** (97 backend + 39 frontend).
+- [x] Persistencia de Base de Datos Real con **Supabase (PostgreSQL)** y Patrón Repository con **141 tests unitarios pasando en total** (102 backend + 39 frontend).
+- [ ] Configuración asistida de variables de entorno de Supabase por el usuario (`.env`) y verificación de conectividad live.
 
 ### ADR-014: Persistencia en Supabase (PostgreSQL) y Patrón Repository Desacoplado
 - **Esquema Relacional (`backend/database/schema.sql`):**
   - Tablas: `photographers` (scrypt hash, multi-rol), `albums` (disciplinas deportivas y sociales, precios, fechas), `photos` (rutas públicas y privadas), `orders` (Zero-Trust, ARS), `order_items` (fotos adquiridas) y `processed_webhook_events` (idempotencia transaccional).
   - Índices B-Tree optimizados en `album_id`, `status`, `customer_email`, `payment_id` y `created_at`.
-  - Políticas Row Level Security (RLS) habilitadas: lectura anónima acotada a álbumes publicados y fotos preview; operaciones de modificación protegidas con `SERVICE_ROLE_KEY` en el backend.
+  - Políticas Row Level Security (RLS) endurecidas post-auditoría:
+    - Vistas públicas seguras `public_photos` (excluye `original_path`) y `public_photographers` (excluye `password_hash`).
+    - Tablas `orders` y `order_items` con lectura pública deshabilitada (Zero-Trust; clientes consultan exclusivamente a través de la API Express con `SERVICE_ROLE_KEY` o admin autenticado para prevenir filtración de emails y tokens).
 - **Patrón Repository Híbrido (`src/repositories/`):**
-  - Interfaces desacopladas `IOrderRepository` e `IAlbumRepository`.
-  - Implementaciones duales: `SupabaseOrderRepository` / `SupabaseAlbumRepository` (producción) y `MemoryOrderRepository` / `MemoryAlbumRepository` (pruebas locales/CI sin conexión).
-  - Factory de inyección defensiva (`createOrderRepository`, `createAlbumRepository`) con detección automática de variables de entorno (`isSupabaseConfigured()`).
+  - Interfaces desacopladas `IOrderRepository`, `IAlbumRepository` e `IPhotographerRepository`.
+  - Tipado estricto sin `any` con interfaces de filas dedicadas: `SupabaseOrderRow`, `SupabaseAlbumRow` y `SupabasePhotographerRow`.
+  - Implementaciones duales: `Supabase*` (producción) y `Memory*` (pruebas locales/CI sin conexión).
+  - Factory de inyección defensiva (`createOrderRepository`, `createAlbumRepository`, `createPhotographerRepository`) con detección automática de variables de entorno (`isSupabaseConfigured()`).
   - Cache sincronizado Write-Through en `OrderService` para máxima velocidad de lectura sin sacrificar persistencia ACID.
 - **Variables de Entorno y Secretos:**
-  - `SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY` registradas en `.env.example`.
+  - `SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY` registradas en `.env.example` con advertencia explícita de seguridad sobre la clave Service Role.
 
 ### ADR-013: Flujo de Entrega Post-Pago, Streaming de Descargas y Pantalla de Éxito (/pago-exitoso)
 - **Endpoints de Entrega y Streaming:**
