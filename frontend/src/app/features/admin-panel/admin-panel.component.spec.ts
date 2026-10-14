@@ -303,4 +303,40 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
     expect(component.updateFeedback()?.success).toBe(true);
     expect(component.albums().find((a) => a.id === 'album-1')?.unitPrice).toBe(1600);
   });
+
+  it('debe rechazar el guardado de precios si unitPrice supera fullAlbumPrice', () => {
+    // Configurar borrador inválido: unitPrice 15000 > fullAlbumPrice 5000
+    const mockInput = { target: { value: '15000' } } as unknown as Event;
+    component.onPriceDraftChange('album-1', 'unitPrice', mockInput);
+
+    const mockAlbumInput = { target: { value: '5000' } } as unknown as Event;
+    component.onPriceDraftChange('album-1', 'fullAlbumPrice', mockAlbumInput);
+
+    component.saveAlbumPrices('album-1');
+
+    expect(mockAdminService.updateAlbum).not.toHaveBeenCalled();
+    expect(component.updateFeedback()?.success).toBe(false);
+    expect(component.updateFeedback()?.message).toContain('no puede ser más cara');
+  });
+
+  it('debe rechazar la creación de un álbum si unitPrice supera fullAlbumPrice en el formulario', () => {
+    component.openCreateModal();
+
+    component.createAlbumForm.patchValue({
+      title: 'Torneo Precios Invertidos',
+      category: 'futbol',
+      subtitle: 'Liga Riojana',
+      date: '20 Octubre, 2026',
+      location: 'Mercado Luna',
+      unitPrice: 15000,
+      fullAlbumPrice: 5000,
+      badge: '⚽ Fútbol',
+      isPublished: true
+    });
+
+    component.submitCreateAlbum();
+
+    expect(mockAdminService.createAlbum).not.toHaveBeenCalled();
+    expect(component.createAlbumError()).toContain('no puede ser mayor');
+  });
 });

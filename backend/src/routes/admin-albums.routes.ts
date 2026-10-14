@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import {
   GoogleDriveImporterService,
@@ -35,7 +35,7 @@ export function createAdminAlbumsRouter(
 
   const requireAdminAuth = authService
     ? createRequireAdminAuth(authService)
-    : (req: any, res: any, next: any) => next();
+    : (_req: Request, _res: Response, next: NextFunction) => next();
 
   // Configuración de Multer para subida múltiple en memoria (hasta 100 fotos de 50MB)
   const upload = multer({
@@ -96,9 +96,17 @@ export function createAdminAlbumsRouter(
       if (typeof body.fullAlbumPrice !== 'number' || body.fullAlbumPrice <= 0) {
         return res.status(400).json({ success: false, error: 'El precio del álbum completo debe ser mayor a 0 ARS' });
       }
+      if (body.unitPrice > body.fullAlbumPrice) {
+        return res.status(400).json({
+          success: false,
+          error: 'El precio por foto individual no puede ser mayor al precio del álbum completo'
+        });
+      }
 
       // 2. Generación de Slug Amigable y Prevención de Colisiones
-      let targetSlug = body.customSlug?.trim() || generateAlbumSlug(body.title, body.date);
+      let targetSlug = body.customSlug?.trim()
+        ? generateAlbumSlug(body.customSlug.trim())
+        : generateAlbumSlug(body.title, body.date);
       const existing = await albumRepository.getAlbumById(targetSlug);
       if (existing) {
         targetSlug = `${targetSlug}-${Date.now().toString().slice(-4)}`;
@@ -168,6 +176,23 @@ export function createAdminAlbumsRouter(
         return res.status(400).json({ success: false, error: 'El precio del álbum completo debe ser mayor a 0 ARS' });
       }
 
+      // Validar invariante de negocio de precios si alguno de los dos se modifica
+      if (updates.unitPrice !== undefined || updates.fullAlbumPrice !== undefined) {
+        const currentAlbum = await albumRepository.getAlbumById(id);
+        if (!currentAlbum) {
+          return res.status(404).json({ success: false, error: `Álbum con ID "${id}" no encontrado` });
+        }
+        const prospectiveUnitPrice = updates.unitPrice !== undefined ? updates.unitPrice : currentAlbum.unitPrice;
+        const prospectiveFullAlbumPrice = updates.fullAlbumPrice !== undefined ? updates.fullAlbumPrice : currentAlbum.fullAlbumPrice;
+
+        if (prospectiveUnitPrice > prospectiveFullAlbumPrice) {
+          return res.status(400).json({
+            success: false,
+            error: 'El precio por foto individual no puede ser mayor al precio del álbum completo'
+          });
+        }
+      }
+
       const updated = await albumRepository.updateAlbum(id, updates);
       if (!updated) {
         return res.status(404).json({ success: false, error: `Álbum con ID "${id}" no encontrado` });
@@ -222,16 +247,17 @@ export function createAdminAlbumsRouter(
         albumId: result.albumId,
         folderId: result.folderId,
         summary: result.summary,
-        photos: result.photos as any,
+        photos: result.photos,
         errors: result.errors,
         skippedFiles: result.skippedFiles
       };
 
       return res.status(result.photos.length > 0 ? 200 : 422).json(response);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error interno al importar carpeta de Google Drive';
       return res.status(500).json({
         success: false,
-        error: error.message || 'Error interno al importar carpeta de Google Drive'
+        error: message
       });
     }
   });
@@ -291,15 +317,16 @@ export function createAdminAlbumsRouter(
         success: result.success,
         albumId: result.albumId,
         summary: result.summary,
-        photos: result.photos as any,
+        photos: result.photos,
         errors: result.errors
       };
 
       return res.status(result.photos.length > 0 ? 200 : 422).json(response);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error interno durante la subida masiva de fotos';
       return res.status(500).json({
         success: false,
-        error: error.message || 'Error interno durante la subida masiva de fotos'
+        error: message
       });
     }
   });

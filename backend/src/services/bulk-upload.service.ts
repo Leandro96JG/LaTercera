@@ -35,7 +35,7 @@ export interface ProcessedUploadPhotoItem {
   height: number;
   originalSize: number;
   previewSize: number;
-  format: string;
+  format: 'webp';
   isHD: boolean;
 }
 

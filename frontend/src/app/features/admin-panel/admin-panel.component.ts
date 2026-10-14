@@ -259,11 +259,16 @@ export class AdminPanelComponent implements OnInit {
       return;
     }
 
+    const val = this.createAlbumForm.getRawValue();
+
+    if (Number(val.unitPrice) > Number(val.fullAlbumPrice)) {
+      this.createAlbumError.set('El precio por foto individual no puede ser mayor al precio del álbum completo');
+      return;
+    }
+
     this.isCreatingAlbum.set(true);
     this.createAlbumError.set(null);
     this.createAlbumSuccess.set(null);
-
-    const val = this.createAlbumForm.getRawValue();
 
     this.adminService.createAlbum({
       title: val.title,
@@ -320,6 +325,15 @@ export class AdminPanelComponent implements OnInit {
       this.updateFeedback.set({
         albumId,
         message: 'Los precios deben ser mayores a $0',
+        success: false
+      });
+      return;
+    }
+
+    if (draft.unitPrice > draft.fullAlbumPrice) {
+      this.updateFeedback.set({
+        albumId,
+        message: 'La foto individual no puede ser más cara que el álbum completo',
         success: false
       });
       return;

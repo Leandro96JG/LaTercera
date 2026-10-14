@@ -242,6 +242,43 @@ describe('Admin Albums API Endpoints (/api/admin/albums)', () => {
       expect(data.error).toContain('precio');
     });
 
+    it('POST /api/admin/albums debe rechazar si el precio unitario supera al del álbum completo (400)', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/albums`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          title: 'Torneo Precios Invertidos',
+          category: 'futbol',
+          unitPrice: 15000,
+          fullAlbumPrice: 5000
+        })
+      });
+
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toContain('no puede ser mayor');
+    });
+
+    it('PUT /api/admin/albums/:id debe rechazar si el nuevo precio unitario supera el precio del álbum completo (400)', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/albums/${createdAlbumId}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          unitPrice: 25000 // fullAlbumPrice es 14000
+        })
+      });
+
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toContain('no puede ser mayor');
+    });
+
     it('PUT /api/admin/albums/:id debe retornar 404 para un álbum que no existe', async () => {
       const res = await fetch(`${baseUrl}/api/admin/albums/album-inexistente-xyz`, {
         method: 'PUT',
