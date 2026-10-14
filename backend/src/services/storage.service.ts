@@ -46,6 +46,12 @@ export interface IStorageService {
     options?: StorageSignedUrlOptions | number
   ): Promise<string | null>;
 
+  deletePhotoFiles?(
+    albumId: string,
+    photoId: string,
+    ext?: string
+  ): Promise<void>;
+
   ensureBucketsExist?(): Promise<void>;
 }
 
@@ -221,6 +227,28 @@ export class SupabaseStorageService implements IStorageService {
     return data.signedUrl;
   }
 
+  public async deletePhotoFiles(albumId: string, photoId: string, ext: string = '.jpg'): Promise<void> {
+    const cleanAlbum = sanitizeId(albumId);
+    const cleanPhoto = sanitizeId(photoId);
+    const cleanExt = ext.startsWith('.') ? ext.toLowerCase() : `.${ext.toLowerCase()}`;
+
+    try {
+      await this.supabase.storage
+        .from(SupabaseStorageService.BUCKET_PREVIEWS)
+        .remove([`${cleanAlbum}/${cleanPhoto}.webp`]);
+    } catch (err: unknown) {
+      console.warn(`[SupabaseStorage] Advertencia al eliminar preview:`, err);
+    }
+
+    try {
+      await this.supabase.storage
+        .from(SupabaseStorageService.BUCKET_ORIGINALS)
+        .remove([`${cleanAlbum}/${cleanPhoto}${cleanExt}`]);
+    } catch (err: unknown) {
+      console.warn(`[SupabaseStorage] Advertencia al eliminar original:`, err);
+    }
+  }
+
   public async ensureBucketsExist(): Promise<void> {
     const { data: buckets, error } = await this.supabase.storage.listBuckets();
     if (error) {
@@ -340,6 +368,17 @@ export class LocalDiskStorageService implements IStorageService {
     return `${this.publicBaseUrl}/originals/${cleanAlbum}/${cleanPhoto}${cleanExt}`;
   }
 
+  public async deletePhotoFiles(albumId: string, photoId: string, ext: string = '.jpg'): Promise<void> {
+    const cleanAlbum = sanitizeId(albumId);
+    const cleanPhoto = sanitizeId(photoId);
+    const cleanExt = ext.startsWith('.') ? ext.toLowerCase() : `.${ext.toLowerCase()}`;
+
+    const previewPath = path.join(this.baseStorageDir, 'previews', cleanAlbum, `${cleanPhoto}.webp`);
+    const originalPath = path.join(this.baseStorageDir, 'originals', cleanAlbum, `${cleanPhoto}${cleanExt}`);
+    await fs.unlink(previewPath).catch(() => {});
+    await fs.unlink(originalPath).catch(() => {});
+  }
+
   public async ensureBucketsExist(): Promise<void> {
     await fs.mkdir(path.join(this.baseStorageDir, 'originals'), { recursive: true });
     await fs.mkdir(path.join(this.baseStorageDir, 'previews'), { recursive: true });
@@ -410,6 +449,12 @@ export class MemoryStorageService implements IStorageService {
   ): Promise<string | null> {
     const cleanExt = ext.replace(/^\./, '');
     return `https://mock.supabase.co/storage/v1/object/sign/originals/${albumId}/${photoId}.${cleanExt}?token=mock_signed_72h`;
+  }
+
+  public async deletePhotoFiles(albumId: string, photoId: string, ext: string = '.jpg'): Promise<void> {
+    const cleanExt = ext.replace(/^\./, '');
+    this.previews.delete(`${albumId}/${photoId}.webp`);
+    this.originals.delete(`${albumId}/${photoId}.${cleanExt}`);
   }
 
   public async ensureBucketsExist(): Promise<void> {

@@ -54,10 +54,16 @@ export interface PaymentVerificationInput {
 }
 
 import { IOrderRepository, MemoryOrderRepository } from '../repositories/order.repository';
+import { IAlbumRepository, MemoryAlbumRepository } from '../repositories/album.repository';
 
 export interface ProcessWebhookPaymentInput extends PaymentVerificationInput {
   eventId: string;
   orderId: string;
+}
+
+export interface PricingOverrides {
+  unitPrice?: number;
+  fullAlbumPrice?: number;
 }
 
 export class OrderService {
@@ -65,29 +71,53 @@ export class OrderService {
   private processedEventIds: Set<string> = new Set();
   private tokenService: DownloadTokenService;
   private repository: IOrderRepository;
+  private albumRepository: IAlbumRepository;
 
-  constructor(tokenService: DownloadTokenService, repository?: IOrderRepository) {
+  public static readonly DEFAULT_UNIT_PRICE = 1200;
+  public static readonly DEFAULT_FULL_ALBUM_PRICE = 9500;
+
+  constructor(
+    tokenService: DownloadTokenService,
+    repository?: IOrderRepository,
+    albumRepository?: IAlbumRepository
+  ) {
     this.tokenService = tokenService;
     this.repository = repository || new MemoryOrderRepository();
+    this.albumRepository = albumRepository || new MemoryAlbumRepository();
   }
 
   /**
-   * Crea una orden aplicando el principio Zero-Trust:
-   * Todos los montos, subtotales y descuentos son calculados estrictamente por el backend.
+   * Crea una orden de forma asíncrona recuperando los precios reales configurados en el álbum (Supabase).
+   * Aplica principio Zero-Trust: ningún precio es aceptado desde el cliente frontend.
    */
-  public createOrder(input: CreateOrderInput): Order {
+  public async createOrderAsync(input: CreateOrderInput): Promise<Order> {
     const isFullAlbum = Boolean(input.isFullAlbum);
     const photoIds = input.photoIds || [];
     const photoCount = isFullAlbum ? 0 : photoIds.length;
 
-    // Precios oficiales vigentes
-    const UNIT_PRICE = 1200;
-    const FULL_ALBUM_PRICE = 9500;
+    // Obtención de precios dinámicos desde Supabase con fallback defensivo
+    let unitPrice = OrderService.DEFAULT_UNIT_PRICE;
+    let fullAlbumPrice = OrderService.DEFAULT_FULL_ALBUM_PRICE;
+
+    try {
+      const album = await this.albumRepository.getAlbumById(input.albumId);
+      if (album) {
+        unitPrice = typeof album.unitPrice === 'number' && album.unitPrice > 0
+          ? album.unitPrice
+          : OrderService.DEFAULT_UNIT_PRICE;
+        fullAlbumPrice = typeof album.fullAlbumPrice === 'number' && album.fullAlbumPrice > 0
+          ? album.fullAlbumPrice
+          : OrderService.DEFAULT_FULL_ALBUM_PRICE;
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[OrderService] Fallback a precios default para álbum ${input.albumId}: ${message}`);
+    }
 
     const pricing = calculateCartTotal({
       photoCount,
-      unitPrice: UNIT_PRICE,
-      fullAlbumPrice: FULL_ALBUM_PRICE,
+      unitPrice,
+      fullAlbumPrice,
       isFullAlbum,
       couponCode: input.couponCode
     });
@@ -117,7 +147,59 @@ export class OrderService {
     };
 
     this.orders.set(order.id, order);
-    this.repository.create(order).catch(err => {
+    await this.repository.createOrder(order).catch(err => {
+      console.warn(`[Persistencia Warning] Error guardando orden en Supabase: ${err.message}`);
+    });
+
+    return order;
+  }
+
+  /**
+   * Crea una orden aplicando el principio Zero-Trust.
+   * Método síncrono preservado para retrocompatibilidad con tests unitarios.
+   */
+  public createOrder(input: CreateOrderInput, overrides?: PricingOverrides): Order {
+    const isFullAlbum = Boolean(input.isFullAlbum);
+    const photoIds = input.photoIds || [];
+    const photoCount = isFullAlbum ? 0 : photoIds.length;
+
+    const unitPrice = overrides?.unitPrice ?? OrderService.DEFAULT_UNIT_PRICE;
+    const fullAlbumPrice = overrides?.fullAlbumPrice ?? OrderService.DEFAULT_FULL_ALBUM_PRICE;
+
+    const pricing = calculateCartTotal({
+      photoCount,
+      unitPrice,
+      fullAlbumPrice,
+      isFullAlbum,
+      couponCode: input.couponCode
+    });
+
+    const now = new Date().toISOString();
+    const order: Order = {
+      id: uuidv4(),
+      albumId: input.albumId,
+      photoIds: [...photoIds],
+      isFullAlbum,
+      photoCount: pricing.photoCount,
+      unitPrice: pricing.unitPrice,
+      subtotal: pricing.subtotal,
+      discount: pricing.discount,
+      discountPercentage: pricing.discountPercentage,
+      totalAmount: pricing.total,
+      currency: 'ARS',
+      customer: {
+        email: input.customer.email,
+        name: input.customer.name,
+        phone: input.customer.phone
+      },
+      couponApplied: pricing.couponApplied,
+      status: 'PENDING',
+      createdAt: now,
+      updatedAt: now
+    };
+
+    this.orders.set(order.id, order);
+    this.repository.createOrder(order).catch(err => {
       console.warn(`[Persistencia Warning] Error guardando orden en repositorio: ${err.message}`);
     });
     return order;
@@ -251,6 +333,50 @@ export class OrderService {
       alreadyProcessed: false,
       fraudAlert: result.fraudAlert,
       error: result.error
+    };
+  }
+
+  /**
+   * Obtiene todas las órdenes combinando persistencia y memoria local
+   */
+  public async listAllOrdersAsync(): Promise<Order[]> {
+    const fromRepo = await this.repository.listAllOrders();
+    for (const ord of fromRepo) {
+      this.orders.set(ord.id, ord);
+    }
+    return fromRepo;
+  }
+
+  /**
+   * Regenera un nuevo token criptográfico de descarga válido por 72 horas para una orden
+   */
+  public async regenerateDownloadTokenAsync(
+    orderId: string
+  ): Promise<{ order: Order; downloadToken: string; expiresAt: string } | null> {
+    const order = await this.getOrderAsync(orderId);
+    if (!order) {
+      return null;
+    }
+
+    const resourceType = order.isFullAlbum ? 'album_zip' : 'photo';
+    const resourceId = order.isFullAlbum
+      ? `${order.albumId}_completo.zip`
+      : order.photoIds[0] || 'foto_seleccionada.jpg';
+
+    const downloadToken = this.tokenService.generateToken(order.id, resourceType, resourceId);
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 72 * 3600 * 1000).toISOString();
+
+    order.downloadToken = downloadToken;
+    order.updatedAt = now.toISOString();
+    this.orders.set(order.id, order);
+
+    await this.repository.updateStatus(order.id, order.status, order.paymentId, downloadToken);
+
+    return {
+      order,
+      downloadToken,
+      expiresAt
     };
   }
 }

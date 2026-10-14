@@ -111,7 +111,7 @@ describe('Admin Albums API Endpoints (/api/admin/albums)', () => {
       }).jpeg().toBuffer();
 
       const formData = new FormData();
-      formData.append('albumId', 'album_futbol_clausura');
+      formData.append('albumId', 'album-1');
       formData.append('watermarkText', 'LA TERCERA • MUESTRA');
       formData.append('hdPhotoIndices', JSON.stringify([0]));
 
@@ -129,13 +129,22 @@ describe('Admin Albums API Endpoints (/api/admin/albums)', () => {
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data.success).toBe(true);
-      expect(data.albumId).toBe('album_futbol_clausura');
+      expect(data.albumId).toBe('album-1');
       expect(data.summary.totalReceived).toBe(1);
       expect(data.summary.successful).toBe(1);
       expect(data.photos.length).toBe(1);
       expect(data.photos[0].isHD).toBe(true);
       expect(data.photos[0].format).toBe('webp');
       expect(data.photos[0].width).toBe(1200); // HD Master mantiene alta resolución con badge sutil
+
+      // Verificar que las fotos se persistieron y se consultan públicamente sin original_path (Zero-Trust)
+      const photosRes = await fetch(`${baseUrl}/api/albums/album-1/photos`);
+      expect(photosRes.status).toBe(200);
+      const photosData = await photosRes.json();
+      expect(photosData.success).toBe(true);
+      expect(photosData.photos.length).toBeGreaterThanOrEqual(1);
+      expect(photosData.photos[0].originalPath).toBeUndefined();
+      expect(photosData.photos[0].previewUrl).toBeDefined();
     });
   });
 
@@ -322,6 +331,119 @@ describe('Admin Albums API Endpoints (/api/admin/albums)', () => {
       expect(data.pagination).toBeDefined();
       expect(data.pagination.page).toBe(1);
       expect(data.pagination.limit).toBe(2);
+    });
+  });
+
+  describe('Gestión de Fotos del Álbum (GET, PATCH, DELETE /api/admin/albums/:id/photos)', () => {
+    let testAlbumId: string;
+    let testPhotoId: string;
+
+    beforeAll(async () => {
+      // Crear un álbum específico para las pruebas de fotos
+      const createRes = await fetch(`${baseUrl}/api/admin/albums`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({
+          title: 'Torneo Test Gestión Fotos',
+          category: 'futbol',
+          subtitle: 'Subtítulo Test',
+          unitPrice: 1200,
+          fullAlbumPrice: 9500
+        })
+      });
+      const createData = await createRes.json();
+      testAlbumId = createData.album.id;
+
+      // Subir una foto mediante bulk-upload para tener datos reales de prueba
+      const samplePng = await sharp({
+        create: {
+          width: 200,
+          height: 200,
+          channels: 3,
+          background: { r: 50, g: 150, b: 200 }
+        }
+      }).png().toBuffer();
+
+      const formData = new FormData();
+      formData.append('albumId', testAlbumId);
+      formData.append('photos', new Blob([samplePng], { type: 'image/png' }), 'test_action_photo.png');
+
+      const uploadRes = await fetch(`${baseUrl}/api/admin/albums/bulk-upload`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${adminToken}`
+        },
+        body: formData
+      });
+      const uploadData = await uploadRes.json();
+      testPhotoId = uploadData.photos[0].id;
+    });
+
+    it('GET /api/admin/albums/:id/photos debe rechazar con 401 si no hay token', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/albums/${testAlbumId}/photos`);
+      expect(res.status).toBe(401);
+    });
+
+    it('GET /api/admin/albums/:id/photos debe retornar la lista de fotos del álbum', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/albums/${testAlbumId}/photos`, {
+        headers: { Authorization: `Bearer ${adminToken}` }
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(data.total).toBeGreaterThanOrEqual(1);
+      expect(data.photos.some((p: any) => p.id === testPhotoId)).toBe(true);
+    });
+
+    it('PATCH /api/admin/albums/:id/photos/:photoId debe alternar isSampleHD y definir portada', async () => {
+      // 1. Alternar isSampleHD a true
+      const patchRes1 = await fetch(`${baseUrl}/api/admin/albums/${testAlbumId}/photos/${testPhotoId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({ isSampleHD: true, setAsCover: true })
+      });
+      expect(patchRes1.status).toBe(200);
+      const patchData1 = await patchRes1.json();
+      expect(patchData1.success).toBe(true);
+      expect(patchData1.photo.isSampleHd).toBe(true);
+      expect(patchData1.coverUrl).toBe(patchData1.photo.previewUrl);
+
+      // 2. Alternar isSampleHD a false
+      const patchRes2 = await fetch(`${baseUrl}/api/admin/albums/${testAlbumId}/photos/${testPhotoId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({ isSampleHD: false })
+      });
+      expect(patchRes2.status).toBe(200);
+      const patchData2 = await patchRes2.json();
+      expect(patchData2.photo.isSampleHd).toBe(false);
+    });
+
+    it('DELETE /api/admin/albums/:id/photos/:photoId debe eliminar la foto y decrementar photosCount', async () => {
+      const deleteRes = await fetch(`${baseUrl}/api/admin/albums/${testAlbumId}/photos/${testPhotoId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${adminToken}` }
+      });
+      expect(deleteRes.status).toBe(200);
+      const deleteData = await deleteRes.json();
+      expect(deleteData.success).toBe(true);
+      expect(deleteData.photoId).toBe(testPhotoId);
+
+      // Verificar que ya no aparece en GET
+      const getRes = await fetch(`${baseUrl}/api/admin/albums/${testAlbumId}/photos`, {
+        headers: { Authorization: `Bearer ${adminToken}` }
+      });
+      const getData = await getRes.json();
+      expect(getData.photos.some((p: any) => p.id === testPhotoId)).toBe(false);
     });
   });
 });

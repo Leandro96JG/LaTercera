@@ -3,6 +3,7 @@ import { DownloadTokenService } from '../src/services/token.service';
 import { OrderService } from '../src/services/order.service';
 import { DeliveryService } from '../src/services/delivery.service';
 import { MemoryStorageService } from '../src/services/storage.service';
+import { MemoryAlbumRepository } from '../src/repositories/album.repository';
 
 describe('DeliveryService (TDD)', () => {
   const SECRET = 'clave_secreta_super_segura_de_al_menos_32_caracteres_12345';
@@ -158,5 +159,129 @@ describe('DeliveryService (TDD)', () => {
     );
     expect(unpurchasedResult.success).toBe(false);
     expect(unpurchasedResult.error).toMatch(/no pertenece a esta orden/i);
+  });
+
+  it('debe obtener título y fecha real del álbum desde IAlbumRepository en lugar del catálogo estático', async () => {
+    const albumRepo = new MemoryAlbumRepository();
+    // Creamos un nuevo álbum con datos personalizados en el repositorio
+    const customAlbum = await albumRepo.createAlbum({
+      id: 'album-custom',
+      title: 'Final Provincial de Básquet La Rioja 2026',
+      category: 'basquet',
+      photosCount: 2,
+      unitPrice: 1500,
+      fullAlbumPrice: 12000,
+      coverUrl: '/uploads/previews/album-custom/cover.webp',
+      eventDate: '2026-10-14',
+      eventTime: '21:30'
+    });
+
+    const deliveryWithRepo = new DeliveryService(orderService, tokenService, storageService, albumRepo);
+
+    const order = orderService.createOrder({
+      albumId: customAlbum.id,
+      photoIds: ['p-10', 'p-20'],
+      customer: { email: 'hincha@basquet.com', name: 'Facundo Gómez' }
+    });
+
+    orderService.verifyAndCompletePayment(order.id, {
+      paymentId: 'pay-custom-album',
+      status: 'approved',
+      currencyId: 'ARS',
+      transactionAmount: order.totalAmount
+    });
+
+    const paidOrder = orderService.getOrder(order.id)!;
+    const result = await deliveryWithRepo.getDeliveryInfo(paidOrder.downloadToken!, 'http://localhost:4000');
+
+    expect(result.valid).toBe(true);
+    expect(result.info).toBeDefined();
+    expect(result.info!.albumTitle).toBe('Final Provincial de Básquet La Rioja 2026');
+    expect(result.info!.albumDate).toBe('2026-10-14');
+  });
+
+  it('debe consultar fotos reales desde IAlbumRepository para órdenes de álbum completo', async () => {
+    const albumRepo = new MemoryAlbumRepository();
+    const album = await albumRepo.createAlbum({
+      id: 'album-social',
+      title: 'Torneo Social Juvenil',
+      category: 'sociales',
+      photosCount: 3,
+      unitPrice: 1000,
+      fullAlbumPrice: 8000,
+      coverUrl: '/cover.webp'
+    });
+
+    // Guardar 3 fotos reales en el álbum
+    await albumRepo.addPhotosToAlbum(album.id, [
+      { id: 'real-photo-1', albumId: album.id, filename: 'p1.jpg', previewUrl: '/p1.webp', isSampleHd: false },
+      { id: 'real-photo-2', albumId: album.id, filename: 'p2.jpg', previewUrl: '/p2.webp', isSampleHd: true },
+      { id: 'real-photo-3', albumId: album.id, filename: 'p3.jpg', previewUrl: '/p3.webp', isSampleHd: false }
+    ]);
+
+    const deliveryWithRepo = new DeliveryService(orderService, tokenService, storageService, albumRepo);
+
+    const order = orderService.createOrder({
+      albumId: album.id,
+      isFullAlbum: true,
+      customer: { email: 'comprador@completo.com', name: 'Florencia' }
+    });
+
+    orderService.verifyAndCompletePayment(order.id, {
+      paymentId: 'pay-full-real',
+      status: 'approved',
+      currencyId: 'ARS',
+      transactionAmount: order.totalAmount
+    });
+
+    const paidOrder = orderService.getOrder(order.id)!;
+    const result = await deliveryWithRepo.getDeliveryInfo(paidOrder.downloadToken!, 'http://localhost:4000');
+
+    expect(result.valid).toBe(true);
+    expect(result.info!.totalPhotos).toBe(3);
+    expect(result.info!.photos.map(p => p.id)).toEqual(['real-photo-1', 'real-photo-2', 'real-photo-3']);
+
+    // Resolver una foto real del álbum
+    const fileResult = await deliveryWithRepo.resolvePhotoFile(paidOrder.downloadToken!, 'real-photo-2');
+    expect(fileResult.success).toBe(true);
+    expect(fileResult.photoId).toBe('real-photo-2');
+
+    // Foto que no pertenece al álbum debe fallar
+    const foreignResult = await deliveryWithRepo.resolvePhotoFile(paidOrder.downloadToken!, 'foto-ajena');
+    expect(foreignResult.success).toBe(false);
+  });
+
+  it('debe resolver orden persistida en repositorio tras reinicio del servidor (getOrderAsync)', async () => {
+    const albumRepo = new MemoryAlbumRepository();
+    const deliveryWithRepo = new DeliveryService(orderService, tokenService, storageService, albumRepo);
+
+    const order = orderService.createOrder({
+      albumId: 'album-1',
+      photoIds: ['photo-1'],
+      customer: { email: 'reboot@test.com' }
+    });
+
+    orderService.verifyAndCompletePayment(order.id, {
+      paymentId: 'pay-reboot',
+      status: 'approved',
+      currencyId: 'ARS',
+      transactionAmount: order.totalAmount
+    });
+
+    const paidOrder = orderService.getOrder(order.id)!;
+    const token = paidOrder.downloadToken!;
+
+    // Simulamos reinicio de servidor limpiando la caché en memoria interna de orderService
+    (orderService as any).orders.clear();
+    expect(orderService.getOrder(order.id)).toBeUndefined();
+
+    // getDeliveryInfo y resolvePhotoFile deben recurrir a getOrderAsync y encontrarla en repositorio
+    const result = await deliveryWithRepo.getDeliveryInfo(token, 'http://localhost:4000');
+    expect(result.valid).toBe(true);
+    expect(result.info!.orderId).toBe(order.id);
+
+    const fileResult = await deliveryWithRepo.resolvePhotoFile(token, 'photo-1');
+    expect(fileResult.success).toBe(true);
+    expect(fileResult.photoId).toBe('photo-1');
   });
 });

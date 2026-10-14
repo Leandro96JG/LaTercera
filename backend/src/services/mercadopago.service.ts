@@ -37,7 +37,8 @@ export class MercadoPagoService {
       ? `LA TERCERA • Álbum Completo (${order.albumId})`
       : `LA TERCERA • Pack ${order.photoCount} Foto(s)`;
 
-    const appUrl = baseUrl || 'http://localhost:4000';
+    const appUrl = baseUrl || process.env.APP_URL || 'http://localhost:4000';
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:4200';
 
     const preferenceData = {
       body: {
@@ -59,9 +60,9 @@ export class MercadoPagoService {
         external_reference: order.id,
         binary_mode: true, // Forzar solo approved o rejected (evita estados intermedios pendientes prolongados)
         back_urls: {
-          success: `${appUrl}/checkout/success?order_id=${order.id}`,
-          failure: `${appUrl}/checkout/failure?order_id=${order.id}`,
-          pending: `${appUrl}/checkout/pending?order_id=${order.id}`
+          success: `${frontendUrl}/pago-exitoso`,
+          failure: `${frontendUrl}/pago-exitoso`,
+          pending: `${frontendUrl}/pago-exitoso`
         },
         auto_return: 'approved',
         notification_url: `${appUrl}/api/webhooks/mercadopago`,

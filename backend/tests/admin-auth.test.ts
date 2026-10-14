@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import express from 'express';
 import { AdminAuthService, AdminUserDto } from '../src/services/admin-auth.service';
+import { MemoryPhotographerRepository } from '../src/repositories/photographer.repository';
 import { createRequireAdminAuth } from '../src/middleware/admin-auth.middleware';
 import { createAdminRouter } from '../src/routes/admin.routes';
 
@@ -149,6 +150,71 @@ describe('Admin Authentication & JWT Security Suite', () => {
       expect(loginResult.success).toBe(true);
       expect(loginResult.user?.name).toBe('Marcos Herrera');
       expect(loginResult.user?.role).toBe('photographer');
+    });
+
+    it('debe registrar y persistir fotógrafos en IPhotographerRepository via registerPhotographer y registerPhotographerAsync', async () => {
+      const customRepo = new MemoryPhotographerRepository();
+      const customAuth = new AdminAuthService(TEST_SECRET, 3600, customRepo);
+
+      // Registro asíncrono
+      const nuevo = await customAuth.registerPhotographerAsync({
+        email: 'carla@latercera.com.ar',
+        password: 'PasswordCarla2026!',
+        name: 'Carla Romero',
+        role: 'photographer',
+        phone: '+54 9 380 411-2233'
+      });
+
+      expect(nuevo.email).toBe('carla@latercera.com.ar');
+      expect(nuevo.name).toBe('Carla Romero');
+
+      // Verificar persistencia directa en el repositorio
+      const persisted = await customRepo.findByEmail('carla@latercera.com.ar');
+      expect(persisted).not.toBeNull();
+      expect(persisted?.email).toBe('carla@latercera.com.ar');
+      expect(persisted?.name).toBe('Carla Romero');
+
+      // Rechazar duplicados asíncronamente
+      await expect(
+        customAuth.registerPhotographerAsync({
+          email: 'carla@latercera.com.ar',
+          password: 'OtraPassword123!',
+          name: 'Duplicado'
+        })
+      ).rejects.toThrow('ya existe');
+    });
+
+    it('debe autenticar mediante loginAsync a fotógrafos colaboradores persistidos tras reinicio del servidor', async () => {
+      const persistentRepo = new MemoryPhotographerRepository();
+      const instance1 = new AdminAuthService(TEST_SECRET, 3600, persistentRepo);
+
+      await instance1.registerPhotographerAsync({
+        email: 'lucas@latercera.com.ar',
+        password: 'PasswordLucas2026!',
+        name: 'Lucas Albornoz',
+        role: 'photographer'
+      });
+
+      // Simular reinicio creando una nueva instancia del servicio compartiendo el mismo repositorio
+      const instance2 = new AdminAuthService(TEST_SECRET, 3600, persistentRepo);
+
+      // En la nueva instancia, la memoria local está limpia de usuarios nuevos
+      expect(instance2.getPhotographerByEmail('lucas@latercera.com.ar')).toBeUndefined();
+
+      // loginAsync busca en el repositorio, valida la contraseña y puebla el caché
+      const loginResult = await instance2.loginAsync('lucas@latercera.com.ar', 'PasswordLucas2026!');
+      expect(loginResult.success).toBe(true);
+      expect(loginResult.token).toBeDefined();
+      expect(loginResult.user?.name).toBe('Lucas Albornoz');
+      expect(loginResult.user?.email).toBe('lucas@latercera.com.ar');
+      expect(loginResult.user?.role).toBe('photographer');
+
+      // Confirmar que quedó cacheado en memoria
+      expect(instance2.getPhotographerByEmail('lucas@latercera.com.ar')).toBeDefined();
+
+      // getPhotographerByEmailAsync
+      const fetched = await instance2.getPhotographerByEmailAsync('lucas@latercera.com.ar');
+      expect(fetched?.name).toBe('Lucas Albornoz');
     });
   });
 

@@ -4,6 +4,7 @@ import { Order, OrderStatus } from '../services/order.service';
 export interface IOrderRepository {
   createOrder(order: Order): Promise<Order>;
   getOrderById(id: string): Promise<Order | null>;
+  listAllOrders(): Promise<Order[]>;
   updateOrderStatus(
     id: string,
     status: OrderStatus,
@@ -46,6 +47,14 @@ export class MemoryOrderRepository implements IOrderRepository {
   async getOrderById(id: string): Promise<Order | null> {
     const order = this.orders.get(id);
     return order ? { ...order, photoIds: [...order.photoIds] } : null;
+  }
+
+  async listAllOrders(): Promise<Order[]> {
+    const list = Array.from(this.orders.values()).map(o => ({
+      ...o,
+      photoIds: [...o.photoIds]
+    }));
+    return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   async findById(id: string): Promise<Order | null> {
@@ -261,6 +270,42 @@ export class SupabaseOrderRepository implements IOrderRepository {
 
     const photoIds = (itemRows || []).map(i => i.photo_id).filter(Boolean);
     return this.mapRowToOrder(orderRow, photoIds);
+  }
+
+  async listAllOrders(): Promise<Order[]> {
+    const { data: orderRows, error } = await this.supabase
+      .from('orders')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error || !orderRows || orderRows.length === 0) {
+      return [];
+    }
+
+    const orderIds = orderRows.map(r => r.id);
+    const itemsMap = new Map<string, string[]>();
+
+    try {
+      const { data: itemRows } = await this.supabase
+        .from('order_items')
+        .select('order_id, photo_id')
+        .in('order_id', orderIds);
+
+      if (itemRows) {
+        for (const item of itemRows) {
+          if (!itemsMap.has(item.order_id)) {
+            itemsMap.set(item.order_id, []);
+          }
+          if (item.photo_id) {
+            itemsMap.get(item.order_id)!.push(item.photo_id);
+          }
+        }
+      }
+    } catch {
+      // Ignorar fallback defensivo si order_items falla
+    }
+
+    return orderRows.map(row => this.mapRowToOrder(row, itemsMap.get(row.id) || []));
   }
 
   async findById(id: string): Promise<Order | null> {

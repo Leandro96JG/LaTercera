@@ -3,6 +3,12 @@ import { MercadoPagoService } from '../src/services/mercadopago.service';
 import { OrderService, Order } from '../src/services/order.service';
 import { DownloadTokenService } from '../src/services/token.service';
 
+const mockPreferenceCreate = vi.fn().mockResolvedValue({
+  id: 'pref-mock-12345',
+  init_point: 'https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=pref-mock-12345',
+  sandbox_init_point: 'https://sandbox.mercadopago.com.ar/checkout/v1/redirect?pref_id=pref-mock-12345'
+});
+
 // Mock del SDK oficial de Mercado Pago
 vi.mock('mercadopago', () => {
   return {
@@ -13,11 +19,7 @@ vi.mock('mercadopago', () => {
       constructor(public options: any) {}
     },
     Preference: class MockPreference {
-      create = vi.fn().mockResolvedValue({
-        id: 'pref-mock-12345',
-        init_point: 'https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=pref-mock-12345',
-        sandbox_init_point: 'https://sandbox.mercadopago.com.ar/checkout/v1/redirect?pref_id=pref-mock-12345'
-      });
+      create = mockPreferenceCreate;
     },
     Payment: class MockPayment {
       get = vi.fn().mockImplementation(({ id }: { id: string }) => {
@@ -71,6 +73,53 @@ describe('MercadoPagoService - Integración de Preferencias y Consulta de Pagos'
     expect(result.initPoint).toContain('pref-mock-12345');
     expect(result.orderId).toBe(order.id);
     expect(orderService.getOrder(order.id)?.preferenceId).toBe('pref-mock-12345');
+
+    expect(mockPreferenceCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.objectContaining({
+          back_urls: {
+            success: 'http://localhost:4200/pago-exitoso',
+            failure: 'http://localhost:4200/pago-exitoso',
+            pending: 'http://localhost:4200/pago-exitoso'
+          },
+          notification_url: 'https://latercera.com.ar/api/webhooks/mercadopago'
+        })
+      })
+    );
+  });
+
+  it('debe respetar la variable de entorno FRONTEND_URL si está configurada', async () => {
+    const originalFrontendUrl = process.env.FRONTEND_URL;
+    process.env.FRONTEND_URL = 'https://custom-domain.com';
+    try {
+      const order = orderService.createOrder({
+        albumId: 'album-1',
+        photoIds: ['p1'],
+        isFullAlbum: false,
+        customer: { email: 'custom@latercera.com' }
+      });
+
+      await mpService.createCheckoutPreference(order.id, 'https://api.custom-domain.com');
+
+      expect(mockPreferenceCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.objectContaining({
+            back_urls: {
+              success: 'https://custom-domain.com/pago-exitoso',
+              failure: 'https://custom-domain.com/pago-exitoso',
+              pending: 'https://custom-domain.com/pago-exitoso'
+            },
+            notification_url: 'https://api.custom-domain.com/api/webhooks/mercadopago'
+          })
+        })
+      );
+    } finally {
+      if (originalFrontendUrl !== undefined) {
+        process.env.FRONTEND_URL = originalFrontendUrl;
+      } else {
+        delete process.env.FRONTEND_URL;
+      }
+    }
   });
 
   it('debe consultar la API oficial y procesar pago aprobado legítimo', async () => {

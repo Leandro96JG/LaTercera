@@ -1,6 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
-import { PhotographerAccount } from '../services/admin-auth.service';
+import type { PhotographerAccount } from '../services/admin-auth.service';
 
 export interface CreatePhotographerInput {
   email: string;

@@ -169,5 +169,45 @@ describe('AlbumRepository (TDD)', () => {
     expect(res.pagination.total).toBe(5);
     expect(res.albums.some(a => a.id === 'album-draft-test')).toBe(true);
   });
+
+  it('debe persistir fotos con addPhotosToAlbum y recuperarlas con getPhotosByAlbumId', async () => {
+    const newPhotos = [
+      {
+        id: 'photo-test-1',
+        albumId: 'album-1',
+        filename: 'foto_partido_1.jpg',
+        originalPath: 'originals/album-1/foto_partido_1.jpg',
+        previewUrl: 'https://storage.supabase.com/previews/album-1/foto_partido_1.webp',
+        isSampleHd: true,
+        width: 4000,
+        height: 3000,
+        sizeBytes: 4500000
+      },
+      {
+        id: 'photo-test-2',
+        albumId: 'album-1',
+        filename: 'foto_partido_2.jpg',
+        originalPath: 'originals/album-1/foto_partido_2.jpg',
+        previewUrl: 'https://storage.supabase.com/previews/album-1/foto_partido_2.webp',
+        isSampleHd: false,
+        width: 4000,
+        height: 3000,
+        sizeBytes: 4200000
+      }
+    ];
+
+    await repo.addPhotosToAlbum('album-1', newPhotos);
+    const photos = await repo.getPhotosByAlbumId('album-1');
+
+    expect(photos.some(p => p.id === 'photo-test-1')).toBe(true);
+    expect(photos.some(p => p.id === 'photo-test-2')).toBe(true);
+    expect(photos.find(p => p.id === 'photo-test-1')?.isSampleHd).toBe(true);
+  });
+
+  it('debe retornar fotos de muestra para los álbumes oficiales iniciales si existen', async () => {
+    const photos = await repo.getPhotosByAlbumId('album-2');
+    expect(photos.length).toBeGreaterThan(0);
+    expect(photos[0].albumId).toBe('album-2');
+  });
 });
 

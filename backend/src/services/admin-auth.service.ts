@@ -1,4 +1,8 @@
 import crypto from 'crypto';
+import {
+  IPhotographerRepository,
+  MemoryPhotographerRepository
+} from '../repositories/photographer.repository';
 
 export interface AdminJwtPayload {
   sub: string;
@@ -34,16 +38,35 @@ export class AdminAuthService {
   private readonly jwtSecret: string;
   private readonly tokenDurationSeconds: number;
   private readonly photographers: Map<string, PhotographerAccount> = new Map();
+  private readonly photographerRepo: IPhotographerRepository;
 
-  constructor(jwtSecret: string, tokenDurationSeconds: number = 86400) {
+  constructor(
+    jwtSecret: string,
+    tokenDurationOrRepo?: number | IPhotographerRepository,
+    repo?: IPhotographerRepository
+  ) {
     if (!jwtSecret || jwtSecret.length < 32) {
       throw new Error('JWT_SECRET debe tener al menos 32 caracteres para garantizar seguridad criptográfica');
     }
     this.jwtSecret = jwtSecret;
-    this.tokenDurationSeconds = tokenDurationSeconds;
+
+    if (typeof tokenDurationOrRepo === 'number') {
+      this.tokenDurationSeconds = tokenDurationOrRepo;
+      this.photographerRepo = repo || new MemoryPhotographerRepository();
+    } else if (tokenDurationOrRepo && typeof tokenDurationOrRepo === 'object') {
+      this.tokenDurationSeconds = 86400;
+      this.photographerRepo = tokenDurationOrRepo;
+    } else {
+      this.tokenDurationSeconds = 86400;
+      this.photographerRepo = repo || new MemoryPhotographerRepository();
+    }
 
     // Inicializar cuenta oficial de la fotógrafa principal (Jenifer "Yuyo" Espeche)
     this.initializeDefaultAdmin();
+  }
+
+  public getRepository(): IPhotographerRepository {
+    return this.photographerRepo;
   }
 
   /**
@@ -176,7 +199,7 @@ export class AdminAuthService {
   }
 
   /**
-   * Autenticación contra el repositorio de fotógrafos
+   * Autenticación contra el repositorio de fotógrafos (Síncrona)
    */
   public login(
     email: string,
@@ -223,28 +246,152 @@ export class AdminAuthService {
   }
 
   /**
-   * Registro escalable para futuros fotógrafos colaboradores
+   * Autenticación asíncrona contra Supabase / Repository
+   * Permite que los fotógrafos colaboradores inicien sesión tras un reinicio del servidor
+   */
+  public async loginAsync(
+    email: string,
+    password: string
+  ): Promise<{
+    success: boolean;
+    token?: string;
+    user?: AdminUserDto;
+    error?: string;
+  }> {
+    if (!email || !password) {
+      return { success: false, error: 'Email y contraseña requeridos' };
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    let account = this.photographers.get(normalizedEmail);
+
+    // Si no está en memoria (ej: tras reinicio del servidor), consultar el repositorio
+    if (!account) {
+      try {
+        const fromRepo = await this.photographerRepo.findByEmail(normalizedEmail);
+        if (fromRepo) {
+          account = fromRepo;
+          this.photographers.set(normalizedEmail, account);
+        }
+      } catch (err: any) {
+        console.warn(`[AdminAuthService] Error al consultar repositorio de fotógrafos: ${err.message}`);
+      }
+    }
+
+    // Protección anti-timing: verificar hash falso si no existe la cuenta
+    const dummyHash =
+      'scrypt:00000000000000000000000000000000:00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000';
+    const isValid = account
+      ? this.verifyPassword(password, account.passwordHash)
+      : this.verifyPassword(password, dummyHash);
+
+    if (!account || !isValid || !account.isActive) {
+      return { success: false, error: 'Credenciales inválidas' };
+    }
+
+    const userDto: AdminUserDto = {
+      id: account.id,
+      email: account.email,
+      name: account.name,
+      role: account.role,
+      photographerId: account.photographerId
+    };
+
+    const token = this.createJwt(userDto);
+
+    return {
+      success: true,
+      token,
+      user: userDto
+    };
+  }
+
+  /**
+   * Registro escalable para futuros fotógrafos colaboradores (Síncrono para tests y compatibilidad)
    */
   public registerPhotographer(data: {
     email: string;
     password: string;
     name: string;
     role?: 'admin' | 'photographer';
+    phone?: string;
   }): PhotographerAccount {
     const normalizedEmail = data.email.trim().toLowerCase();
     if (this.photographers.has(normalizedEmail)) {
       throw new Error(`El fotógrafo con email ${normalizedEmail} ya existe`);
     }
 
+    const passwordHash = this.hashPassword(data.password);
     const newAccount: PhotographerAccount = {
       id: `usr_${crypto.randomBytes(8).toString('hex')}`,
       email: normalizedEmail,
       name: data.name,
       role: data.role || 'photographer',
       photographerId: `photo_${crypto.randomBytes(6).toString('hex')}`,
-      passwordHash: this.hashPassword(data.password),
+      passwordHash,
       isActive: true,
       createdAt: new Date().toISOString()
+    };
+
+    this.photographers.set(normalizedEmail, newAccount);
+
+    // Persistir en el repositorio Supabase / Memoria
+    this.photographerRepo
+      .createPhotographer({
+        email: newAccount.email,
+        passwordHash: newAccount.passwordHash,
+        name: newAccount.name,
+        role: newAccount.role,
+        photographerId: newAccount.photographerId,
+        phone: data.phone
+      })
+      .catch((err) => {
+        console.warn(`[AdminAuthService] Error al persistir fotógrafo en repositorio: ${err.message}`);
+      });
+
+    return newAccount;
+  }
+
+  /**
+   * Registro asíncrono que aguarda la confirmación de persistencia en Supabase / DB
+   */
+  public async registerPhotographerAsync(data: {
+    email: string;
+    password: string;
+    name: string;
+    role?: 'admin' | 'photographer';
+    phone?: string;
+  }): Promise<PhotographerAccount> {
+    const normalizedEmail = data.email.trim().toLowerCase();
+    if (this.photographers.has(normalizedEmail)) {
+      throw new Error(`El fotógrafo con email ${normalizedEmail} ya existe`);
+    }
+
+    // Comprobar existencia previa en DB
+    const existing = await this.photographerRepo.findByEmail(normalizedEmail);
+    if (existing) {
+      this.photographers.set(normalizedEmail, existing);
+      throw new Error(`El fotógrafo con email ${normalizedEmail} ya existe`);
+    }
+
+    const passwordHash = this.hashPassword(data.password);
+    const createdInRepo = await this.photographerRepo.createPhotographer({
+      email: normalizedEmail,
+      passwordHash,
+      name: data.name,
+      role: data.role || 'photographer',
+      phone: data.phone
+    });
+
+    const newAccount: PhotographerAccount = {
+      id: createdInRepo.id,
+      email: createdInRepo.email,
+      name: createdInRepo.name,
+      role: createdInRepo.role,
+      photographerId: createdInRepo.photographerId || createdInRepo.id,
+      passwordHash: createdInRepo.passwordHash,
+      isActive: createdInRepo.isActive,
+      createdAt: createdInRepo.createdAt
     };
 
     this.photographers.set(normalizedEmail, newAccount);
@@ -253,6 +400,23 @@ export class AdminAuthService {
 
   public getPhotographerByEmail(email: string): PhotographerAccount | undefined {
     return this.photographers.get(email.trim().toLowerCase());
+  }
+
+  public async getPhotographerByEmailAsync(email: string): Promise<PhotographerAccount | null> {
+    const normalizedEmail = email.trim().toLowerCase();
+    const cached = this.photographers.get(normalizedEmail);
+    if (cached) return cached;
+
+    try {
+      const fromRepo = await this.photographerRepo.findByEmail(normalizedEmail);
+      if (fromRepo) {
+        this.photographers.set(normalizedEmail, fromRepo);
+        return fromRepo;
+      }
+    } catch (err: any) {
+      console.warn(`[AdminAuthService] Error consultando fotógrafo por email: ${err.message}`);
+    }
+    return null;
   }
 
   private initializeDefaultAdmin(): void {

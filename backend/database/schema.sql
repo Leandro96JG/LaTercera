@@ -46,7 +46,11 @@ CREATE TABLE IF NOT EXISTS albums (
     category VARCHAR(50) NOT NULL CHECK (category IN ('futbol', 'hockey', 'basquet', 'sociales', 'otros')),
     title VARCHAR(255) NOT NULL,
     subtitle VARCHAR(255),
-    event_date VARCHAR(100),
+    event_date VARCHAR(100), -- Display format o ISO (ej: '2026-10-14' o '12 Octubre, 2026')
+    event_date_iso DATE, -- Fecha estructurada ISO (YYYY-MM-DD)
+    event_time VARCHAR(10) DEFAULT '16:00', -- Horario del partido/evento (HH:MM)
+    event_datetime TIMESTAMPTZ, -- Timestamp con zona horaria para ordenamiento cronológico
+    event_date_display VARCHAR(100), -- Formato legible para UI
     location VARCHAR(200),
     cover_url TEXT NOT NULL,
     photos_count INTEGER NOT NULL DEFAULT 0 CHECK (photos_count >= 0),
@@ -54,6 +58,11 @@ CREATE TABLE IF NOT EXISTS albums (
     full_album_price NUMERIC(10, 2) NOT NULL DEFAULT 9500.00 CHECK (full_album_price >= 0),
     badge VARCHAR(50) DEFAULT '⚽ Fútbol',
     is_published BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at TIMESTAMPTZ NULL DEFAULT NULL,
+    is_free_download BOOLEAN NOT NULL DEFAULT FALSE,
+    free_download_unlocked_at TIMESTAMPTZ NULL DEFAULT NULL,
+    is_private BOOLEAN NOT NULL DEFAULT FALSE,
+    access_code VARCHAR(100) NULL DEFAULT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

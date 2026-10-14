@@ -3,6 +3,8 @@
  * Plataforma 'LA TERCERA' - Jenifer "Yuyo" Espeche
  */
 
+import type { AlbumDTO } from '../repositories/album.repository';
+
 // ==========================================
 // 1. POST /api/admin/albums/import-drive
 // ==========================================
@@ -104,6 +106,8 @@ export interface CreateAlbumRequest {
   category: AlbumCategory;
   subtitle?: string;
   date?: string;
+  eventDate?: string;
+  eventTime?: string;
   location?: string;
   unitPrice: number;
   fullAlbumPrice: number;
@@ -111,6 +115,9 @@ export interface CreateAlbumRequest {
   coverUrl?: string;
   isPublished?: boolean;
   customSlug?: string;
+  isFreeDownload?: boolean;
+  isPrivate?: boolean;
+  accessCode?: string | null;
 }
 
 export interface CreateAlbumResponse {
@@ -125,11 +132,17 @@ export interface UpdateAlbumRequest {
   title?: string;
   subtitle?: string;
   date?: string;
+  eventDate?: string;
+  eventTime?: string;
   location?: string;
   category?: AlbumCategory;
   badge?: string;
   coverUrl?: string;
   isPublished?: boolean;
+  deletedAt?: string | null;
+  isFreeDownload?: boolean;
+  isPrivate?: boolean;
+  accessCode?: string | null;
 }
 
 export interface UpdateAlbumPricesRequest {
@@ -156,6 +169,10 @@ export interface AlbumPaginationOptions {
   page?: number;
   limit?: number;
   category?: string;
+  date?: string;
+  from?: string;
+  to?: string;
+  search?: string;
 }
 
 export interface PaginatedAlbumsResult {
@@ -168,5 +185,37 @@ export interface AdminListAlbumsResponse {
   total: number;
   albums: import('../repositories/album.repository').AlbumDTO[];
   pagination?: PaginationMeta;
+}
+
+// ==========================================
+// 4. PAPELERA, CORTESÍA Y PRIVACIDAD
+// ==========================================
+
+export interface TrashAlbumItemDTO extends AlbumDTO {
+  daysRemaining: number;
+}
+
+export interface AdminTrashListResponse {
+  success: boolean;
+  total: number;
+  trashAlbums: TrashAlbumItemDTO[];
+}
+
+export interface TrashActionResponse {
+  success: boolean;
+  albumId: string;
+  message: string;
+}
+
+export interface VerifyAlbumAccessRequest {
+  accessCode: string;
+}
+
+export interface VerifyAlbumAccessResponse {
+  success: boolean;
+  valid: boolean;
+  albumId: string;
+  accessToken?: string;
+  message?: string;
 }
 

@@ -15,7 +15,11 @@ import { createAdminRouter } from './routes/admin.routes';
 import { createAdminAlbumsRouter, adminAlbumsRouter } from './routes/admin-albums.routes';
 import { createDownloadsRouter } from './routes/downloads.routes';
 
-import { createOrderRepository, createAlbumRepository } from './repositories';
+import {
+  createOrderRepository,
+  createAlbumRepository,
+  createPhotographerRepository
+} from './repositories';
 
 dotenv.config();
 
@@ -34,14 +38,15 @@ const MP_WEBHOOK_SECRET =
 const JWT_SECRET =
   process.env.JWT_SECRET || 'secreto_para_autenticacion_jwt_admin_la_tercera_32c';
 
+export const photographerRepository = createPhotographerRepository();
 export const orderRepository = createOrderRepository();
 export const albumRepository = createAlbumRepository();
 export const tokenService = new DownloadTokenService(DOWNLOAD_TOKEN_SECRET);
-export const orderService = new OrderService(tokenService, orderRepository);
+export const orderService = new OrderService(tokenService, orderRepository, albumRepository);
 export const mpService = new MercadoPagoService(MP_ACCESS_TOKEN, MP_WEBHOOK_SECRET, orderService);
-export const adminAuthService = new AdminAuthService(JWT_SECRET);
+export const adminAuthService = new AdminAuthService(JWT_SECRET, 86400, photographerRepository);
 export const storageService = createStorageService();
-export const deliveryService = new DeliveryService(orderService, tokenService, storageService);
+export const deliveryService = new DeliveryService(orderService, tokenService, storageService, albumRepository);
 
 // Middlewares
 app.use(cors());
@@ -49,9 +54,12 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Rutas Administrativas y de Autenticación
-app.use('/api/admin', createAdminRouter(adminAuthService));
+app.use(
+  '/api/admin',
+  createAdminRouter(adminAuthService, orderRepository, albumRepository, tokenService, orderService)
+);
 app.use('/api/admin/albums', createAdminAlbumsRouter(adminAuthService, albumRepository));
-app.use('/api/downloads', createDownloadsRouter(deliveryService, orderService));
+app.use('/api/downloads', createDownloadsRouter(deliveryService, orderService, storageService));
 
 // Multer en memoria para procesamiento directo en streaming con Sharp
 const upload = multer({
@@ -128,8 +136,12 @@ app.get('/api/albums', async (req: Request, res: Response) => {
     // Si se envía 'page', devuelve estructura paginada moderna
     const page = Math.max(1, parseInt(String(rawPage), 10) || 1);
     const limit = Math.max(1, Math.min(50, parseInt(String(rawLimit), 10) || 8));
+    const rawSearch = req.query.search as string | undefined;
+    const search = Array.isArray(rawSearch) ? rawSearch[0] : rawSearch;
+    const rawDate = req.query.date as string | undefined;
+    const date = Array.isArray(rawDate) ? rawDate[0] : rawDate;
 
-    const result = await albumRepository.listAlbumsPaginated({ page, limit, category });
+    const result = await albumRepository.listAlbumsPaginated({ page, limit, category, search, date });
     return res.json({
       success: true,
       albums: result.albums,
@@ -138,6 +150,84 @@ app.get('/api/albums', async (req: Request, res: Response) => {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Error al obtener álbumes';
     return res.status(500).json({ error: message });
+  }
+});
+
+// Endpoint: Obtener Fotos Públicas de un Álbum (Zero-Trust: proyección segura sin original_path)
+app.get('/api/albums/:id/photos', async (req: Request, res: Response) => {
+  try {
+    const rawId = req.params.id;
+    const albumId = Array.isArray(rawId) ? rawId[0] : rawId;
+
+    const album = await albumRepository.getAlbumById(albumId);
+    if (!album) {
+      return res.status(404).json({ success: false, error: `Álbum con ID "${albumId}" no encontrado` });
+    }
+
+    const photos = await albumRepository.getPhotosByAlbumId(albumId);
+    // Proyección Zero-Trust: omitimos original_path para visitantes y clientes públicos
+    const publicPhotos = photos.map(p => ({
+      id: p.id,
+      albumId: p.albumId,
+      filename: p.filename,
+      previewUrl: p.previewUrl,
+      isSampleHd: p.isSampleHd,
+      width: p.width,
+      height: p.height,
+      sizeBytes: p.sizeBytes
+    }));
+
+    return res.json({
+      success: true,
+      albumId,
+      total: publicPhotos.length,
+      photos: publicPhotos
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Error al obtener fotos del álbum';
+    return res.status(500).json({ success: false, error: message });
+  }
+});
+
+// Endpoint: Verificación de Código de Acceso para Álbumes Privados
+app.post('/api/albums/:id/verify-access', async (req: Request, res: Response) => {
+  try {
+    const rawId = req.params.id;
+    const albumId = Array.isArray(rawId) ? rawId[0] : rawId;
+    const { accessCode } = req.body as { accessCode?: string };
+
+    if (!accessCode || typeof accessCode !== 'string') {
+      return res.status(400).json({
+        success: false,
+        valid: false,
+        albumId,
+        message: 'Debe ingresar el código de acceso'
+      });
+    }
+
+    const isValid = await albumRepository.verifyAlbumAccess(albumId, accessCode);
+    if (!isValid) {
+      return res.status(401).json({
+        success: false,
+        valid: false,
+        albumId,
+        message: 'Código de acceso incorrecto'
+      });
+    }
+
+    // Token criptográfico temporal (24 horas) para confirmar sesión desbloqueada
+    const accessToken = tokenService.generateToken(`access_${albumId}`, 'photo', albumId, 24 * 3600);
+
+    return res.status(200).json({
+      success: true,
+      valid: true,
+      albumId,
+      accessToken,
+      message: 'Acceso autorizado correctamente'
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Error al verificar acceso al álbum';
+    return res.status(500).json({ success: false, valid: false, error: message });
   }
 });
 
@@ -150,8 +240,8 @@ app.post('/api/checkout/preference', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Parámetros obligatorios faltantes: albumId y customer.email' });
     }
 
-    // Creación de la orden con cálculo determinista en servidor
-    const order = orderService.createOrder({
+    // Creación de la orden con cálculo dinámico en servidor desde Supabase
+    const order = await orderService.createOrderAsync({
       albumId,
       photoIds,
       isFullAlbum,
@@ -250,7 +340,7 @@ app.get('/api/orders/:orderId', (req: Request, res: Response) => {
 });
 
 // Endpoint: Verificación de Token Criptográfico de Descarga (72h)
-app.get('/api/downloads/verify/:token', (req: Request, res: Response) => {
+app.get('/api/downloads/verify/:token', async (req: Request, res: Response) => {
   const token = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
   const result = tokenService.verifyToken(token);
 
@@ -259,7 +349,7 @@ app.get('/api/downloads/verify/:token', (req: Request, res: Response) => {
   }
 
   // Verificar que la orden no esté cancelada o en fraude
-  const order = orderService.getOrder(result.payload!.orderId);
+  const order = await orderService.getOrderAsync(result.payload!.orderId);
   if (order && order.status !== 'PAID') {
     return res.status(403).json({ error: 'La orden vinculada a esta descarga no se encuentra activa' });
   }
@@ -268,6 +358,32 @@ app.get('/api/downloads/verify/:token', (req: Request, res: Response) => {
     valid: true,
     payload: result.payload
   });
+});
+
+// Endpoint: Descarga Gratuita de Cortesía de Álbum Completo en Máxima Calidad (ZIP)
+app.get('/api/downloads/free/:albumId/zip', async (req: Request, res: Response) => {
+  try {
+    const rawAlbumId = req.params.albumId;
+    const albumId = Array.isArray(rawAlbumId) ? rawAlbumId[0] : rawAlbumId;
+    const album = await albumRepository.getAlbumById(albumId);
+
+    if (!album) {
+      return res.status(404).json({ error: 'Álbum no encontrado' });
+    }
+
+    if (!album.isFreeDownload) {
+      return res.status(403).json({
+        error: 'Este álbum no tiene habilitada la descarga gratuita de cortesía'
+      });
+    }
+
+    await deliveryService.streamFreeAlbumZip(album.id, album.title, res);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Error al descargar álbum gratuito';
+    if (!res.headersSent) {
+      return res.status(500).json({ error: message });
+    }
+  }
 });
 
 export { app };

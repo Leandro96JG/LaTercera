@@ -15,9 +15,11 @@ import {
   UpdateAlbumRequest,
   UpdateAlbumResponse,
   AdminListAlbumsResponse,
-  AlbumCategory
+  AlbumCategory,
+  AdminTrashListResponse,
+  TrashActionResponse
 } from '../contracts/admin-albums.contract';
-import { IAlbumRepository, AlbumDTO, generateAlbumSlug } from '../repositories/album.repository';
+import { IAlbumRepository, AlbumDTO, PhotoDTO, generateAlbumSlug } from '../repositories/album.repository';
 import { createAlbumRepository } from '../repositories';
 import { AdminAuthService } from '../services/admin-auth.service';
 import { createRequireAdminAuth } from '../middleware/admin-auth.middleware';
@@ -68,8 +70,10 @@ export function createAdminAlbumsRouter(
 
       const page = Math.max(1, parseInt(String(rawPage), 10) || 1);
       const limit = Math.max(1, Math.min(50, parseInt(String(rawLimit), 10) || 10));
+      const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+      const date = typeof req.query.date === 'string' ? req.query.date : undefined;
 
-      const result = await albumRepository.listAllAdminPaginated({ page, limit, category });
+      const result = await albumRepository.listAllAdminPaginated({ page, limit, category, search, date });
       const response: AdminListAlbumsResponse = {
         success: true,
         total: result.pagination.total,
@@ -80,6 +84,25 @@ export function createAdminAlbumsRouter(
       return res.status(200).json(response);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Error al listar álbumes';
+      return res.status(500).json({ success: false, error: message });
+    }
+  });
+
+  /**
+   * GET /api/admin/albums/trash
+   * Lista todos los álbumes en la papelera de reciclaje con cálculo de días restantes
+   */
+  router.get('/trash', requireAdminAuth, async (_req: Request, res: Response) => {
+    try {
+      const trashAlbums = await albumRepository.listTrashAlbums();
+      const response: AdminTrashListResponse = {
+        success: true,
+        total: trashAlbums.length,
+        trashAlbums
+      };
+      return res.status(200).json(response);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al listar papelera de reciclaje';
       return res.status(500).json({ success: false, error: message });
     }
   });
@@ -151,13 +174,18 @@ export function createAdminAlbumsRouter(
         category: body.category,
         subtitle: body.subtitle?.trim() || 'Cobertura Oficial • La Tercera',
         date: body.date?.trim() || new Date().toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' }),
+        eventDate: body.eventDate?.trim(),
+        eventTime: body.eventTime?.trim(),
         location: body.location?.trim() || 'La Rioja, Argentina',
         photosCount: 0,
         unitPrice: Math.round(body.unitPrice),
         fullAlbumPrice: Math.round(body.fullAlbumPrice),
         coverUrl: body.coverUrl?.trim() || defaultCovers[body.category],
         badge: body.badge?.trim() || defaultBadges[body.category],
-        isPublished: body.isPublished ?? true
+        isPublished: body.isPublished ?? true,
+        isFreeDownload: body.isFreeDownload ?? false,
+        isPrivate: body.isPrivate ?? false,
+        accessCode: body.isPrivate && body.accessCode ? body.accessCode.trim() : null
       };
 
       const created = await albumRepository.createAlbum(newAlbum);
@@ -228,6 +256,159 @@ export function createAdminAlbumsRouter(
   });
 
   /**
+   * POST /api/admin/albums/:id/trash
+   * Mueve un álbum a la papelera (Soft delete con retención de 30 días)
+   */
+  router.post('/:id/trash', requireAdminAuth, async (req: Request, res: Response) => {
+    try {
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const success = await albumRepository.moveToTrash(id);
+      if (!success) {
+        return res.status(404).json({ success: false, error: `Álbum con ID "${id}" no encontrado` });
+      }
+      const response: TrashActionResponse = {
+        success: true,
+        albumId: id,
+        message: 'Álbum movido a la papelera de reciclaje (se purgará en 30 días)'
+      };
+      return res.status(200).json(response);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al mover a papelera';
+      return res.status(500).json({ success: false, error: message });
+    }
+  });
+
+  /**
+   * POST /api/admin/albums/:id/restore
+   * Restaura un álbum desde la papelera a activo
+   */
+  router.post('/:id/restore', requireAdminAuth, async (req: Request, res: Response) => {
+    try {
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const restored = await albumRepository.restoreFromTrash(id);
+      if (!restored) {
+        return res.status(404).json({ success: false, error: `Álbum con ID "${id}" no encontrado en la papelera` });
+      }
+      const response: TrashActionResponse = {
+        success: true,
+        albumId: id,
+        message: `Álbum "${restored.title}" restaurado exitosamente`
+      };
+      return res.status(200).json(response);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al restaurar álbum';
+      return res.status(500).json({ success: false, error: message });
+    }
+  });
+
+  /**
+   * DELETE /api/admin/albums/:id/permanent
+   * Elimina permanentemente un álbum (Hard delete irreversible)
+   */
+  router.delete('/:id/permanent', requireAdminAuth, async (req: Request, res: Response) => {
+    try {
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const success = await albumRepository.permanentDeleteAlbum(id);
+      if (!success) {
+        return res.status(404).json({ success: false, error: `Álbum con ID "${id}" no encontrado` });
+      }
+      const response: TrashActionResponse = {
+        success: true,
+        albumId: id,
+        message: 'Álbum eliminado permanentemente de la base de datos'
+      };
+      return res.status(200).json(response);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al purgar álbum permanentemente';
+      return res.status(500).json({ success: false, error: message });
+    }
+  });
+
+  /**
+   * PATCH /api/admin/albums/:id/courtesy-download
+   * Habilita o deshabilita la descarga gratuita de cortesía en máxima calidad
+   */
+  router.patch('/:id/courtesy-download', requireAdminAuth, async (req: Request, res: Response) => {
+    try {
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const { isFreeDownload } = req.body as { isFreeDownload: boolean };
+
+      if (typeof isFreeDownload !== 'boolean') {
+        return res.status(400).json({ success: false, error: 'El campo isFreeDownload debe ser un booleano' });
+      }
+
+      const updates: Partial<AlbumDTO> = {
+        isFreeDownload,
+        freeDownloadUnlockedAt: isFreeDownload ? new Date().toISOString() : null
+      };
+
+      const updated = await albumRepository.updateAlbum(id, updates);
+      if (!updated) {
+        return res.status(404).json({ success: false, error: `Álbum con ID "${id}" no encontrado` });
+      }
+
+      const response: UpdateAlbumResponse = {
+        success: true,
+        album: updated,
+        message: isFreeDownload
+          ? 'Descarga gratuita de cortesía activada en máxima calidad'
+          : 'Descarga gratuita de cortesía desactivada'
+      };
+      return res.status(200).json(response);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al actualizar descarga gratuita';
+      return res.status(500).json({ success: false, error: message });
+    }
+  });
+
+  /**
+   * PATCH /api/admin/albums/:id/privacy
+   * Configura la privacidad del álbum y su código PIN
+   */
+  router.patch('/:id/privacy', requireAdminAuth, async (req: Request, res: Response) => {
+    try {
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const { isPrivate, accessCode } = req.body as { isPrivate: boolean; accessCode?: string | null };
+
+      if (typeof isPrivate !== 'boolean') {
+        return res.status(400).json({ success: false, error: 'El campo isPrivate debe ser un booleano' });
+      }
+
+      if (isPrivate && (!accessCode || !accessCode.trim())) {
+        return res.status(400).json({
+          success: false,
+          error: 'Debe ingresar un código PIN o contraseña de acceso para álbumes privados'
+        });
+      }
+
+      const updates: Partial<AlbumDTO> = {
+        isPrivate,
+        accessCode: isPrivate ? accessCode?.trim() : null
+      };
+
+      const updated = await albumRepository.updateAlbum(id, updates);
+      if (!updated) {
+        return res.status(404).json({ success: false, error: `Álbum con ID "${id}" no encontrado` });
+      }
+
+      const response: UpdateAlbumResponse = {
+        success: true,
+        album: {
+          ...updated,
+          accessCode: updated.accessCode ? '********' : null
+        },
+        message: isPrivate
+          ? 'Álbum configurado como privado con acceso protegido por código PIN'
+          : 'Álbum configurado como público para todos los visitantes'
+      };
+      return res.status(200).json(response);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al configurar privacidad del álbum';
+      return res.status(500).json({ success: false, error: message });
+    }
+  });
+
+  /**
    * POST /api/admin/albums/import-drive
    * Importa fotos desde una carpeta compartida de Google Drive
    */
@@ -258,6 +439,36 @@ export function createAdminAlbumsRouter(
         apiKey
       });
 
+      // Persistir fotos importadas en la tabla photos y actualizar álbum
+      if (result.photos.length > 0) {
+        try {
+          const photosToPersist: PhotoDTO[] = result.photos.map(p => ({
+            id: p.id,
+            albumId,
+            filename: p.originalName,
+            originalPath: p.storagePath,
+            previewUrl: p.previewUrl,
+            isSampleHd: p.isHD,
+            width: p.width,
+            height: p.height,
+            sizeBytes: p.originalSize
+          }));
+          await albumRepository.addPhotosToAlbum(albumId, photosToPersist);
+
+          const currentAlbum = await albumRepository.getAlbumById(albumId);
+          if (currentAlbum) {
+            const newCount = (currentAlbum.photosCount || 0) + result.photos.length;
+            const updates: Partial<AlbumDTO> = { photosCount: newCount };
+            if (!currentAlbum.coverUrl && result.photos[0]?.previewUrl) {
+              updates.coverUrl = result.photos[0].previewUrl;
+            }
+            await albumRepository.updateAlbum(albumId, updates);
+          }
+        } catch (repoErr) {
+          console.warn('[ImportDrive] Advertencia al persistir fotos en álbum:', repoErr);
+        }
+      }
+
       const response: AdminDriveImportResponse = {
         success: result.success,
         albumId: result.albumId,
@@ -279,10 +490,44 @@ export function createAdminAlbumsRouter(
   });
 
   /**
+   * Middleware seguro para capturar errores de tamaño o cantidad de Multer
+   * y responder con códigos semánticos (413 Payload Too Large) y JSON estructurado
+   */
+  const handleMulterUpload = (req: Request, res: Response, next: NextFunction) => {
+    upload.array('photos', 100)(req, res, (err: unknown) => {
+      if (err) {
+        if (err instanceof multer.MulterError) {
+          if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(413).json({
+              success: false,
+              error: 'Uno o más archivos superan el límite de 50 MB por fotografía (límite del plan de Supabase Storage). Por favor reduce su resolución o expórtalo en formato JPG optimizado antes de subirlo.'
+            });
+          }
+          if (err.code === 'LIMIT_FILE_COUNT') {
+            return res.status(400).json({
+              success: false,
+              error: 'Has superado el límite de 100 fotografías por lote.'
+            });
+          }
+          return res.status(400).json({
+            success: false,
+            error: `Error de subida: ${err.message}`
+          });
+        }
+        return res.status(500).json({
+          success: false,
+          error: err instanceof Error ? err.message : 'Error al recibir los archivos de imagen'
+        });
+      }
+      next();
+    });
+  };
+
+  /**
    * POST /api/admin/albums/bulk-upload
    * Procesa subida directa de múltiples fotos (drag-and-drop)
    */
-  router.post('/bulk-upload', requireAdminAuth, upload.array('photos', 100), async (req: Request, res: Response) => {
+  router.post('/bulk-upload', requireAdminAuth, handleMulterUpload, async (req: Request, res: Response) => {
     try {
       const files = req.files as Express.Multer.File[] | undefined;
       const albumId = req.body.albumId;
@@ -329,6 +574,36 @@ export function createAdminAlbumsRouter(
         hdPhotoIndices
       });
 
+      // Persistir fotos procesadas en la tabla photos y actualizar álbum
+      if (result.photos.length > 0) {
+        try {
+          const photosToPersist: PhotoDTO[] = result.photos.map(p => ({
+            id: p.id,
+            albumId,
+            filename: p.originalName,
+            originalPath: p.storagePath,
+            previewUrl: p.previewUrl,
+            isSampleHd: p.isHD,
+            width: p.width,
+            height: p.height,
+            sizeBytes: p.originalSize
+          }));
+          await albumRepository.addPhotosToAlbum(albumId, photosToPersist);
+
+          const currentAlbum = await albumRepository.getAlbumById(albumId);
+          if (currentAlbum) {
+            const newCount = (currentAlbum.photosCount || 0) + result.photos.length;
+            const updates: Partial<AlbumDTO> = { photosCount: newCount };
+            if (!currentAlbum.coverUrl && result.photos[0]?.previewUrl) {
+              updates.coverUrl = result.photos[0].previewUrl;
+            }
+            await albumRepository.updateAlbum(albumId, updates);
+          }
+        } catch (repoErr) {
+          console.warn('[BulkUpload] Advertencia al actualizar contador y persistir fotos en álbum:', repoErr);
+        }
+      }
+
       const response: AdminBulkUploadResponse = {
         success: result.success,
         albumId: result.albumId,
@@ -344,6 +619,153 @@ export function createAdminAlbumsRouter(
         success: false,
         error: message
       });
+    }
+  });
+
+  /**
+   * GET /api/admin/albums/:id/photos
+   * Lista todas las fotos del álbum para la vista administrativa
+   */
+  router.get('/:id/photos', requireAdminAuth, async (req: Request, res: Response) => {
+    try {
+      const rawId = req.params.id;
+      const albumId = Array.isArray(rawId) ? rawId[0] : rawId;
+
+      const album = await albumRepository.getAlbumById(albumId);
+      if (!album) {
+        return res.status(404).json({
+          success: false,
+          error: 'Álbum no encontrado'
+        });
+      }
+
+      const photos = await albumRepository.getPhotosByAlbumId(albumId);
+      return res.status(200).json({
+        success: true,
+        albumId,
+        total: photos.length,
+        photos
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al obtener fotos del álbum';
+      return res.status(500).json({ success: false, error: message });
+    }
+  });
+
+  /**
+   * PATCH /api/admin/albums/:id/photos/:photoId
+   * Permite alternar isSampleHD en una foto o establecerla como nueva coverUrl del álbum
+   */
+  router.patch('/:id/photos/:photoId', requireAdminAuth, async (req: Request, res: Response) => {
+    try {
+      const rawId = req.params.id;
+      const albumId = Array.isArray(rawId) ? rawId[0] : rawId;
+      const rawPhotoId = req.params.photoId;
+      const photoId = Array.isArray(rawPhotoId) ? rawPhotoId[0] : rawPhotoId;
+
+      const album = await albumRepository.getAlbumById(albumId);
+      if (!album) {
+        return res.status(404).json({
+          success: false,
+          error: 'Álbum no encontrado'
+        });
+      }
+
+      const photos = await albumRepository.getPhotosByAlbumId(albumId);
+      const photo = photos.find(p => p.id === photoId);
+      if (!photo) {
+        return res.status(404).json({
+          success: false,
+          error: 'Foto no encontrada en el álbum'
+        });
+      }
+
+      let updatedCoverUrl = album.coverUrl;
+      const setAsCover = req.body.setAsCover === true || req.body.isCover === true;
+      if (setAsCover) {
+        const updatedAlbum = await albumRepository.updateAlbum(albumId, { coverUrl: photo.previewUrl });
+        if (updatedAlbum) {
+          updatedCoverUrl = updatedAlbum.coverUrl;
+        }
+      }
+
+      let updatedPhoto = photo;
+      const sampleHdRaw = req.body.isSampleHD !== undefined ? req.body.isSampleHD : req.body.isSampleHd;
+      if (typeof sampleHdRaw === 'boolean') {
+        const resPhoto = await albumRepository.updatePhoto(albumId, photoId, { isSampleHd: sampleHdRaw });
+        if (resPhoto) {
+          updatedPhoto = resPhoto;
+        }
+      }
+
+      return res.status(200).json({
+        success: true,
+        photo: updatedPhoto,
+        coverUrl: updatedCoverUrl,
+        message: 'Foto y portada actualizadas correctamente'
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al actualizar foto';
+      return res.status(500).json({ success: false, error: message });
+    }
+  });
+
+  /**
+   * DELETE /api/admin/albums/:id/photos/:photoId
+   * Elimina la foto de la tabla photos y del almacenamiento, y decrementa photosCount
+   */
+  router.delete('/:id/photos/:photoId', requireAdminAuth, async (req: Request, res: Response) => {
+    try {
+      const rawId = req.params.id;
+      const albumId = Array.isArray(rawId) ? rawId[0] : rawId;
+      const rawPhotoId = req.params.photoId;
+      const photoId = Array.isArray(rawPhotoId) ? rawPhotoId[0] : rawPhotoId;
+
+      const album = await albumRepository.getAlbumById(albumId);
+      if (!album) {
+        return res.status(404).json({
+          success: false,
+          error: 'Álbum no encontrado'
+        });
+      }
+
+      const photo = await albumRepository.getPhotoById(albumId, photoId);
+      if (!photo) {
+        return res.status(404).json({
+          success: false,
+          error: 'Foto no encontrada en el álbum'
+        });
+      }
+
+      // Eliminar de Storage
+      if (storageService.deletePhotoFiles) {
+        const extMatch = photo.filename.match(/\.[a-zA-Z0-9]+$/);
+        const ext = extMatch ? extMatch[0] : '.jpg';
+        await storageService.deletePhotoFiles(albumId, photoId, ext);
+      }
+
+      // Eliminar de base de datos / repositorio
+      await albumRepository.deletePhoto(albumId, photoId);
+
+      // Decrementar conteo del álbum
+      const newCount = Math.max(0, (album.photosCount || 1) - 1);
+      await albumRepository.updatePhotosCount(albumId, newCount);
+
+      // Si la foto eliminada era la coverUrl, actualizar a otra o vaciar
+      if (album.coverUrl === photo.previewUrl) {
+        const remaining = await albumRepository.getPhotosByAlbumId(albumId);
+        const newCover = remaining[0]?.previewUrl || '';
+        await albumRepository.updateAlbum(albumId, { coverUrl: newCover });
+      }
+
+      return res.status(200).json({
+        success: true,
+        photoId,
+        message: 'Foto eliminada exitosamente del álbum'
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al eliminar foto del álbum';
+      return res.status(500).json({ success: false, error: message });
     }
   });
 
