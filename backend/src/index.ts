@@ -8,6 +8,9 @@ import { DownloadTokenService } from './services/token.service';
 import { OrderService } from './services/order.service';
 import { MercadoPagoService } from './services/mercadopago.service';
 import { validateMercadoPagoWebhook } from './services/mercadopago-webhook.service';
+import { AdminAuthService } from './services/admin-auth.service';
+import { createAdminRouter } from './routes/admin.routes';
+import { createAdminAlbumsRouter, adminAlbumsRouter } from './routes/admin-albums.routes';
 
 dotenv.config();
 
@@ -23,15 +26,22 @@ const MP_ACCESS_TOKEN =
   process.env.MP_ACCESS_TOKEN || 'TEST-00000000-0000-0000-0000-000000000000';
 const MP_WEBHOOK_SECRET =
   process.env.MP_WEBHOOK_SECRET || 'test_webhook_secret_key_super_segura_para_firmas_32_chars';
+const JWT_SECRET =
+  process.env.JWT_SECRET || 'secreto_para_autenticacion_jwt_admin_la_tercera_32c';
 
 export const tokenService = new DownloadTokenService(DOWNLOAD_TOKEN_SECRET);
 export const orderService = new OrderService(tokenService);
 export const mpService = new MercadoPagoService(MP_ACCESS_TOKEN, MP_WEBHOOK_SECRET, orderService);
+export const adminAuthService = new AdminAuthService(JWT_SECRET);
 
 // Middlewares
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Rutas Administrativas y de Autenticación
+app.use('/api/admin', createAdminRouter(adminAuthService));
+app.use('/api/admin/albums', createAdminAlbumsRouter(adminAuthService));
 
 // Multer en memoria para procesamiento directo en streaming con Sharp
 const upload = multer({

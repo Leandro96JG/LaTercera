@@ -5,8 +5,11 @@ import { HeroComponent } from './features/hero/hero.component';
 import { FloatingCartComponent } from './features/cart/floating-cart.component';
 import { LightboxComponent } from './features/lightbox/lightbox.component';
 import { CheckoutModalComponent } from './features/checkout/checkout-modal.component';
+import { AdminLoginComponent } from './features/admin-login/admin-login.component';
+import { AdminPanelComponent } from './features/admin-panel/admin-panel.component';
 import { AlbumService } from './core/services/album.service';
 import { CartStore } from './core/state/cart.store';
+import { AdminAuthStore } from './core/state/admin-auth.store';
 import { Album, AlbumCategory } from './core/models/album.model';
 import { Photo } from './core/models/photo.model';
 
@@ -19,7 +22,9 @@ import { Photo } from './core/models/photo.model';
     HeroComponent,
     FloatingCartComponent,
     LightboxComponent,
-    CheckoutModalComponent
+    CheckoutModalComponent,
+    AdminLoginComponent,
+    AdminPanelComponent
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './app.html',
@@ -28,9 +33,10 @@ import { Photo } from './core/models/photo.model';
 export class App implements OnInit {
   public readonly albumService = inject(AlbumService);
   public readonly cartStore = inject(CartStore);
+  public readonly adminAuthStore = inject(AdminAuthStore);
 
-  // Vistas activas: 'portfolio' | 'album' | 'admin'
-  public readonly currentView = signal<'portfolio' | 'album' | 'admin'>('portfolio');
+  // Vistas activas: 'portfolio' | 'album' | 'admin' | 'admin-login'
+  public readonly currentView = signal<'portfolio' | 'album' | 'admin' | 'admin-login'>('portfolio');
 
   // Filtro de categoría en portfolio
   public readonly selectedCategory = signal<string>('all');
@@ -144,6 +150,41 @@ export class App implements OnInit {
         ]);
       }
     });
+
+    // Atajo administrativo discreto: Ctrl + Shift + A
+    if (typeof window !== 'undefined') {
+      window.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+          e.preventDefault();
+          if (this.adminAuthStore.isAuthenticated()) {
+            this.currentView.set(this.currentView() === 'admin' ? 'portfolio' : 'admin');
+          } else {
+            this.currentView.set(this.currentView() === 'admin-login' ? 'portfolio' : 'admin-login');
+          }
+        }
+      });
+    }
+  }
+
+  public switchView(view: 'portfolio' | 'admin'): void {
+    if (view === 'admin') {
+      if (!this.adminAuthStore.isAuthenticated()) {
+        this.currentView.set('admin-login');
+        return;
+      }
+    }
+    this.currentView.set(view);
+  }
+
+  public onAdminLoginSuccess(): void {
+    this.currentView.set('admin');
+  }
+
+  public logoutAdmin(): void {
+    this.adminAuthStore.logout();
+    if (this.currentView() === 'admin' || this.currentView() === 'admin-login') {
+      this.currentView.set('portfolio');
+    }
   }
 
   public openAlbum(album: Album): void {

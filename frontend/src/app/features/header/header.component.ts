@@ -19,8 +19,9 @@ import { Component, ChangeDetectionStrategy, output, input } from '@angular/core
         </div>
       </button>
 
-      <!-- Navegación Minimalista -->
+      <!-- Navegación & Acciones -->
       <div class="flex items-center gap-2.5 flex-wrap">
+        <!-- Navegación Pública: Solo Portfolio (Sin exposición de administración) -->
         <div class="bg-zinc-200/70 p-1 rounded-2xl flex items-center text-xs font-semibold">
           <button
             (click)="changeView.emit('portfolio')"
@@ -28,13 +29,28 @@ import { Component, ChangeDetectionStrategy, output, input } from '@angular/core
           >
             Portfolio & Álbumes
           </button>
-          <button
-            (click)="changeView.emit('admin')"
-            [class]="currentView() === 'admin' ? 'px-3.5 py-1.5 rounded-xl bg-white text-zinc-900 shadow-sm transition' : 'px-3.5 py-1.5 rounded-xl text-zinc-600 hover:text-zinc-950 transition'"
-          >
-            Panel Fotógrafa
-          </button>
+
+          <!-- Botón de administración SOLO visible para sesiones verificadas -->
+          @if (isAuthenticated()) {
+            <button
+              (click)="changeView.emit('admin')"
+              [class]="currentView() === 'admin' ? 'px-3.5 py-1.5 rounded-xl bg-zinc-950 text-white shadow-sm transition' : 'px-3.5 py-1.5 rounded-xl text-zinc-600 hover:text-zinc-950 transition'"
+            >
+              🔒 Panel Fotógrafa
+            </button>
+          }
         </div>
+
+        <!-- Acciones de Sesión Administrativa (Solo si está autenticado) -->
+        @if (isAuthenticated()) {
+          <button
+            (click)="logout.emit()"
+            class="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold border border-rose-200/60 transition active:scale-95"
+            title="Cerrar sesión de fotógrafa"
+          >
+            Salir
+          </button>
+        }
 
         <!-- Botón Contacto WhatsApp para Contrataciones -->
         <a
@@ -51,7 +67,9 @@ import { Component, ChangeDetectionStrategy, output, input } from '@angular/core
   `
 })
 export class HeaderComponent {
-  public readonly currentView = input<'portfolio' | 'album' | 'admin'>('portfolio');
+  public readonly currentView = input<'portfolio' | 'album' | 'admin' | 'admin-login'>('portfolio');
+  public readonly isAuthenticated = input<boolean>(false);
   public readonly goHome = output<void>();
   public readonly changeView = output<'portfolio' | 'admin'>();
+  public readonly logout = output<void>();
 }

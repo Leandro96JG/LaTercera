@@ -1,0 +1,549 @@
+<div class="space-y-8 animate-fadeIn">
+  <!-- Cabecera del Panel Administrativo -->
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-black/[0.05]">
+    <div>
+      <div class="flex items-center gap-2 mb-1">
+        <span class="px-2.5 py-0.5 rounded-full bg-amber-400 text-zinc-950 font-bold text-[10px] uppercase tracking-wider">
+          🔒 Panel Privado • {{ adminAuthStore.userRole() === 'admin' ? 'Administradora' : 'Fotógrafo' }}
+        </span>
+        <span class="text-xs text-zinc-400 font-mono">{{ adminAuthStore.userEmail() }}</span>
+      </div>
+      <h2 class="font-display font-extrabold text-2xl sm:text-3xl text-zinc-900 tracking-tight">
+        Hola, {{ adminAuthStore.userName() || 'Jenifer "Yuyo" Espeche' }}! 👋
+      </h2>
+      <p class="text-xs text-zinc-500 mt-0.5">
+        Gestiona tus álbumes de partidos y eventos, procesa fotos con Sharp y supervisa tus ingresos en Mercado Pago.
+      </p>
+    </div>
+
+    <div class="flex items-center gap-2.5">
+      <button
+        (click)="goHome.emit()"
+        class="px-4 py-2 rounded-2xl bg-white hover:bg-zinc-100 border border-black/[0.06] text-zinc-800 font-bold text-xs shadow-sm transition active:scale-95"
+      >
+        ← Volver al Portfolio
+      </button>
+
+      <button
+        (click)="logout.emit()"
+        class="px-4 py-2 rounded-2xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200/60 transition active:scale-95 flex items-center gap-1.5"
+      >
+        <span>Cerrar Sesión</span>
+        <span>🚪</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Tarjetas Bento de Métricas en Vivo -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+    <!-- Métricas 1: Fotos Vendidas -->
+    <div class="bg-zinc-950 text-white rounded-[28px] p-6 shadow-bento flex flex-col justify-between relative overflow-hidden">
+      <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-amber-400/10 rounded-full blur-2xl pointer-events-none"></div>
+      <span class="text-zinc-400 text-xs font-semibold">Resumen General</span>
+      <div class="my-4">
+        <span class="font-display font-black text-3xl sm:text-4xl text-white">{{ stats().photosSold }}</span>
+        <span class="text-xs text-zinc-400 block mt-1">fotos individuales vendidas</span>
+        <p class="text-xs text-amber-400 mt-1 font-medium">+{{ stats().albumsSold }} álbumes completos</p>
+      </div>
+      <span class="text-[10px] text-zinc-500">Temporada oficial La Rioja</span>
+    </div>
+
+    <!-- Métricas 2: Ingresos Mercado Pago -->
+    <div class="bg-white rounded-[28px] p-6 border border-black/[0.05] shadow-bento flex flex-col justify-between">
+      <div class="flex justify-between items-center text-xs text-zinc-400">
+        <span class="font-semibold text-zinc-700">Ingresos del Mes</span>
+        <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 font-bold text-[10px]">+24%</span>
+      </div>
+      <div class="my-4">
+        <span class="font-display font-black text-3xl text-zinc-900">\${{ stats().revenueARS.toLocaleString('es-AR') }}</span>
+        <span class="text-xs text-zinc-400 block mt-0.5">ARS en Mercado Pago</span>
+      </div>
+      <span class="text-[10px] text-zinc-400">Cobros acreditados en tu cuenta</span>
+    </div>
+
+    <!-- Métricas 3: Almacenamiento & Capacidad -->
+    <div class="bg-white rounded-[28px] p-6 border border-black/[0.05] shadow-bento flex flex-col justify-between">
+      <span class="font-semibold text-zinc-700 text-xs">Almacenamiento en Servidor</span>
+      <div class="my-3">
+        <div class="flex items-baseline gap-1">
+          <span class="font-display font-bold text-2xl text-zinc-900">{{ stats().storageUsedGB }} GB</span>
+          <span class="text-xs text-zinc-400">/ {{ stats().storageLimitGB }} GB</span>
+        </div>
+        <!-- Barra de Progreso de Espacio -->
+        <div class="w-full bg-zinc-100 rounded-full h-2 mt-2 overflow-hidden">
+          <div
+            class="bg-amber-400 h-2 rounded-full transition-all duration-500"
+            [style.width.%]="(stats().storageUsedGB / stats().storageLimitGB) * 100"
+          ></div>
+        </div>
+      </div>
+      <span class="text-[10px] text-emerald-600 font-semibold">Capa pública WebP 800px optimizada</span>
+    </div>
+
+    <!-- Métricas 4: Álbumes Activos -->
+    <div class="bg-white rounded-[28px] p-6 border border-black/[0.05] shadow-bento flex flex-col justify-between">
+      <span class="font-semibold text-zinc-700 text-xs">Álbumes Activos</span>
+      <div class="my-4">
+        <span class="font-display font-black text-3xl text-zinc-900">{{ albums().length }}</span>
+        <span class="text-xs text-zinc-400 block mt-0.5">publicados en portfolio</span>
+      </div>
+      <span class="text-[10px] text-zinc-400">Fútbol, Hockey, Básquet, Fiestas</span>
+    </div>
+  </div>
+
+  <!-- Selector de Pestañas Bento -->
+  <div class="flex items-center gap-2 border-b border-black/[0.05] pb-2 overflow-x-auto no-scrollbar">
+    <button
+      (click)="activeTab.set('drive')"
+      [class]="activeTab() === 'drive'
+        ? 'px-4 py-2.5 rounded-2xl bg-zinc-950 text-white font-bold text-xs shadow-sm transition'
+        : 'px-4 py-2.5 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.04] transition'"
+    >
+      ☁️ Importar de Google Drive
+    </button>
+    <button
+      (click)="activeTab.set('upload')"
+      [class]="activeTab() === 'upload'
+        ? 'px-4 py-2.5 rounded-2xl bg-zinc-950 text-white font-bold text-xs shadow-sm transition'
+        : 'px-4 py-2.5 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.04] transition'"
+    >
+      📤 Subida Masiva de Fotos
+    </button>
+    @if (adminAuthStore.userRole() === 'admin') {
+      <button
+        (click)="activeTab.set('photographers')"
+        [class]="activeTab() === 'photographers'
+          ? 'px-4 py-2.5 rounded-2xl bg-zinc-950 text-white font-bold text-xs shadow-sm transition'
+          : 'px-4 py-2.5 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.04] transition'"
+      >
+        👥 Registro de Fotógrafos
+      </button>
+    }
+  </div>
+
+  <!-- PESTAÑA 1: IMPORTADOR DE GOOGLE DRIVE -->
+  @if (activeTab() === 'drive') {
+    <div class="bg-white rounded-[32px] p-6 sm:p-8 border border-black/[0.05] shadow-bento space-y-6 animate-fadeIn">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div>
+          <h3 class="font-display font-extrabold text-xl text-zinc-900 tracking-tight">
+            Importación Automática desde Google Drive
+          </h3>
+          <p class="text-xs text-zinc-500 mt-0.5">
+            Ingresa la URL pública de una carpeta de Google Drive. El backend descargará las fotos, estampará marcas de agua diagonales y generará miniaturas WebP 800px protegidas.
+          </p>
+        </div>
+        <span class="px-3 py-1 rounded-full bg-amber-50 text-amber-800 text-[11px] font-bold border border-amber-200/60 self-start sm:self-auto">
+          ⚡ Motor Sharp Concurrente Anti-OOM
+        </span>
+      </div>
+
+      <!-- Alerta de Error -->
+      @if (driveError()) {
+        <div class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-3">
+          <span class="text-base">⚠️</span>
+          <span>{{ driveError() }}</span>
+        </div>
+      }
+
+      <!-- Formulario de Importación -->
+      <form [formGroup]="driveForm" (ngSubmit)="submitDriveImport()" class="space-y-5">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Selector de Álbum Destino -->
+          <div>
+            <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1.5">
+              Álbum de Destino
+            </label>
+            <select
+              formControlName="albumId"
+              class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-semibold focus:outline-none focus:border-zinc-950 transition"
+            >
+              @for (album of albums(); track album.id) {
+                <option [value]="album.id">{{ album.title }} ({{ album.badge }})</option>
+              }
+            </select>
+          </div>
+
+          <!-- Texto de Marca de Agua -->
+          <div>
+            <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1.5">
+              Marca de Agua Diagonal
+            </label>
+            <input
+              type="text"
+              formControlName="watermarkText"
+              placeholder="LA TERCERA • MUESTRA"
+              class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
+            />
+          </div>
+        </div>
+
+        <!-- URL de Google Drive -->
+        <div>
+          <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1.5">
+            Enlace de la Carpeta de Google Drive
+          </label>
+          <input
+            type="url"
+            formControlName="driveUrl"
+            placeholder="https://drive.google.com/drive/folders/1a2b3c4d5e..."
+            class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition font-mono"
+          />
+          <p class="text-[11px] text-zinc-400 mt-1">
+            Formatos soportados: <code>/drive/folders/&#123;id&#125;</code>, <code>/u/0/folders/&#123;id&#125;</code> o enlaces compartibles estándar.
+          </p>
+          @if (driveForm.controls.driveUrl.touched && driveForm.controls.driveUrl.invalid) {
+            <span class="text-[11px] text-rose-500 mt-1 block">
+              Ingresa una URL válida de carpeta de Google Drive
+            </span>
+          }
+        </div>
+
+        <!-- Ajustes Avanzados de Procesamiento -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-2xl bg-zinc-50 border border-black/[0.04]">
+          <div>
+            <label class="block text-[11px] font-bold text-zinc-600 mb-1">
+              Fotos iniciales con insignia "✦ Muestra HD"
+            </label>
+            <input
+              type="number"
+              formControlName="markHdFirstN"
+              min="0"
+              max="10"
+              class="w-full px-3 py-2 rounded-xl bg-white border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
+            />
+            <span class="text-[10px] text-zinc-400">Demuestran nitidez profesional en la grilla</span>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-bold text-zinc-600 mb-1">
+              Límite de concurrencia Sharp (Worker Pool)
+            </label>
+            <input
+              type="number"
+              formControlName="concurrencyLimit"
+              min="1"
+              max="5"
+              class="w-full px-3 py-2 rounded-xl bg-white border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
+            />
+            <span class="text-[10px] text-zinc-400">Mantiene el uso de RAM bajo control (&lt;350MB)</span>
+          </div>
+        </div>
+
+        <!-- Botón de Envío -->
+        <div class="flex items-center justify-end gap-3 pt-2">
+          <button
+            type="submit"
+            [disabled]="driveForm.invalid || isDriveImporting()"
+            class="px-6 py-3.5 rounded-2xl bg-zinc-950 hover:bg-zinc-800 text-white font-display font-extrabold text-xs shadow-md transition active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center gap-2"
+          >
+            @if (isDriveImporting()) {
+              <span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              <span>Descargando y procesando fotos con Sharp...</span>
+            } @else {
+              <span>Importar Fotos de Drive</span>
+              <span>⚡</span>
+            }
+          </button>
+        </div>
+      </form>
+
+      <!-- Resumen de Resultados de Importación -->
+      @if (driveResult(); as res) {
+        <div class="mt-6 p-6 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-950 space-y-4 animate-fadeIn">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="text-xl">✅</span>
+              <h4 class="font-bold text-sm text-emerald-900">
+                ¡Importación completada exitosamente!
+              </h4>
+            </div>
+            <span class="text-xs font-mono text-emerald-700">
+              Duración: {{ (res.summary.durationMs / 1000).toFixed(1) }}s
+            </span>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div class="bg-white/80 p-3 rounded-xl border border-emerald-200/60">
+              <span class="text-zinc-500 block text-[10px]">Archivos en Drive</span>
+              <span class="font-bold text-base text-zinc-900">{{ res.summary.totalFound }}</span>
+            </div>
+            <div class="bg-white/80 p-3 rounded-xl border border-emerald-200/60">
+              <span class="text-zinc-500 block text-[10px]">Imágenes Elegibles</span>
+              <span class="font-bold text-base text-zinc-900">{{ res.summary.totalEligible }}</span>
+            </div>
+            <div class="bg-white/80 p-3 rounded-xl border border-emerald-200/60">
+              <span class="text-zinc-500 block text-[10px]">Procesadas con Sharp</span>
+              <span class="font-bold text-base text-emerald-600">{{ res.summary.successful }}</span>
+            </div>
+            <div class="bg-white/80 p-3 rounded-xl border border-emerald-200/60">
+              <span class="text-zinc-500 block text-[10px]">No soportados / Omitidos</span>
+              <span class="font-bold text-base text-zinc-500">{{ res.summary.totalSkipped }}</span>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- PESTAÑA 2: SUBIDA MASIVA DIRECTA -->
+  @else if (activeTab() === 'upload') {
+    <div class="bg-white rounded-[32px] p-6 sm:p-8 border border-black/[0.05] shadow-bento space-y-6 animate-fadeIn">
+      <div>
+        <h3 class="font-display font-extrabold text-xl text-zinc-900 tracking-tight">
+          Subida Masiva de Fotografías (Drag & Drop)
+        </h3>
+        <p class="text-xs text-zinc-500 mt-0.5">
+          Arrastra o selecciona las fotos desde tu computadora o cámara. El servidor generará las marcas de agua quemadas y guardará los archivos originales protegidos.
+        </p>
+      </div>
+
+      <!-- Alerta de Error -->
+      @if (bulkError()) {
+        <div class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-3">
+          <span class="text-base">⚠️</span>
+          <span>{{ bulkError() }}</span>
+        </div>
+      }
+
+      <form [formGroup]="bulkForm" (ngSubmit)="submitBulkUpload()" class="space-y-5">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1.5">
+              Álbum de Destino
+            </label>
+            <select
+              formControlName="albumId"
+              class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-semibold focus:outline-none focus:border-zinc-950 transition"
+            >
+              @for (album of albums(); track album.id) {
+                <option [value]="album.id">{{ album.title }} ({{ album.badge }})</option>
+              }
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1.5">
+              Texto Marca de Agua
+            </label>
+            <input
+              type="text"
+              formControlName="watermarkText"
+              class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
+            />
+          </div>
+        </div>
+
+        <!-- Zona Drag & Drop -->
+        <div
+          (dragover)="$event.preventDefault()"
+          (drop)="onFilesDropped($event)"
+          class="border-2 border-dashed border-zinc-300 hover:border-zinc-950 rounded-[28px] p-8 text-center bg-zinc-50/50 hover:bg-zinc-50 transition cursor-pointer relative"
+        >
+          <input
+            type="file"
+            multiple
+            accept="image/jpeg,image/png,image/webp"
+            (change)="onFileSelect($event)"
+            class="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+          />
+          <div class="space-y-2 pointer-events-none">
+            <span class="text-3xl block">🖼️</span>
+            <span class="font-display font-bold text-sm text-zinc-900 block">
+              Arrastra tus fotografías aquí o haz clic para explorar
+            </span>
+            <span class="text-[11px] text-zinc-400 block">
+              Formatos aceptados: JPG, PNG, WebP (Lotes de hasta 100 fotos de 50MB)
+            </span>
+          </div>
+        </div>
+
+        <!-- Lista de Archivos Seleccionados -->
+        @if (selectedFiles().length > 0) {
+          <div class="space-y-3">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-bold text-zinc-700">
+                Archivos listos para procesar ({{ selectedFiles().length }} fotos seleccionadas)
+              </span>
+              <span class="text-[11px] text-zinc-400">
+                Marca la estrella ⭐ en las fotos que quieras destacar como "Muestra HD"
+              </span>
+            </div>
+
+            <div class="max-h-60 overflow-y-auto space-y-2 pr-1 border border-zinc-200 rounded-2xl p-2 bg-zinc-50">
+              @for (file of selectedFiles(); track file.name; let idx = $index) {
+                <div class="flex items-center justify-between p-2.5 rounded-xl bg-white border border-black/[0.04] text-xs">
+                  <div class="flex items-center gap-2 truncate">
+                    <span class="text-zinc-400 font-mono text-[10px]">#{{ idx + 1 }}</span>
+                    <span class="font-medium text-zinc-800 truncate">{{ file.name }}</span>
+                    <span class="text-zinc-400 text-[10px]">({{ (file.size / 1024 / 1024).toFixed(2) }} MB)</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    (click)="toggleHdIndex(idx)"
+                    [class]="isHdSelected(idx)
+                      ? 'px-2.5 py-1 rounded-lg bg-emerald-500 text-zinc-950 font-bold text-[10px] flex items-center gap-1 shadow-sm'
+                      : 'px-2.5 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-600 text-[10px] flex items-center gap-1'"
+                  >
+                    <span>⭐</span>
+                    <span>{{ isHdSelected(idx) ? 'Muestra HD' : 'Foto Estándar' }}</span>
+                  </button>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- Botón de Envío -->
+        <div class="flex items-center justify-end gap-3 pt-2">
+          <button
+            type="submit"
+            [disabled]="selectedFiles().length === 0 || isBulkUploading()"
+            class="px-6 py-3.5 rounded-2xl bg-zinc-950 hover:bg-zinc-800 text-white font-display font-extrabold text-xs shadow-md transition active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center gap-2"
+          >
+            @if (isBulkUploading()) {
+              <span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              <span>Procesando fotos en segundo plano...</span>
+            } @else {
+              <span>Subir y Procesar Lote ({{ selectedFiles().length }})</span>
+              <span>⚡</span>
+            }
+          </button>
+        </div>
+      </form>
+
+      <!-- Resumen de Subida Masiva -->
+      @if (bulkResult(); as res) {
+        <div class="mt-6 p-6 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-950 space-y-4 animate-fadeIn">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="text-xl">🎉</span>
+              <h4 class="font-bold text-sm text-emerald-900">
+                ¡Lote de fotos subido y protegido exitosamente!
+              </h4>
+            </div>
+            <span class="text-xs font-mono text-emerald-700">
+              Duración: {{ (res.summary.durationMs / 1000).toFixed(1) }}s
+            </span>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+            <div class="bg-white/80 p-3 rounded-xl border border-emerald-200/60">
+              <span class="text-zinc-500 block text-[10px]">Total Recibidas</span>
+              <span class="font-bold text-base text-zinc-900">{{ res.summary.totalReceived }}</span>
+            </div>
+            <div class="bg-white/80 p-3 rounded-xl border border-emerald-200/60">
+              <span class="text-zinc-500 block text-[10px]">Optimizadas WebP 800px</span>
+              <span class="font-bold text-base text-emerald-600">{{ res.summary.successful }}</span>
+            </div>
+            <div class="bg-white/80 p-3 rounded-xl border border-emerald-200/60">
+              <span class="text-zinc-500 block text-[10px]">Fallidas</span>
+              <span class="font-bold text-base text-zinc-500">{{ res.summary.failed }}</span>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- PESTAÑA 3: REGISTRO DE FOTÓGRAFOS COLABORADORES (ESCALABILIDAD FUTURA) -->
+  @else if (activeTab() === 'photographers' && adminAuthStore.userRole() === 'admin') {
+    <div class="bg-white rounded-[32px] p-6 sm:p-8 border border-black/[0.05] shadow-bento space-y-6 animate-fadeIn">
+      <div>
+        <h3 class="font-display font-extrabold text-xl text-zinc-900 tracking-tight">
+          Registro de Fotógrafos Colaboradores
+        </h3>
+        <p class="text-xs text-zinc-500 mt-0.5">
+          Permite crear cuentas para fotógrafos asistentes que cubren partidos adicionales. Cada fotógrafo tendrá credenciales privadas y acceso a sus propios álbumes.
+        </p>
+      </div>
+
+      <!-- Alerta de Éxito o Error -->
+      @if (photographerResult(); as res) {
+        <div class="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center justify-between animate-fadeIn">
+          <div class="flex items-center gap-2">
+            <span>✅</span>
+            <span>Fotógrafo <strong>{{ res.photographer.name }}</strong> ({{ res.photographer.email }}) registrado exitosamente.</span>
+          </div>
+          <span class="font-mono text-[10px] text-emerald-600">ID: {{ res.photographer.photographerId }}</span>
+        </div>
+      }
+
+      @if (photographerError()) {
+        <div class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
+          <span>⚠️</span>
+          <span>{{ photographerError() }}</span>
+        </div>
+      }
+
+      <!-- Formulario de Registro -->
+      <form [formGroup]="photographerForm" (ngSubmit)="submitRegisterPhotographer()" class="space-y-4 max-w-xl">
+        <div>
+          <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1.5">
+            Nombre Completo del Fotógrafo
+          </label>
+          <input
+            type="text"
+            formControlName="name"
+            placeholder="Ej: Lucas Martínez"
+            class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
+          />
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1.5">
+            Correo Electrónico
+          </label>
+          <input
+            type="email"
+            formControlName="email"
+            placeholder="lucas@latercera.com.ar"
+            class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
+          />
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1.5">
+            Contraseña Inicial
+          </label>
+          <input
+            type="password"
+            formControlName="password"
+            placeholder="Mínimo 8 caracteres"
+            class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
+          />
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1.5">
+            Rol del Sistema
+          </label>
+          <select
+            formControlName="role"
+            class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-semibold focus:outline-none focus:border-zinc-950 transition"
+          >
+            <option value="photographer">Fotógrafo Colaborador</option>
+            <option value="admin">Co-Administrador</option>
+          </select>
+        </div>
+
+        <div class="pt-2">
+          <button
+            type="submit"
+            [disabled]="photographerForm.invalid || isRegisteringPhotographer()"
+            class="px-6 py-3.5 rounded-2xl bg-zinc-950 hover:bg-zinc-800 text-white font-display font-extrabold text-xs shadow-md transition active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center gap-2"
+          >
+            @if (isRegisteringPhotographer()) {
+              <span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              <span>Registrando fotógrafo...</span>
+            } @else {
+              <span>Crear Cuenta de Fotógrafo</span>
+              <span>→</span>
+            }
+          </button>
+        </div>
+      </form>
+    </div>
+  }
+</div>

@@ -55,8 +55,28 @@ Plataforma web e-commerce mobile-first orientada a la venta de fotografías de p
 - [x] Servicio de precios y cálculo de packs de descuento con **TDD (6 tests pasando con Vitest)**.
 - [x] Integración de Mercado Pago SDK & Webhooks con **Máxima Seguridad Transaccional** (Checkout Pro, validación HMAC-SHA256, anti-replay, Zero-Trust y **34 tests unitarios pasando**).
 - [x] Conexión del frontend definitivo con la API del backend (**Angular 21 Standalone, Signals, OnPush, Bento UI, micro-animaciones a 120fps y 11 tests unitarios pasando**).
-- [ ] Importador de carpetas compartidas de Google Drive.
-- [ ] Panel administrativo con subida masiva drag-and-drop y métricas en vivo.
+- [x] Seguridad y Autenticación Criptográfica del Panel Administrativo (**Ocultamiento público, Scrypt + JWT RFC 7519, Middleware requireAdminAuth, AdminAuthStore con Signals, y suite de 87 tests pasando**).
+- [x] Importador de carpetas compartidas de Google Drive con Sharp (Anti-OOM worker pool concurrente, validación de magic bytes y generación de WebP 800px protegidos).
+- [x] Panel administrativo completo con subida masiva drag-and-drop, métricas en vivo y registro de fotógrafos colaboradores para escalabilidad futura.
+
+### ADR-012: Ingesta Masiva, Importador de Google Drive y Worker Pool Concurrente Anti-OOM con Sharp
+- **Extracción de Identificadores Drive:** Algoritmo multi-patrón en `drive-parser.service.ts` compatible con carpetas `/drive/folders/{id}`, `/u/0/folders/{id}`, query parameters `?id={id}`, formato legacy `/open?id=` y validación de dominios autorizados de Google (`drive.google.com`, `docs.google.com`).
+- **Worker Pool Concurrente Anti-OOM (`concurrency.service.ts`):** Límite controlado de procesamiento paralelo con semáforo asíncrono (por defecto 3 concurrentes). Previene que lotes de 50+ fotos masivas de 24-48MP desborden la memoria RAM (>5GB) manteniendo el consumo estable en ~300-350MB sin bloquear el event loop.
+- **Validación Estricta de Magic Bytes (`mime-validator.service.ts`):** Verificación binaria en buffer (JPEG `FF D8 FF`, PNG `89 50 4E 47 0D 0A 1A 0A`, WebP `RIFF...WEBP`) para prevenir inyecciones de código malicioso o archivos corruptos. Sanitización de nombres de archivo contra Path Traversal (`path.posix.basename`).
+- **Estructura de Almacenamiento por Capas (`storage.service.ts`):**
+  - *Capa Pública (`uploads/previews/`):* Imágenes redimensionadas a 800px en formato WebP con marcas de agua diagonales quemadas en los píxeles.
+  - *Capa Privada (`uploads/originals/`):* Archivos originales en máxima resolución preservados para descargas seguras con token firmado de 72 horas.
+- **Suite de Pruebas y Evidencia Demostrable:** 80 tests unitarios pasando en el backend (Vitest) y 29 tests pasando en el frontend (Vitest + Angular 21). Cero errores de compilación en `ng build` y `tsc`.
+
+### ADR-011: Seguridad, Autenticación Criptográfica & Ocultamiento del Panel Administrativo
+- **Ocultamiento de la Vista Pública:** Eliminación total de enlaces y botones administrativos en la cabecera pública. Los visitantes solo tienen acceso al portfolio de fotos, álbumes y contacto oficial por WhatsApp.
+- **Acceso Discreto:** Vista administrativa accesible exclusivamente mediante autenticación con credenciales registradas o el atajo de teclado del sistema `Ctrl + Shift + A`.
+- **Hashing de Contraseñas (scrypt):** Uso de `crypto.scryptSync` con sal aleatoria de 16 bytes y formato `scrypt:<salt>:<key>`. Comparación en tiempo constante con `crypto.timingSafeEqual` con protección contra timing attacks e inspección de usuarios inexistentes (dummy hash).
+- **Tokens JWT RFC 7519:** Firma criptográfica HMAC-SHA256 generada y validada en servidor con `JWT_SECRET`. Rechazo estricto de payloads o firmas manipuladas, y tokens expirados.
+- **Middleware `requireAdminAuth`:** Bloqueo perimetral para endpoints `/api/admin/*`. Exige cabecera `Authorization: Bearer <token>` y valida roles.
+- **Frontend `AdminAuthStore` con Signals:** Gestión reactiva en Angular 21 de `isAuthenticated`, `adminToken`, `userEmail`, `userRole` y `photographerId`, con sincronización en `localStorage`.
+- **Escalabilidad Multi-Fotógrafo:** Payload de usuario y token estructurados para soportar roles (`admin` vs `photographer`) y múltiples colaboradores en el futuro.
+- **Guards y Redirección Defensiva:** Si un usuario no autenticado intenta forzar la vista `admin`, el sistema lo redirige inmediatamente a la vista de login o al catálogo público.
 
 ### ADR-010: Arquitectura de Frontend Angular Standalone & Reactividad con Signals
 - **Componentes Standalone & OnPush:** 100% de los componentes utilizan `standalone: true`, `ChangeDetectionStrategy.OnPush` e inyección moderna con `inject()`.

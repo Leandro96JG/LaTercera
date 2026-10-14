@@ -11,8 +11,10 @@
   <!-- Header Bento Standalone -->
   <app-header
     [currentView]="currentView()"
+    [isAuthenticated]="adminAuthStore.isAuthenticated()"
     (goHome)="goHome()"
-    (changeView)="currentView.set($event)"
+    (changeView)="switchView($event)"
+    (logout)="logoutAdmin()"
   />
 
   <!-- VISTA 1: PORTFOLIO & CATÁLOGO DE ÁLBUMES -->
@@ -240,70 +242,51 @@
     </div>
   }
 
-  <!-- VISTA 3: PANEL ADMINISTRATIVO DE LA FOTÓGRAFA -->
+  <!-- VISTA 3: PANEL ADMINISTRATIVO DE LA FOTÓGRAFA (PROTEGIDO) -->
   @else if (currentView() === 'admin') {
-    <div class="space-y-6 animate-fadeIn">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 class="font-display font-extrabold text-2xl sm:text-3xl text-zinc-900 tracking-tight">
-            Hola, Jenifer! 👋
-          </h2>
-          <p class="text-xs text-zinc-500 mt-1">
-            Supervisa tus ventas en Mercado Pago, sube nuevos partidos y gestiona tu catálogo.
-          </p>
-        </div>
-
-        <button
-          (click)="goHome()"
-          class="px-4 py-2 rounded-2xl bg-zinc-100 text-zinc-800 hover:bg-zinc-200 font-bold text-xs transition"
-        >
-          ← Volver al Portfolio
-        </button>
-      </div>
-
-      <!-- Tarjetas Bento Métricas -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-        <div class="bg-surface-darkCard text-white rounded-[28px] p-6 shadow-bento flex flex-col justify-between">
-          <span class="text-zinc-400 text-xs font-semibold">Resumen General</span>
-          <div class="my-4">
-            <span class="font-display font-black text-3xl sm:text-4xl text-white">43</span>
-            <span class="text-xs text-zinc-400 block mt-1">fotos vendidas</span>
-            <p class="text-xs text-emerald-400 mt-1 font-medium">+3 álbumes completos</p>
-          </div>
-          <span class="text-[10px] text-zinc-400">Total acumulado temporada</span>
-        </div>
-
-        <div class="bg-white rounded-[28px] p-6 border border-black/[0.05] shadow-bento flex flex-col justify-between">
-          <div class="flex justify-between items-center text-xs text-zinc-400">
-            <span class="font-semibold text-zinc-700">Ingresos del Mes</span>
-            <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 font-bold text-[10px]">+24%</span>
-          </div>
-          <div class="my-4">
-            <span class="font-display font-black text-3xl text-zinc-900">$64.200</span>
-            <span class="text-xs text-zinc-400 block mt-0.5">ARS en Mercado Pago</span>
-          </div>
-          <span class="text-[10px] text-zinc-400">Cobros acreditados en tu cuenta</span>
-        </div>
-
-        <div class="bg-white rounded-[28px] p-6 border border-black/[0.05] shadow-bento flex flex-col justify-between">
-          <span class="font-semibold text-zinc-700 text-xs">Almacenamiento</span>
-          <div class="my-4">
-            <span class="font-display font-bold text-2xl text-zinc-900">1.8 GB</span>
-            <span class="text-xs text-zinc-400 block">usados de 10 GB (18%)</span>
-          </div>
-          <span class="text-[10px] text-emerald-600 font-semibold">Capacidad óptima</span>
-        </div>
-
-        <div class="bg-white rounded-[28px] p-6 border-2 border-dashed border-zinc-300 hover:border-zinc-950 shadow-bento flex flex-col items-center justify-center text-center cursor-pointer transition">
-          <span class="text-2xl mb-1">☁️</span>
-          <h4 class="font-bold text-sm text-zinc-900">Importar de Google Drive</h4>
-          <p class="text-[11px] text-zinc-400 mt-1">
-            Pega el enlace de una carpeta compartida
-          </p>
-        </div>
-      </div>
-    </div>
+    @if (!adminAuthStore.isAuthenticated()) {
+      <app-admin-login
+        (loginSuccess)="onAdminLoginSuccess()"
+        (cancel)="goHome()"
+      />
+    } @else {
+      <app-admin-panel
+        (goHome)="goHome()"
+        (logout)="logoutAdmin()"
+      />
+    }
   }
+
+  <!-- VISTA 4: LOGIN ADMINISTRATIVO -->
+  @else if (currentView() === 'admin-login') {
+    <app-admin-login
+      (loginSuccess)="onAdminLoginSuccess()"
+      (cancel)="goHome()"
+    />
+  }
+
+  <!-- Pie de Página Bento Minimalista con Acceso Privado -->
+  <footer class="mt-12 pt-6 border-t border-black/[0.05] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-400">
+    <div class="flex items-center gap-2">
+      <span class="font-display font-bold text-zinc-700">LA TERCERA</span>
+      <span>•</span>
+      <span>Jenifer "Yuyo" Espeche • La Rioja, Argentina</span>
+    </div>
+
+    <div class="flex items-center gap-4">
+      <span class="text-[11px] text-zinc-400">Fotos protegidas con marca de agua • Cobros vía Mercado Pago</span>
+      @if (!adminAuthStore.isAuthenticated()) {
+        <button
+          (click)="switchView('admin')"
+          class="text-zinc-400 hover:text-zinc-700 transition flex items-center gap-1 text-[11px] font-medium"
+          title="Acceso exclusivo para fotógrafos"
+        >
+          <span>🔒</span>
+          <span>Acceso Fotógrafa</span>
+        </button>
+      }
+    </div>
+  </footer>
 
 </div>
 
