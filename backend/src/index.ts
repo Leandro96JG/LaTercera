@@ -9,7 +9,7 @@ import { OrderService } from './services/order.service';
 import { MercadoPagoService } from './services/mercadopago.service';
 import { validateMercadoPagoWebhook } from './services/mercadopago-webhook.service';
 import { AdminAuthService } from './services/admin-auth.service';
-import { LocalDiskStorageService } from './services/storage.service';
+import { createStorageService } from './services/storage.service';
 import { DeliveryService } from './services/delivery.service';
 import { createAdminRouter } from './routes/admin.routes';
 import { createAdminAlbumsRouter, adminAlbumsRouter } from './routes/admin-albums.routes';
@@ -40,7 +40,7 @@ export const tokenService = new DownloadTokenService(DOWNLOAD_TOKEN_SECRET);
 export const orderService = new OrderService(tokenService, orderRepository);
 export const mpService = new MercadoPagoService(MP_ACCESS_TOKEN, MP_WEBHOOK_SECRET, orderService);
 export const adminAuthService = new AdminAuthService(JWT_SECRET);
-export const storageService = new LocalDiskStorageService();
+export const storageService = createStorageService();
 export const deliveryService = new DeliveryService(orderService, tokenService, storageService);
 
 // Middlewares

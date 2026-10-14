@@ -4,7 +4,7 @@ import { extractGoogleDriveFolderId } from './drive-parser.service';
 import { isAllowedImageMimeType, isAllowedImageExtension, sanitizeFilename, validateImageBufferHeader } from './mime-validator.service';
 import { runConcurrentBatch, BatchProgress } from './concurrency.service';
 import { processImageWithWatermark } from './image.service';
-import { IStorageService, LocalDiskStorageService } from './storage.service';
+import { IStorageService, createStorageService } from './storage.service';
 
 export interface DriveFileMetadata {
   id: string;
@@ -123,7 +123,7 @@ export class GoogleDriveImporterService {
     defaultApiKey?: string
   ) {
     this.httpClient = httpClient || new DefaultDriveHttpClient();
-    this.storageService = storageService || new LocalDiskStorageService();
+    this.storageService = storageService || createStorageService();
     this.defaultApiKey = defaultApiKey || process.env.GOOGLE_DRIVE_API_KEY;
   }
 

@@ -218,11 +218,17 @@ export class DeliveryService {
       const cleanPhoto = this.sanitizeId(pId);
       const photoName = `LA_TERCERA_${cleanAlbumId}_${cleanPhoto}.jpg`;
 
-      // Intentamos leer el archivo original si existe, o enviamos un placeholder HD
+      // Intentamos leer el archivo original si existe (en Supabase Storage o local), o enviamos un placeholder HD
       try {
-        const originalPath = this.storageService.getOriginalPath(cleanAlbumId, cleanPhoto, '.jpg');
-        // Si no existe físicamente en el storage durante tests, agregamos un buffer representativo
-        archive.append(Buffer.from(`LA_TERCERA_HD_IMAGE_${cleanPhoto}`), { name: photoName });
+        let buffer: Buffer | null = null;
+        if (this.storageService.getOriginalBuffer) {
+          buffer = await this.storageService.getOriginalBuffer(cleanAlbumId, cleanPhoto, '.jpg');
+        }
+        if (buffer) {
+          archive.append(buffer, { name: photoName });
+        } else {
+          archive.append(Buffer.from(`LA_TERCERA_HD_IMAGE_${cleanPhoto}`), { name: photoName });
+        }
       } catch {
         archive.append(Buffer.from(`LA_TERCERA_HD_IMAGE_${cleanPhoto}`), { name: photoName });
       }

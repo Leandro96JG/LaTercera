@@ -92,7 +92,7 @@ export class SupabasePhotographerRepository implements IPhotographerRepository {
     return {
       id: row.id,
       email: row.email,
-      name: row.full_name || row.display_name,
+      name: row.full_name || row.display_name || row.email,
       role: row.role,
       photographerId: row.id,
       passwordHash: row.password_hash,

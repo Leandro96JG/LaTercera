@@ -8,7 +8,7 @@ import {
 } from './mime-validator.service';
 import { runConcurrentBatch, BatchProgress } from './concurrency.service';
 import { processImageWithWatermark } from './image.service';
-import { IStorageService, LocalDiskStorageService } from './storage.service';
+import { IStorageService, createStorageService } from './storage.service';
 
 export interface UploadedFileItem {
   originalname: string;
@@ -59,7 +59,7 @@ export class BulkUploadService {
   private storageService: IStorageService;
 
   constructor(storageService?: IStorageService) {
-    this.storageService = storageService || new LocalDiskStorageService();
+    this.storageService = storageService || createStorageService();
   }
 
   async processBulkUpload(options: BulkUploadOptions): Promise<BulkUploadResult> {

@@ -5,7 +5,7 @@ import {
   DefaultDriveHttpClient
 } from '../services/drive-importer.service';
 import { BulkUploadService } from '../services/bulk-upload.service';
-import { LocalDiskStorageService } from '../services/storage.service';
+import { createStorageService } from '../services/storage.service';
 import {
   AdminDriveImportRequest,
   AdminDriveImportResponse,
@@ -17,7 +17,7 @@ import { createRequireAdminAuth } from '../middleware/admin-auth.middleware';
 
 export function createAdminAlbumsRouter(authService?: AdminAuthService): Router {
   const router = Router();
-  const storageService = new LocalDiskStorageService();
+  const storageService = createStorageService();
   const driveHttpClient = new DefaultDriveHttpClient();
   const driveImporterService = new GoogleDriveImporterService(driveHttpClient, storageService);
   const bulkUploadService = new BulkUploadService(storageService);
