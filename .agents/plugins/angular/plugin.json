@@ -1,0 +1,19 @@
+{
+  "name": "angular",
+  "displayName": "Angular Moderno Suite",
+  "version": "1.0.0",
+  "description": "Suite integral para desarrollo en Angular Moderno (v17/18/19/21+): Signals, Standalone Components, OnPush, Control Flow nativo, Reactive Forms, Vitest y MCP oficial de Angular CLI.",
+  "author": {
+    "name": "La Tercera Dev Team"
+  },
+  "keywords": [
+    "angular",
+    "signals",
+    "standalone",
+    "onpush",
+    "vitest",
+    "mcp",
+    "typescript",
+    "frontend"
+  ]
+}

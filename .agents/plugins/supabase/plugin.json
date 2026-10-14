@@ -1,0 +1,18 @@
+{
+  "name": "supabase",
+  "displayName": "Supabase Suite",
+  "version": "1.0.0",
+  "description": "Suite integral para desarrollo, modelado de bases de datos PostgreSQL, seguridad RLS, almacenamiento Storage y arquitectura de backend con Supabase.",
+  "author": {
+    "name": "La Tercera Dev Team"
+  },
+  "keywords": [
+    "supabase",
+    "postgres",
+    "rls",
+    "storage",
+    "mcp",
+    "database",
+    "sql"
+  ]
+}

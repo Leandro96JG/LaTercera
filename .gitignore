@@ -26,3 +26,6 @@ backend/uploads/
 # Sistema Operativo
 Thumbs.db
 .DS_Store
+
+# Herramientas de Contexto / Repomix
+repomix-output.xml
