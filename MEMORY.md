@@ -53,10 +53,17 @@ Plataforma web e-commerce mobile-first orientada a la venta de fotografías de p
 - [x] Estructuración de `backend/` con Express y TypeScript estricto.
 - [x] Motor de imágenes con **`sharp`** (WebP ligero + marca de agua diagonal estampada en píxeles).
 - [x] Servicio de precios y cálculo de packs de descuento con **TDD (6 tests pasando con Vitest)**.
-- [ ] Integración de Mercado Pago SDK (Preferencias y Webhooks con firma criptográfica).
-- [ ] Conexión del frontend definitivo con la API del backend.
+- [x] Integración de Mercado Pago SDK & Webhooks con **Máxima Seguridad Transaccional** (Checkout Pro, validación HMAC-SHA256, anti-replay, Zero-Trust y **34 tests unitarios pasando**).
+- [ ] Conexión del frontend definitivo con la API del backend (Angular 19 Standalone / Signals).
 - [ ] Importador de carpetas compartidas de Google Drive.
 - [ ] Panel administrativo con subida masiva drag-and-drop y métricas en vivo.
+
+### ADR-008: Seguridad de Pagos, Zero-Trust & Webhooks Criptográficos (Mercado Pago ARS)
+- **Principio Zero-Trust de Precios:** El frontend nunca envía montos ni totales. Solo envía IDs de fotos/álbumes y cupones. El backend calcula el total y en el webhook consulta directamente `GET /v1/payments/{id}` a Mercado Pago verificando que `payment.transaction_amount >= order.total_amount`, `currency === 'ARS'` y `status === 'approved'`. Discrepancias disparan la alerta inmutable `FRAUD_ALERT_PRICE_MISMATCH`.
+- **Firma Criptográfica HMAC-SHA256:** Validación del manifest `id:[data.id];request-id:[x-request-id];ts:[ts];` utilizando `MP_WEBHOOK_SECRET` y comparación en tiempo constante (`crypto.timingSafeEqual`) con protección contra excepciones de disparidad de tamaño.
+- **Protección Anti-Replay:** Ventana de tolerancia estricta de ±300 segundos (5 minutos) contra ataques de repetición.
+- **Idempotencia Transaccional:** Registro único de eventos procesados para absorber reintentos automáticos de Mercado Pago sin re-ejecutar lógica de negocio.
+- **Tokens de Descarga Seguros (72 Horas):** Generación de tokens HMAC-SHA256 con Base64Url que expiran a las 72 horas, protegidos contra Path Traversal (`path.posix.basename`).
 
 ### ADR-006: Especificación del Dashboard Administrativo & Panel de Control
 - **Métricas & Finanzas:** Ingresos del mes ($ ARS), fotos vendidas, álbumes vendidos, espacio en servidor utilizado (GB), tabla histórica de transacciones con estado de Mercado Pago y datos del comprador.
