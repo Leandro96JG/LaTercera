@@ -24,6 +24,14 @@
               darkPill: '#1A1A1E',
               border: 'rgba(0, 0, 0, 0.05)',
               muted: '#71717A'
+            },
+            brand: {
+              dark: '#131316',
+              pill: '#1A1A1E',
+              gold: '#FDB813',
+              goldHover: '#F59E0B',
+              sky: '#38BDF8',
+              canvas: '#ECEEF2'
             }
           },
           fontFamily: {
@@ -33,7 +41,62 @@
           boxShadow: {
             'bento': '0 12px 32px -8px rgba(0, 0, 0, 0.05), 0 4px 12px -2px rgba(0, 0, 0, 0.03)',
             'bento-hover': '0 20px 40px -12px rgba(0, 0, 0, 0.1), 0 6px 16px -4px rgba(0, 0, 0, 0.04)',
-            'glass': '0 24px 60px -15px rgba(0, 0, 0, 0.08)'
+            'bento-active': '0 10px 28px -4px rgba(0, 0, 0, 0.16)',
+            'glass': '0 24px 60px -15px rgba(0, 0, 0, 0.08)',
+            'gold-glow': '0 0 24px rgba(253, 184, 19, 0.45)'
+          },
+          transitionTimingFunction: {
+            'apple-fluid': 'cubic-bezier(0.16, 1, 0.3, 1)',
+            'spring-bounce': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+            'accelerate-out': 'cubic-bezier(0.4, 0, 1, 1)'
+          },
+          keyframes: {
+            floatCartIn: {
+              '0%': { transform: 'translateY(110px) scale(0.92)', opacity: '0' },
+              '70%': { transform: 'translateY(-6px) scale(1.02)', opacity: '1' },
+              '100%': { transform: 'translateY(0) scale(1)', opacity: '1' }
+            },
+            cartPulse: {
+              '0%': { transform: 'scale(1)' },
+              '40%': { transform: 'scale(1.04)' },
+              '100%': { transform: 'scale(1)' }
+            },
+            counterPop: {
+              '0%': { transform: 'scale(0.6) rotate(-15deg)', opacity: '0.4' },
+              '65%': { transform: 'scale(1.3) rotate(5deg)' },
+              '100%': { transform: 'scale(1) rotate(0deg)', opacity: '1' }
+            },
+            checkPop: {
+              '0%': { transform: 'scale(0) rotate(-45deg)', opacity: '0' },
+              '70%': { transform: 'scale(1.24) rotate(6deg)', opacity: '1' },
+              '100%': { transform: 'scale(1) rotate(0deg)', opacity: '1' }
+            },
+            shimmerSweep: {
+              '0%, 70%': { transform: 'translateX(-160%) skewX(-20deg)' },
+              '100%': { transform: 'translateX(220%) skewX(-20deg)' }
+            },
+            slideNext: {
+              '0%': { transform: 'translateX(50px) scale(0.97)', opacity: '0' },
+              '100%': { transform: 'translateX(0) scale(1)', opacity: '1' }
+            },
+            slidePrev: {
+              '0%': { transform: 'translateX(-50px) scale(0.97)', opacity: '0' },
+              '100%': { transform: 'translateX(0) scale(1)', opacity: '1' }
+            },
+            goldGlow: {
+              '0%, 100%': { boxShadow: '0 0 15px rgba(253, 184, 19, 0.25)' },
+              '50%': { boxShadow: '0 0 28px rgba(253, 184, 19, 0.55)' }
+            }
+          },
+          animation: {
+            'float-cart-in': 'floatCartIn 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+            'cart-pulse': 'cartPulse 0.26s cubic-bezier(0.16, 1, 0.3, 1)',
+            'counter-pop': 'counterPop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+            'check-pop': 'checkPop 0.24s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+            'shimmer-sweep': 'shimmerSweep 4.5s cubic-bezier(0.4, 0, 0.2, 1) infinite',
+            'slide-next': 'slideNext 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+            'slide-prev': 'slidePrev 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+            'gold-glow': 'goldGlow 2.5s ease-in-out infinite'
           }
         }
       }
@@ -44,6 +107,10 @@
   <script src="https://unpkg.com/lucide@latest"></script>
 
   <style>
+    * {
+      -webkit-tap-highlight-color: transparent;
+    }
+
     body {
       background-color: #ECEEF2;
       background-image: 
@@ -64,14 +131,53 @@
       pointer-events: none;
     }
 
-    .animate-float-in {
-      animation: floatIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    /* Rendimiento 60/120fps Móvil & Virtualización */
+    .bento-photo-card {
+      contain: layout style paint;
+      content-visibility: auto;
+      contain-intrinsic-size: auto 320px;
+      touch-action: manipulation;
     }
-    @keyframes floatIn {
-      from { opacity: 0; transform: translateY(16px) scale(0.98); }
-      to { opacity: 1; transform: translateY(0) scale(1); }
+
+    /* View Transitions API (Portfolio <-> Álbum) */
+    ::view-transition-old(album-hero),
+    ::view-transition-new(album-hero) {
+      height: 100%;
+      width: 100%;
+      object-fit: cover;
     }
-  </style>
+    ::view-transition-group(album-hero) {
+      animation-duration: 420ms;
+      animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    ::view-transition-old(root) {
+      animation: 240ms cubic-bezier(0.4, 0, 1, 1) both fadeOutRoot;
+    }
+    ::view-transition-new(root) {
+      animation: 340ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both fadeInRoot;
+    }
+    @keyframes fadeOutRoot {
+      from { opacity: 1; transform: translateY(0); }
+      to { opacity: 0; transform: translateY(-6px); }
+    }
+    @keyframes fadeInRoot {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* A11y: Respeto estricto de prefers-reduced-motion */
+    @media (prefers-reduced-motion: reduce) {
+      *, ::before, ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+      ::view-transition-group(*),
+      ::view-transition-old(*),
+      ::view-transition-new(*) {
+        animation: none !important;
+      }
+    }
 </head>
 <body class="text-zinc-900 font-sans antialiased min-h-screen p-2 sm:p-5 md:p-8 relative selection:bg-zinc-900 selection:text-white">
 
@@ -260,7 +366,7 @@
       </div>
 
       <!-- Hero del Álbum Activo -->
-      <div class="bg-white rounded-[32px] p-6 sm:p-8 border border-black/[0.05] shadow-bento flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div id="albumDetailHero" class="bg-white rounded-[32px] p-6 sm:p-8 border border-black/[0.05] shadow-bento flex flex-col md:flex-row md:items-center justify-between gap-6" style="view-transition-name: album-hero;">
         <div>
           <div class="flex items-center gap-2 mb-2">
             <span id="albumDetailCategoryBadge" class="px-3 py-1 rounded-full bg-zinc-950 text-white text-[11px] font-bold uppercase tracking-wider">
@@ -406,14 +512,14 @@
   <!-- ==================================================== -->
   <!-- CÁPSULA FLOTANTE DE COMPRA (SOLO APARECE AL ELEGIR)  -->
   <!-- ==================================================== -->
-  <div id="bentoFloatingCart" class="fixed bottom-6 inset-x-0 z-40 flex justify-center pointer-events-none transition-all duration-300 transform translate-y-24 opacity-0">
-    <div class="pointer-events-auto bg-zinc-950 text-white rounded-full px-5 py-3 shadow-2xl border border-white/20 flex items-center gap-4 sm:gap-6 backdrop-blur-xl animate-float-in">
+  <div id="bentoFloatingCart" class="fixed bottom-6 inset-x-0 z-40 flex justify-center pointer-events-none transition-all duration-300 transform translate-y-28 opacity-0">
+    <div id="bentoFloatingCartPill" class="pointer-events-auto bg-zinc-950/95 text-white rounded-full px-5 py-3 shadow-2xl border border-white/20 flex items-center gap-4 sm:gap-6 backdrop-blur-2xl transition-transform duration-200" style="transform-origin: center bottom;">
       
       <div class="flex items-center gap-2.5">
-        <span id="floatingCartCount" class="w-6 h-6 rounded-full bg-white text-zinc-950 text-xs font-bold flex items-center justify-center">
+        <span id="floatingCartCount" class="w-6 h-6 rounded-full bg-white text-zinc-950 text-xs font-black flex items-center justify-center shadow-sm">
           1
         </span>
-        <span class="text-xs sm:text-sm font-medium text-zinc-200">
+        <span class="text-xs sm:text-sm font-semibold text-zinc-200">
           fotos seleccionadas
         </span>
       </div>
@@ -421,14 +527,14 @@
       <div class="h-4 w-px bg-white/20"></div>
 
       <div>
-        <span id="floatingCartTotal" class="font-display font-extrabold text-sm sm:text-base text-white tracking-wide">
+        <span id="floatingCartTotal" class="font-display font-black text-sm sm:text-base text-white tracking-wide">
           $1.200 ARS
         </span>
       </div>
 
-      <button onclick="openCheckoutModal()" class="px-4 sm:px-5 py-2 rounded-full bg-white text-zinc-950 hover:bg-zinc-200 font-bold text-xs sm:text-sm transition flex items-center gap-1.5 shadow-md active:scale-95">
+      <button onclick="openCheckoutModal()" class="group relative px-5 py-2.5 rounded-full bg-white text-zinc-950 hover:bg-brand-gold hover:text-black font-bold text-xs sm:text-sm transition-all duration-200 flex items-center gap-2 shadow-md hover:shadow-gold-glow active:scale-95 active:duration-75">
         <span>Comprar</span>
-        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+        <i data-lucide="arrow-right" class="w-3.5 h-3.5 transition-transform duration-200 ease-apple-fluid group-hover:translate-x-1"></i>
       </button>
 
     </div>
@@ -437,7 +543,7 @@
   <!-- ==================================================== -->
   <!-- LIGHTBOX CINEMÁTICO LIMPIO                           -->
   <!-- ==================================================== -->
-  <div id="bentoLightbox" class="hidden fixed inset-0 z-50 bg-black/90 backdrop-blur-2xl flex flex-col justify-between p-4 sm:p-8 select-none transition-all">
+  <div id="bentoLightbox" class="hidden fixed inset-0 z-50 bg-black/95 backdrop-blur-2xl flex flex-col justify-between p-4 sm:p-8 select-none transition-opacity duration-300 ease-apple-fluid opacity-0">
     <div class="flex items-center justify-between text-white z-10 max-w-6xl mx-auto w-full">
       <div class="flex items-center gap-3">
         <span id="lightboxCounter" class="text-xs text-zinc-400 font-medium">Foto 1 de 24</span>
@@ -462,7 +568,7 @@
       </button>
 
       <div class="relative max-h-full max-w-full flex items-center justify-center">
-        <img id="lightboxMainImg" src="" alt="Foto" class="max-h-[78vh] w-auto max-w-full object-contain rounded-2xl shadow-2xl">
+        <img id="lightboxMainImg" src="" alt="Foto" class="max-h-[78vh] w-auto max-w-full object-contain rounded-2xl shadow-2xl transition-transform duration-200">
         <div id="lightboxWatermarkLayer" class="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div class="bg-black/40 backdrop-blur-md px-6 py-2.5 rounded-full border border-white/20">
             <span class="font-display font-extrabold text-white/90 tracking-widest text-xs sm:text-sm">LA TERCERA • MUESTRA</span>
@@ -655,7 +761,7 @@
       filtered.forEach(album => {
         const card = document.createElement('div');
         card.className = 'group bg-white rounded-[28px] overflow-hidden border border-black/[0.05] shadow-bento hover:shadow-bento-hover transition-all duration-300 cursor-pointer flex flex-col justify-between';
-        card.onclick = () => openAlbumDetail(album);
+        card.onclick = () => openAlbumDetail(album, card);
 
         card.innerHTML = `
           <div class="relative aspect-[16/10] overflow-hidden bg-zinc-100">
@@ -701,17 +807,22 @@
       renderAlbumsGrid();
     }
 
-    // Abrir Vista Detalle de un Álbum
-    function openAlbumDetail(album) {
+    // Abrir Vista Detalle de un Álbum con View Transition Morphing
+    function openAlbumDetail(album, cardEl = null) {
       document.getElementById('albumDetailTitle').textContent = album.title;
       document.getElementById('albumDetailDate').textContent = album.date + ' • ' + album.subtitle;
       document.getElementById('albumDetailCategoryBadge').textContent = album.badge;
+
+      if (cardEl) {
+        document.querySelectorAll('.bento-album-hero').forEach(el => el.style.viewTransitionName = '');
+        cardEl.style.viewTransitionName = 'album-hero';
+      }
 
       renderAlbumPhotos();
       showSection('albumDetail');
     }
 
-    // Renderizar Fotos del Álbum Activo
+    // Renderizar Fotos del Álbum Activo con Micro-animaciones Bento
     function renderAlbumPhotos() {
       const container = document.getElementById('albumPhotosGrid');
       container.innerHTML = '';
@@ -720,11 +831,11 @@
         const isSelected = selectedPhotos.has(photo.id);
 
         const card = document.createElement('div');
-        card.className = `group relative rounded-[28px] overflow-hidden bg-white border transition-all duration-300 cursor-pointer shadow-bento hover:shadow-bento-hover ${photo.span} ${isSelected ? 'ring-2 ring-zinc-950 scale-[0.98]' : 'border-black/[0.05]'}`;
+        card.className = `group bento-photo-card relative rounded-[28px] overflow-hidden bg-white border transition-all duration-200 ease-apple-fluid cursor-pointer shadow-bento hover:shadow-bento-hover ${photo.span} ${isSelected ? 'ring-2 ring-zinc-950 scale-[0.975] shadow-bento-active' : 'border-black/[0.05] hover:scale-[1.01]'}`;
 
         card.innerHTML = `
           <div class="relative w-full h-full overflow-hidden" onclick="openLightbox(${photo.id})">
-            <img src="${photo.url}" alt="${photo.title}" class="w-full h-full object-cover prevent-save group-hover:scale-105 transition duration-700 ease-out">
+            <img src="${photo.url}" alt="${photo.title}" class="w-full h-full object-cover prevent-save group-hover:scale-105 transition duration-700 ease-apple-fluid">
             
             ${!photo.isHD ? `
               <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40 group-hover:opacity-70 transition">
@@ -733,8 +844,10 @@
                 </span>
               </div>
             ` : `
-              <div class="absolute top-3 left-3 z-10 px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-md text-zinc-900 text-[10px] font-bold tracking-wide flex items-center gap-1 shadow-sm">
-                <span>✦</span> HD Master
+              <div class="absolute top-3 left-3 z-10 overflow-hidden px-3 py-1 rounded-full bg-white/95 backdrop-blur-md text-zinc-900 text-[10px] font-extrabold tracking-wide flex items-center gap-1.5 shadow-sm border border-black/5">
+                <span class="text-emerald-500 font-black">✦</span>
+                <span>HD Master</span>
+                <span class="absolute inset-0 w-full h-full pointer-events-none bg-gradient-to-r from-transparent via-white/80 to-transparent animate-shimmer-sweep"></span>
               </div>
             `}
 
@@ -742,8 +855,8 @@
           </div>
 
           <div class="absolute bottom-3 right-3 z-20">
-            <button onclick="toggleSelect(${photo.id}, event)" class="w-9 h-9 rounded-full flex items-center justify-center transition shadow-md ${isSelected ? 'bg-zinc-950 text-white' : 'bg-white/90 hover:bg-white text-zinc-800 backdrop-blur-md'}">
-              <i data-lucide="${isSelected ? 'check' : 'plus'}" class="w-4 h-4 stroke-[2.5]"></i>
+            <button onclick="toggleSelect(${photo.id}, event)" class="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 shadow-md active:scale-90 ${isSelected ? 'bg-zinc-950 text-white ring-2 ring-white/80' : 'bg-white/90 hover:bg-white text-zinc-800 backdrop-blur-md'}">
+              <i data-lucide="${isSelected ? 'check' : 'plus'}" class="${isSelected ? 'w-5 h-5 stroke-[3] animate-check-pop' : 'w-4 h-4 stroke-[2.5]'}"></i>
             </button>
           </div>
 
@@ -760,7 +873,7 @@
       lucide.createIcons();
     }
 
-    // Toggle Selección
+    // Toggle Selección con Pulso Elástico
     function toggleSelect(id, event) {
       if (event) event.stopPropagation();
 
@@ -770,31 +883,55 @@
         selectedPhotos.add(id);
       }
 
-      updateFloatingCart();
+      updateFloatingCart(true);
       renderAlbumPhotos();
     }
 
-    function updateFloatingCart() {
+    function updateFloatingCart(shouldPulse = false) {
       const count = selectedPhotos.size;
       const cart = document.getElementById('bentoFloatingCart');
+      const cartPill = document.getElementById('bentoFloatingCartPill');
       const countEl = document.getElementById('floatingCartCount');
       const totalEl = document.getElementById('floatingCartTotal');
 
       if (count === 0) {
-        cart.classList.add('translate-y-24', 'opacity-0');
+        cart.classList.add('translate-y-28', 'opacity-0');
         cart.classList.remove('translate-y-0', 'opacity-100');
       } else {
         countEl.textContent = count;
+        
+        // Micro-animación Pop del Contador
+        countEl.classList.remove('animate-counter-pop');
+        void countEl.offsetWidth; // Reflow forzar reinicio de animación
+        countEl.classList.add('animate-counter-pop');
+
+        // Pulso elástico en la cápsula completa
+        if (shouldPulse && cartPill) {
+          cartPill.classList.remove('animate-cart-pulse');
+          void cartPill.offsetWidth;
+          cartPill.classList.add('animate-cart-pulse');
+        }
+
         const total = count * PHOTO_PRICE;
         totalEl.textContent = `$${total.toLocaleString('es-AR')} ARS`;
 
-        cart.classList.remove('translate-y-24', 'opacity-0');
+        cart.classList.remove('translate-y-28', 'opacity-0');
         cart.classList.add('translate-y-0', 'opacity-100');
       }
     }
 
-    // Navegación entre Vistas
+    // Navegación entre Vistas con View Transitions API
     function showSection(section) {
+      if (document.startViewTransition) {
+        document.startViewTransition(() => {
+          executeSectionSwitch(section);
+        });
+      } else {
+        executeSectionSwitch(section);
+      }
+    }
+
+    function executeSectionSwitch(section) {
       const home = document.getElementById('homeSection');
       const albumDetail = document.getElementById('albumDetailSection');
       const admin = document.getElementById('adminSection');
@@ -820,21 +957,45 @@
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    // Lightbox
+    // Lightbox Cinemático con Slide y Fade Suave
     function openLightbox(id) {
       currentLightboxIdx = samplePhotos.findIndex(p => p.id === id);
       if (currentLightboxIdx === -1) currentLightboxIdx = 0;
       updateLightboxView();
-      document.getElementById('bentoLightbox').classList.remove('hidden');
+      const lb = document.getElementById('bentoLightbox');
+      lb.classList.remove('hidden');
+      requestAnimationFrame(() => {
+        lb.classList.remove('opacity-0');
+        lb.classList.add('opacity-100');
+      });
       document.body.classList.add('overflow-hidden');
     }
+
     function closeLightbox() {
-      document.getElementById('bentoLightbox').classList.add('hidden');
-      document.body.classList.remove('overflow-hidden');
+      const lb = document.getElementById('bentoLightbox');
+      lb.classList.remove('opacity-100');
+      lb.classList.add('opacity-0');
+      setTimeout(() => {
+        lb.classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
+      }, 250);
     }
-    function updateLightboxView() {
+
+    function updateLightboxView(direction = null) {
       const p = samplePhotos[currentLightboxIdx];
-      document.getElementById('lightboxMainImg').src = p.url;
+      const img = document.getElementById('lightboxMainImg');
+
+      // Animación de deslizamiento cinemático
+      img.classList.remove('animate-slide-next', 'animate-slide-prev');
+      if (direction === 'next') {
+        void img.offsetWidth;
+        img.classList.add('animate-slide-next');
+      } else if (direction === 'prev') {
+        void img.offsetWidth;
+        img.classList.add('animate-slide-prev');
+      }
+
+      img.src = p.url;
       document.getElementById('lightboxCounter').textContent = `Foto ${currentLightboxIdx + 1} de ${samplePhotos.length}`;
 
       const watermark = document.getElementById('lightboxWatermarkLayer');
@@ -848,32 +1009,37 @@
       }
       updateLightboxBtn();
     }
+
     function updateLightboxBtn() {
       const p = samplePhotos[currentLightboxIdx];
       const btn = document.getElementById('btnLightboxSelect');
       const isSelected = selectedPhotos.has(p.id);
       if (isSelected) {
-        btn.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5"></i> Seleccionada`;
-        btn.className = 'px-4 py-2 rounded-full bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition';
+        btn.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5 stroke-[3]"></i> Seleccionada`;
+        btn.className = 'px-4 py-2 rounded-full bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm';
       } else {
         btn.innerHTML = `<i data-lucide="plus" class="w-3.5 h-3.5"></i> Seleccionar ($${PHOTO_PRICE})`;
-        btn.className = 'px-4 py-2 rounded-full bg-white text-zinc-950 font-bold text-xs flex items-center gap-1.5 transition';
+        btn.className = 'px-4 py-2 rounded-full bg-white text-zinc-950 font-bold text-xs flex items-center gap-1.5 transition hover:bg-zinc-100 shadow-sm';
       }
       lucide.createIcons();
     }
+
     function toggleCurrentFromLightbox() {
       const p = samplePhotos[currentLightboxIdx];
       toggleSelect(p.id);
       updateLightboxBtn();
     }
+
     function nextPhoto() {
       currentLightboxIdx = (currentLightboxIdx + 1) % samplePhotos.length;
-      updateLightboxView();
+      updateLightboxView('next');
     }
+
     function prevPhoto() {
       currentLightboxIdx = (currentLightboxIdx - 1 + samplePhotos.length) % samplePhotos.length;
-      updateLightboxView();
+      updateLightboxView('prev');
     }
+
     window.addEventListener('keydown', (e) => {
       if (document.getElementById('bentoLightbox').classList.contains('hidden')) return;
       if (e.key === 'ArrowRight') nextPhoto();

@@ -54,9 +54,16 @@ Plataforma web e-commerce mobile-first orientada a la venta de fotografías de p
 - [x] Motor de imágenes con **`sharp`** (WebP ligero + marca de agua diagonal estampada en píxeles).
 - [x] Servicio de precios y cálculo de packs de descuento con **TDD (6 tests pasando con Vitest)**.
 - [x] Integración de Mercado Pago SDK & Webhooks con **Máxima Seguridad Transaccional** (Checkout Pro, validación HMAC-SHA256, anti-replay, Zero-Trust y **34 tests unitarios pasando**).
-- [ ] Conexión del frontend definitivo con la API del backend (Angular 19 Standalone / Signals).
+- [x] Conexión del frontend definitivo con la API del backend (**Angular 21 Standalone, Signals, OnPush, Bento UI, micro-animaciones a 120fps y 11 tests unitarios pasando**).
 - [ ] Importador de carpetas compartidas de Google Drive.
 - [ ] Panel administrativo con subida masiva drag-and-drop y métricas en vivo.
+
+### ADR-010: Arquitectura de Frontend Angular Standalone & Reactividad con Signals
+- **Componentes Standalone & OnPush:** 100% de los componentes utilizan `standalone: true`, `ChangeDetectionStrategy.OnPush` e inyección moderna con `inject()`.
+- **Control de Flujo Nativo:** Exclusivo uso de `@if`, `@else`, `@for (item of items; track item.id)` y `@switch` (cero directivas estructurales legadas).
+- **Gestión de Estado Reactiva (`CartStore`):** Implementado con `signal` y `computed` derivando en tiempo real subtotales, descuentos escalonados (-20% en 3 fotos, -30% en 5+ fotos, cupón YUYO10) y modo de álbum completo ($9.500 ARS).
+- **Integración Transaccional Zero-Trust:** Conexión con `POST /api/checkout/preference` de Mercado Pago Checkout Pro a través de `PaymentService`.
+- **Micro-interacciones Móviles:** Cápsula flotante elástica, visor lightbox cinemático con protección anti-guardado de imágenes y badges HD Master.
 
 ### ADR-008: Seguridad de Pagos, Zero-Trust & Webhooks Criptográficos (Mercado Pago ARS)
 - **Principio Zero-Trust de Precios:** El frontend nunca envía montos ni totales. Solo envía IDs de fotos/álbumes y cupones. El backend calcula el total y en el webhook consulta directamente `GET /v1/payments/{id}` a Mercado Pago verificando que `payment.transaction_amount >= order.total_amount`, `currency === 'ARS'` y `status === 'approved'`. Discrepancias disparan la alerta inmutable `FRAUD_ALERT_PRICE_MISMATCH`.
@@ -64,6 +71,18 @@ Plataforma web e-commerce mobile-first orientada a la venta de fotografías de p
 - **Protección Anti-Replay:** Ventana de tolerancia estricta de ±300 segundos (5 minutos) contra ataques de repetición.
 - **Idempotencia Transaccional:** Registro único de eventos procesados para absorber reintentos automáticos de Mercado Pago sin re-ejecutar lógica de negocio.
 - **Tokens de Descarga Seguros (72 Horas):** Generación de tokens HMAC-SHA256 con Base64Url que expiran a las 72 horas, protegidos contra Path Traversal (`path.posix.basename`).
+
+### ADR-009: Motion Design, Micro-animaciones Bento y Optimización Móvil a 120fps
+- **Filosofía Apple Fluid Motion:** Curvas cúbicas `cubic-bezier(0.16, 1, 0.3, 1)` y rebote elástico `cubic-bezier(0.34, 1.56, 0.64, 1)`.
+- **View Transitions API:** Navegación SPA con morphing entre tarjeta Bento del portfolio y el hero del álbum (`view-transition-name: album-hero`) con contención de aspect-ratio (`object-fit: cover`).
+- **Cápsula Flotante Reactiva:** Entrada en resorte `translateY(110px) -> 0`, pulso elástico de la cápsula al alterar selección y pop rotativo del contador circular (`animate-counter-pop`). Botón de compra con halo solar dorado (`#FDB813`) y avance sutil de flecha.
+- **Micro-interacciones en Grilla de Fotos:** Contracción elástica táctil `scale(0.975)`, borde activo `ring-2 ring-zinc-950`, check emergente `check-pop` y destello continuo de rayo de luz (shimmer) en las insignias de fotos HD Master.
+- **Lightbox Cinemático:** Fade con desenfoque de fondo profundo (`backdrop-blur-2xl`), desplazamiento horizontal inercial (`slide-next` / `slide-prev`) y cierre elástico.
+- **Garantía 60/120fps en Móviles:**
+  - Animaciones confinadas estrictamente al compositor GPU (`transform` y `opacity`).
+  - Virtualización ligera con `contain: layout style paint` y `content-visibility: auto`.
+  - Supresión de retardo táctil con `touch-action: manipulation` y `-webkit-tap-highlight-color: transparent`.
+  - Cumplimiento de accesibilidad con supresión de animaciones bajo `@media (prefers-reduced-motion: reduce)`.
 
 ### ADR-006: Especificación del Dashboard Administrativo & Panel de Control
 - **Métricas & Finanzas:** Ingresos del mes ($ ARS), fotos vendidas, álbumes vendidos, espacio en servidor utilizado (GB), tabla histórica de transacciones con estado de Mercado Pago y datos del comprador.
