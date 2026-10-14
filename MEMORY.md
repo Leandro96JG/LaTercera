@@ -60,9 +60,28 @@ Plataforma web e-commerce mobile-first orientada a la venta de fotografías de p
 - [x] Panel administrativo completo con subida masiva drag-and-drop, métricas en vivo y registro de fotógrafos colaboradores para escalabilidad futura.
 - [x] Flujo de Entrega Post-Pago, Streaming de Descargas y Pantalla de Éxito (`/pago-exitoso`) con **127 tests unitarios pasando en total** (88 backend + 39 frontend).
 - [x] Persistencia de Base de Datos Real con **Supabase (PostgreSQL)** y Patrón Repository con **141 tests unitarios pasando en total** (102 backend + 39 frontend).
-- [x] Configuración de variables de entorno de Supabase y verificación de conectividad live exitosa (4 álbumes, fotógrafa Jenifer Espeche, órdenes e inserciones comprobadas en tiempo real).
 - [x] Arquitectura de Almacenamiento Dual en la Nube con **Supabase Storage Buckets** (`previews` CDN público y `originals` privado Zero-Trust con RLS), **149 tests unitarios pasando en total** (110 backend + 39 frontend).
+- [x] Gestión Dinámica de Álbumes, Creación de Eventos y Edición de Precios desde el Panel Administrativo con **165 tests unitarios pasando en total** (120 backend + 45 frontend).
 - [ ] Preparación para Despliegue en Producción (CI/CD, Railway/Render para Backend, Vercel/Cloudflare Pages para Frontend).
+
+### ADR-016: Gestión Dinámica de Álbumes, Creación de Eventos y Edición de Precios desde el Panel Administrativo
+- **Motivación & Requerimiento:**
+  - La fotógrafa requería flexibilidad total para dar de alta nuevos álbumes para eventos deportivos o sociales no preexistentes, sin depender de IDs estáticos preconfigurados (`album-1` a `album-4`).
+  - Necesidad de modificar dinámicamente los precios unitarios (`unitPrice`) y del álbum completo (`fullAlbumPrice`) directamente desde el dashboard de administración con feedback visual instantáneo.
+- **Contratos y Endpoints de Backend (`/api/admin/albums`):**
+  - `GET /api/admin/albums`: Expone la totalidad de álbumes del sistema (publicados y borradores) para control administrativo.
+  - `POST /api/admin/albums`: Crea un nuevo álbum con generación automática de slug amigable (`generateAlbumSlug` sanitizando tildes, acentos y símbolos), resolución automática de colisiones con sufijos aleatorios, validación de categorías (`futbol`, `hockey`, `basquet`, `sociales`, `otros`) e imposición de reglas de negocio (`unitPrice > 0`, `fullAlbumPrice > 0`, `unitPrice <= fullAlbumPrice`).
+  - `PUT /api/admin/albums/:id`: Permite la modificación granular de precios, títulos, fechas, ubicaciones y estado de publicación (`isPublished`).
+  - Protección estricta con middleware `adminAuthService.requireAdminAuth` en todas las rutas.
+- **Persistencia Dual (Repository Pattern):**
+  - Implementación de `listAllAdmin(category?)` y `updateAlbum(id, updates)` tanto en `SupabaseAlbumRepository` (actualizaciones ACID en PostgreSQL con `updated_at` automático) como en `MemoryAlbumRepository` (clonación defensiva para pruebas y entorno local).
+  - Aislamiento riguroso del catálogo público: `listAlbums()` filtra defensivamente álbumes que no estén publicados (`isPublished !== false`), emulando las políticas RLS de Supabase.
+- **Frontend Angular 21 Standalone + Signals + Bento UI:**
+  - Nueva pestaña principal en el panel de administración: `📁 Álbumes & Precios`.
+  - Tarjetas Bento por evento con campos editables de precios, validación reactiva en tiempo real y persistencia inmediata vía `adminService.updateAlbum()`.
+  - Modal de alta rápida con autocompletado inteligente de insignias según disciplina deportiva o evento social.
+  - Accesos directos `✨ + Crear nuevo álbum...` en las pestañas de **Google Drive** y **Subida Masiva**, los cuales, tras crear el evento, autoseleccionan el nuevo álbum en el formulario de destino y devuelven al usuario a su flujo de carga sin fricción.
+- **Suite de Pruebas y Evidencia:** 120 tests en backend (20 suites) y 45 tests en frontend (7 suites), totalizando 165 tests unitarios e integrados pasando al 100%. Auditoría Guardian Angel pre-commit APROBADA.
 
 ### ADR-015: Arquitectura de Almacenamiento Dual en Supabase Storage (Zero-Trust & CDN Caching)
 - **Capa Dual de Buckets:**

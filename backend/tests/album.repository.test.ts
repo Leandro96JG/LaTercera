@@ -75,4 +75,58 @@ describe('AlbumRepository (TDD)', () => {
     expect(created.id).toBe('album-explicit-test');
     expect(await repo.getAlbumById('album-explicit-test')).not.toBeNull();
   });
+
+  it('debe actualizar precios y metadatos con updateAlbum sin mutar el ID', async () => {
+    const updated = await repo.updateAlbum('album-1', {
+      unitPrice: 1500,
+      fullAlbumPrice: 11000,
+      title: 'Tesorieri vs Andino (Clásico Actualizado)'
+    });
+
+    expect(updated).not.toBeNull();
+    expect(updated?.id).toBe('album-1');
+    expect(updated?.unitPrice).toBe(1500);
+    expect(updated?.fullAlbumPrice).toBe(11000);
+    expect(updated?.title).toBe('Tesorieri vs Andino (Clásico Actualizado)');
+
+    // Verificar en almacenamiento
+    const fetched = await repo.getAlbumById('album-1');
+    expect(fetched?.unitPrice).toBe(1500);
+    expect(fetched?.fullAlbumPrice).toBe(11000);
+  });
+
+  it('updateAlbum debe retornar null si el álbum no existe', async () => {
+    const res = await repo.updateAlbum('album-inexistente', { unitPrice: 2000 });
+    expect(res).toBeNull();
+  });
+
+  it('listAllAdmin debe devolver todos los álbumes sin filtrar por isPublished', async () => {
+    await repo.createAlbum({
+      id: 'album-oculto',
+      category: 'sociales',
+      title: 'Evento Privado',
+      photosCount: 0,
+      unitPrice: 1500,
+      fullAlbumPrice: 12000,
+      coverUrl: '',
+      isPublished: false
+    });
+
+    const publicList = await repo.listAlbums();
+    expect(publicList.some(a => a.id === 'album-oculto')).toBe(false);
+
+    const adminList = await repo.listAllAdmin();
+    expect(adminList.some(a => a.id === 'album-oculto')).toBe(true);
+  });
+
+  it('generateAlbumSlug debe crear slugs limpios y normalizados con año', async () => {
+    const { generateAlbumSlug } = await import('../src/repositories/album.repository');
+    const slug1 = generateAlbumSlug('Atlético Tesorieri vs Andino SC!', '12 Octubre, 2026');
+    expect(slug1).toBe('atletico-tesorieri-vs-andino-sc-2026');
+
+    const slug2 = generateAlbumSlug('Cumpleaños de 15 de Martina');
+    const currentYear = new Date().getFullYear().toString();
+    expect(slug2).toContain('cumpleanos-de-15-de-martina');
+    expect(slug2).toContain(currentYear);
+  });
 });

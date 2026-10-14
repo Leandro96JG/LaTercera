@@ -14,6 +14,24 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
     importFromDrive: ReturnType<typeof vi.fn>;
     bulkUpload: ReturnType<typeof vi.fn>;
     registerPhotographer: ReturnType<typeof vi.fn>;
+    getAdminAlbums: ReturnType<typeof vi.fn>;
+    createAlbum: ReturnType<typeof vi.fn>;
+    updateAlbum: ReturnType<typeof vi.fn>;
+  };
+
+  const initialMockAlbum = {
+    id: 'album-1',
+    category: 'futbol' as const,
+    title: 'Atlético Tesorieri vs Andino SC',
+    subtitle: 'Liga Riojana de Fútbol',
+    date: '12 Octubre, 2026',
+    location: 'Estadio Carlos Augusto Mercado Luna',
+    photosCount: 48,
+    unitPrice: 1200,
+    fullAlbumPrice: 9500,
+    coverUrl: 'https://images.unsplash.com/photo-test',
+    badge: '⚽ Fútbol',
+    isPublished: true
   };
 
   beforeEach(async () => {
@@ -30,6 +48,13 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
           lastUpdated: new Date().toISOString()
         }
       })),
+      getAdminAlbums: vi.fn().mockReturnValue(of({
+        success: true,
+        total: 1,
+        albums: [initialMockAlbum]
+      })),
+      createAlbum: vi.fn(),
+      updateAlbum: vi.fn(),
       importFromDrive: vi.fn(),
       bulkUpload: vi.fn(),
       registerPhotographer: vi.fn()
@@ -49,10 +74,13 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
     fixture.detectChanges();
   });
 
-  it('debe inicializar con la pestaña de Google Drive activa y estadísticas cargadas', () => {
+  it('debe inicializar con la pestaña de Álbumes activa, álbumes cargados y estadísticas', () => {
     expect(component).toBeTruthy();
-    expect(component.activeTab()).toBe('drive');
+    expect(component.activeTab()).toBe('albums');
     expect(component.stats().photosSold).toBe(50);
+    expect(component.albums().length).toBe(1);
+    expect(component.albums()[0].id).toBe('album-1');
+    expect(component.priceDrafts()['album-1'].unitPrice).toBe(1200);
   });
 
   it('debe validar la URL de Google Drive antes de permitir la importación', () => {
@@ -155,5 +183,124 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
 
     expect(component.isRegisteringPhotographer()).toBe(false);
     expect(component.photographerResult()).toEqual(mockPhotographerRes);
+  });
+
+  it('debe crear un nuevo álbum y actualizar la lista reactiva en el panel', () => {
+    const createdAlbum = {
+      id: 'clasico-riojano-2026',
+      category: 'futbol' as const,
+      title: 'Clásico Riojano 2026',
+      subtitle: 'Tesorieri vs Rioja Juniors',
+      date: '20 Octubre, 2026',
+      location: 'Mercado Luna',
+      photosCount: 0,
+      unitPrice: 1500,
+      fullAlbumPrice: 11000,
+      coverUrl: '',
+      badge: '⚽ Fútbol',
+      isPublished: true
+    };
+
+    mockAdminService.createAlbum.mockReturnValue(of({
+      success: true,
+      album: createdAlbum,
+      message: 'Álbum creado exitosamente'
+    }));
+
+    component.openCreateModal();
+    expect(component.isCreateModalOpen()).toBe(true);
+
+    component.createAlbumForm.patchValue({
+      title: 'Clásico Riojano 2026',
+      category: 'futbol',
+      subtitle: 'Tesorieri vs Rioja Juniors',
+      date: '20 Octubre, 2026',
+      location: 'Mercado Luna',
+      unitPrice: 1500,
+      fullAlbumPrice: 11000,
+      badge: '⚽ Fútbol',
+      isPublished: true
+    });
+
+    component.submitCreateAlbum();
+
+    expect(component.isCreatingAlbum()).toBe(false);
+    expect(component.isCreateModalOpen()).toBe(false);
+    expect(component.albums().length).toBe(2);
+    expect(component.albums()[0].id).toBe('clasico-riojano-2026');
+    expect(component.priceDrafts()['clasico-riojano-2026'].unitPrice).toBe(1500);
+  });
+
+  it('debe autoseleccionar el álbum creado si se originó desde la pestaña de Google Drive', () => {
+    const createdAlbum = {
+      id: 'nuevo-evento-drive',
+      category: 'sociales' as const,
+      title: 'Cumpleaños 15 Años Sofía',
+      subtitle: 'Salón de Eventos',
+      date: '14 Octubre, 2026',
+      photosCount: 0,
+      unitPrice: 1400,
+      fullAlbumPrice: 10000,
+      badge: '🎉 Cumpleaños & Social',
+      isPublished: true
+    };
+
+    mockAdminService.createAlbum.mockReturnValue(of({
+      success: true,
+      album: createdAlbum,
+      message: 'Álbum creado exitosamente'
+    }));
+
+    component.openCreateModal('drive');
+    expect(component.pendingTargetForm()).toBe('drive');
+
+    component.createAlbumForm.patchValue({
+      title: 'Cumpleaños 15 Años Sofía',
+      category: 'sociales',
+      subtitle: 'Salón de Eventos',
+      date: '14 Octubre, 2026',
+      location: 'Salón Elegance',
+      unitPrice: 1400,
+      fullAlbumPrice: 10000,
+      badge: '🎉 Cumpleaños & Social',
+      isPublished: true
+    });
+
+    component.submitCreateAlbum();
+
+    expect(component.driveForm.get('albumId')?.value).toBe('nuevo-evento-drive');
+    expect(component.activeTab()).toBe('drive');
+  });
+
+  it('debe guardar precios actualizados de un álbum y mostrar feedback', () => {
+    mockAdminService.updateAlbum.mockReturnValue(of({
+      success: true,
+      album: {
+        ...initialMockAlbum,
+        unitPrice: 1600,
+        fullAlbumPrice: 12000
+      },
+      message: 'Precios actualizados exitosamente'
+    }));
+
+    // Modificar borrador de precios
+    const mockInput = { target: { value: '1600' } } as unknown as Event;
+    component.onPriceDraftChange('album-1', 'unitPrice', mockInput);
+
+    const mockAlbumInput = { target: { value: '12000' } } as unknown as Event;
+    component.onPriceDraftChange('album-1', 'fullAlbumPrice', mockAlbumInput);
+
+    expect(component.priceDrafts()['album-1'].unitPrice).toBe(1600);
+    expect(component.priceDrafts()['album-1'].fullAlbumPrice).toBe(12000);
+
+    component.saveAlbumPrices('album-1');
+
+    expect(mockAdminService.updateAlbum).toHaveBeenCalledWith('album-1', {
+      unitPrice: 1600,
+      fullAlbumPrice: 12000
+    });
+    expect(component.updatingAlbumId()).toBe(null);
+    expect(component.updateFeedback()?.success).toBe(true);
+    expect(component.albums().find((a) => a.id === 'album-1')?.unitPrice).toBe(1600);
   });
 });

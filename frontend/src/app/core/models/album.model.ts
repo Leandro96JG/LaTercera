@@ -1,6 +1,6 @@
 import { Photo } from './photo.model';
 
-export type AlbumCategory = 'futbol' | 'hockey' | 'basquet' | 'sociales';
+export type AlbumCategory = 'futbol' | 'hockey' | 'basquet' | 'sociales' | 'otros';
 
 export interface Album {
   readonly id: string;
@@ -13,6 +13,8 @@ export interface Album {
   readonly fullAlbumPrice: number;
   readonly coverUrl: string;
   readonly badge: string;
+  readonly location?: string;
+  readonly isPublished?: boolean;
   readonly photos?: readonly Photo[];
 }
 

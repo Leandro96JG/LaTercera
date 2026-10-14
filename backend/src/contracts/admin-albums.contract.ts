@@ -92,3 +92,59 @@ export interface AdminBulkUploadResponse {
   photos: AdminProcessedPhotoDTO[];
   errors: Array<{ fileName: string; error: string }>;
 }
+
+// ==========================================
+// 3. GESTIÓN DE ÁLBUMES & PRECIOS (CRUD)
+// ==========================================
+
+export type AlbumCategory = 'futbol' | 'hockey' | 'basquet' | 'sociales' | 'otros';
+
+export interface CreateAlbumRequest {
+  title: string;
+  category: AlbumCategory;
+  subtitle?: string;
+  date?: string;
+  location?: string;
+  unitPrice: number;
+  fullAlbumPrice: number;
+  badge?: string;
+  coverUrl?: string;
+  isPublished?: boolean;
+  customSlug?: string;
+}
+
+export interface CreateAlbumResponse {
+  success: boolean;
+  album: import('../repositories/album.repository').AlbumDTO;
+  message: string;
+}
+
+export interface UpdateAlbumRequest {
+  unitPrice?: number;
+  fullAlbumPrice?: number;
+  title?: string;
+  subtitle?: string;
+  date?: string;
+  location?: string;
+  category?: AlbumCategory;
+  badge?: string;
+  coverUrl?: string;
+  isPublished?: boolean;
+}
+
+export interface UpdateAlbumPricesRequest {
+  unitPrice: number;
+  fullAlbumPrice: number;
+}
+
+export interface UpdateAlbumResponse {
+  success: boolean;
+  album: import('../repositories/album.repository').AlbumDTO;
+  message: string;
+}
+
+export interface AdminListAlbumsResponse {
+  success: boolean;
+  total: number;
+  albums: import('../repositories/album.repository').AlbumDTO[];
+}

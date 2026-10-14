@@ -138,4 +138,125 @@ describe('Admin Albums API Endpoints (/api/admin/albums)', () => {
       expect(data.photos[0].width).toBe(1200); // HD Master mantiene alta resolución con badge sutil
     });
   });
+
+  describe('Gestión Administrativa de Álbumes y Precios (CRUD)', () => {
+    let createdAlbumId: string;
+
+    it('GET /api/admin/albums debe listar todos los álbumes para el admin', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/albums`, {
+        headers: { Authorization: `Bearer ${adminToken}` }
+      });
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(Array.isArray(data.albums)).toBe(true);
+      expect(data.albums.length).toBeGreaterThanOrEqual(4);
+    });
+
+    it('POST /api/admin/albums debe crear un nuevo álbum con slug autogenerado', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/albums`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          title: 'Defensores de la Boca vs Rioja Juniors',
+          category: 'futbol',
+          subtitle: 'Fecha 9 - Torneo Clausura',
+          date: '20 Octubre, 2026',
+          location: 'Estadio Mercado Luna',
+          unitPrice: 1500,
+          fullAlbumPrice: 12000
+        })
+      });
+
+      expect(res.status).toBe(201);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(data.album.id).toContain('defensores-de-la-boca-vs-rioja-juniors-2026');
+      expect(data.album.unitPrice).toBe(1500);
+      expect(data.album.fullAlbumPrice).toBe(12000);
+      expect(data.album.badge).toBe('⚽ Fútbol');
+
+      createdAlbumId = data.album.id;
+    });
+
+    it('POST /api/admin/albums debe rechazar si los precios son inválidos o faltan campos obligatorios', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/albums`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          title: 'Torneo Inválido',
+          category: 'futbol',
+          unitPrice: -50,
+          fullAlbumPrice: 0
+        })
+      });
+
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toBeDefined();
+    });
+
+    it('PUT /api/admin/albums/:id debe actualizar los precios de un álbum existente', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/albums/${createdAlbumId}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          unitPrice: 1800,
+          fullAlbumPrice: 14000,
+          subtitle: 'Fecha 9 - Edición Especial de Precios'
+        })
+      });
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(data.album.unitPrice).toBe(1800);
+      expect(data.album.fullAlbumPrice).toBe(14000);
+      expect(data.album.subtitle).toBe('Fecha 9 - Edición Especial de Precios');
+    });
+
+    it('PUT /api/admin/albums/:id debe rechazar actualización con 400 si el precio es menor o igual a 0', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/albums/${createdAlbumId}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          unitPrice: 0
+        })
+      });
+
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toContain('precio');
+    });
+
+    it('PUT /api/admin/albums/:id debe retornar 404 para un álbum que no existe', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/albums/album-inexistente-xyz`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          unitPrice: 2000
+        })
+      });
+
+      expect(res.status).toBe(404);
+      const data = await res.json();
+      expect(data.error).toContain('no encontrado');
+    });
+  });
 });

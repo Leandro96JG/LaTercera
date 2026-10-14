@@ -4,12 +4,14 @@ import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { AdminAuthStore } from '../../core/state/admin-auth.store';
 import { AdminService } from '../../core/services/admin.service';
 import { AlbumService } from '../../core/services/album.service';
-import { Album } from '../../core/models/album.model';
+import { Album, AlbumCategory } from '../../core/models/album.model';
 import {
   AdminStats,
   DriveImportResponse,
   BulkUploadResponse,
-  RegisterPhotographerResponse
+  RegisterPhotographerResponse,
+  CreateAlbumRequest,
+  UpdateAlbumRequest
 } from '../../core/models/admin.model';
 
 @Component({
@@ -30,11 +32,24 @@ export class AdminPanelComponent implements OnInit {
   public readonly goHome = output<void>();
   public readonly logout = output<void>();
 
-  // Pestaña activa: 'metrics' | 'drive' | 'upload' | 'photographers'
-  public readonly activeTab = signal<'metrics' | 'drive' | 'upload' | 'photographers'>('drive');
+  // Pestaña activa: 'albums' | 'drive' | 'upload' | 'photographers'
+  public readonly activeTab = signal<'albums' | 'drive' | 'upload' | 'photographers'>('albums');
 
-  // Álbumes disponibles en el sistema
+  // Álbumes disponibles en el sistema (vista administrativa y formularios)
   public readonly albums = signal<readonly Album[]>([]);
+  public readonly isLoadingAlbums = signal<boolean>(false);
+
+  // Estado de Modal de Creación de Álbum
+  public readonly isCreateModalOpen = signal<boolean>(false);
+  public readonly isCreatingAlbum = signal<boolean>(false);
+  public readonly createAlbumError = signal<string | null>(null);
+  public readonly createAlbumSuccess = signal<string | null>(null);
+  public readonly pendingTargetForm = signal<'drive' | 'bulk' | null>(null);
+
+  // Borradores de edición de precios por tarjeta: { [albumId]: { unitPrice, fullAlbumPrice } }
+  public readonly priceDrafts = signal<Record<string, { unitPrice: number; fullAlbumPrice: number }>>({});
+  public readonly updatingAlbumId = signal<string | null>(null);
+  public readonly updateFeedback = signal<{ albumId: string; message: string; success: boolean } | null>(null);
 
   // Estadísticas en vivo
   public readonly stats = signal<AdminStats>({
@@ -47,7 +62,7 @@ export class AdminPanelComponent implements OnInit {
     lastUpdated: new Date().toISOString()
   });
 
-  // Estados de carga
+  // Estados de carga de operaciones
   public readonly isDriveImporting = signal<boolean>(false);
   public readonly isBulkUploading = signal<boolean>(false);
   public readonly isRegisteringPhotographer = signal<boolean>(false);
@@ -65,6 +80,20 @@ export class AdminPanelComponent implements OnInit {
   // Archivos seleccionados para subida masiva
   public readonly selectedFiles = signal<File[]>([]);
   public readonly hdIndices = signal<number[]>([0, 1]);
+
+  // Formulario de Creación de Nuevo Álbum
+  public readonly createAlbumForm = this.fb.nonNullable.group({
+    title: ['', [Validators.required, Validators.minLength(4)]],
+    category: ['futbol' as AlbumCategory, [Validators.required]],
+    subtitle: ['', [Validators.required]],
+    date: [new Date().toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' }), [Validators.required]],
+    location: ['Estadio Carlos A. Mercado Luna, La Rioja', [Validators.required]],
+    unitPrice: [1200, [Validators.required, Validators.min(100)]],
+    fullAlbumPrice: [9500, [Validators.required, Validators.min(500)]],
+    badge: ['⚽ Fútbol', [Validators.required]],
+    coverUrl: [''],
+    isPublished: [true]
+  });
 
   // Formulario de Importación de Google Drive
   public readonly driveForm = this.fb.nonNullable.group({
@@ -96,11 +125,32 @@ export class AdminPanelComponent implements OnInit {
   }
 
   public loadAlbums(): void {
-    this.albumService.getAlbums().subscribe({
-      next: (list) => this.albums.set(list),
+    this.isLoadingAlbums.set(true);
+    // Intentamos cargar desde la API administrativa (incluye borradores)
+    this.adminService.getAdminAlbums().subscribe({
+      next: (res) => {
+        this.isLoadingAlbums.set(false);
+        if (res.success && res.albums) {
+          this.setAlbumsData(res.albums);
+        } else {
+          this.fallbackPublicAlbums();
+        }
+      },
       error: () => {
-        // Fallback local
-        this.albums.set([
+        this.fallbackPublicAlbums();
+      }
+    });
+  }
+
+  private fallbackPublicAlbums(): void {
+    this.albumService.getAlbums().subscribe({
+      next: (list) => {
+        this.isLoadingAlbums.set(false);
+        this.setAlbumsData(list);
+      },
+      error: () => {
+        this.isLoadingAlbums.set(false);
+        this.setAlbumsData([
           {
             id: 'album-1',
             category: 'futbol',
@@ -111,7 +161,8 @@ export class AdminPanelComponent implements OnInit {
             unitPrice: 1200,
             fullAlbumPrice: 9500,
             coverUrl: '',
-            badge: '⚽ Fútbol'
+            badge: '⚽ Fútbol',
+            isPublished: true
           },
           {
             id: 'album-2',
@@ -123,11 +174,31 @@ export class AdminPanelComponent implements OnInit {
             unitPrice: 1200,
             fullAlbumPrice: 9500,
             coverUrl: '',
-            badge: '🏑 Hockey'
+            badge: '🏑 Hockey',
+            isPublished: true
           }
         ]);
       }
     });
+  }
+
+  private setAlbumsData(list: readonly Album[]): void {
+    this.albums.set(list);
+    const drafts: Record<string, { unitPrice: number; fullAlbumPrice: number }> = {};
+    for (const a of list) {
+      drafts[a.id] = { unitPrice: a.unitPrice, fullAlbumPrice: a.fullAlbumPrice };
+    }
+    this.priceDrafts.set(drafts);
+
+    if (list.length > 0) {
+      const firstId = list[0].id;
+      if (!this.driveForm.get('albumId')?.value) {
+        this.driveForm.patchValue({ albumId: firstId });
+      }
+      if (!this.bulkForm.get('albumId')?.value) {
+        this.bulkForm.patchValue({ albumId: firstId });
+      }
+    }
   }
 
   public loadStats(): void {
@@ -143,6 +214,175 @@ export class AdminPanelComponent implements OnInit {
     });
   }
 
+  // --- Modal de Creación de Álbum ---
+  public openCreateModal(targetForm?: 'drive' | 'bulk'): void {
+    this.pendingTargetForm.set(targetForm || null);
+    this.createAlbumError.set(null);
+    this.createAlbumSuccess.set(null);
+    this.createAlbumForm.reset({
+      title: '',
+      category: 'futbol',
+      subtitle: '',
+      date: new Date().toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' }),
+      location: 'La Rioja, Argentina',
+      unitPrice: 1200,
+      fullAlbumPrice: 9500,
+      badge: '⚽ Fútbol',
+      coverUrl: '',
+      isPublished: true
+    });
+    this.isCreateModalOpen.set(true);
+  }
+
+  public closeCreateModal(): void {
+    this.isCreateModalOpen.set(false);
+    this.pendingTargetForm.set(null);
+  }
+
+  public onCategoryChange(event: Event): void {
+    const cat = (event.target as HTMLSelectElement).value as AlbumCategory;
+    const defaultBadges: Record<AlbumCategory, string> = {
+      futbol: '⚽ Fútbol',
+      hockey: '🏑 Hockey',
+      basquet: '🏀 Básquet',
+      sociales: '🎉 Cumpleaños & Social',
+      otros: '📸 Evento Especial'
+    };
+    this.createAlbumForm.patchValue({
+      badge: defaultBadges[cat] || '📸 Evento'
+    });
+  }
+
+  public submitCreateAlbum(): void {
+    if (this.createAlbumForm.invalid) {
+      this.createAlbumForm.markAllAsTouched();
+      return;
+    }
+
+    this.isCreatingAlbum.set(true);
+    this.createAlbumError.set(null);
+    this.createAlbumSuccess.set(null);
+
+    const val = this.createAlbumForm.getRawValue();
+
+    this.adminService.createAlbum({
+      title: val.title,
+      category: val.category,
+      subtitle: val.subtitle,
+      date: val.date,
+      location: val.location,
+      unitPrice: Number(val.unitPrice),
+      fullAlbumPrice: Number(val.fullAlbumPrice),
+      badge: val.badge,
+      coverUrl: val.coverUrl || undefined,
+      isPublished: val.isPublished
+    }).subscribe({
+      next: (res) => {
+        this.isCreatingAlbum.set(false);
+        if (res.success && res.album) {
+          const newAlbum = res.album;
+          // Actualizamos la lista local reactiva
+          const updatedList = [newAlbum, ...this.albums()];
+          this.setAlbumsData(updatedList);
+
+          // Si se abrió desde un formulario de subida, autoseleccionar el nuevo álbum
+          const target = this.pendingTargetForm();
+          if (target === 'drive') {
+            this.driveForm.patchValue({ albumId: newAlbum.id });
+            this.activeTab.set('drive');
+          } else if (target === 'bulk') {
+            this.bulkForm.patchValue({ albumId: newAlbum.id });
+            this.activeTab.set('upload');
+          }
+
+          this.closeCreateModal();
+        }
+      },
+      error: (err) => {
+        this.isCreatingAlbum.set(false);
+        this.createAlbumError.set(err.error?.error || err.message || 'Error al crear el álbum');
+      }
+    });
+  }
+
+  // --- Edición de Precios en Línea ---
+  public onPriceDraftChange(albumId: string, field: 'unitPrice' | 'fullAlbumPrice', event: Event): void {
+    const rawVal = (event.target as HTMLInputElement).value;
+    const num = Math.max(0, Number(rawVal) || 0);
+    const current = { ...(this.priceDrafts()[albumId] || { unitPrice: 1200, fullAlbumPrice: 9500 }) };
+    current[field] = num;
+    this.priceDrafts.set({ ...this.priceDrafts(), [albumId]: current });
+  }
+
+  public saveAlbumPrices(albumId: string): void {
+    const draft = this.priceDrafts()[albumId];
+    if (!draft || draft.unitPrice <= 0 || draft.fullAlbumPrice <= 0) {
+      this.updateFeedback.set({
+        albumId,
+        message: 'Los precios deben ser mayores a $0',
+        success: false
+      });
+      return;
+    }
+
+    this.updatingAlbumId.set(albumId);
+    this.updateFeedback.set(null);
+
+    this.adminService.updateAlbum(albumId, {
+      unitPrice: draft.unitPrice,
+      fullAlbumPrice: draft.fullAlbumPrice
+    }).subscribe({
+      next: (res) => {
+        this.updatingAlbumId.set(null);
+        if (res.success && res.album) {
+          this.updateFeedback.set({
+            albumId,
+            message: '¡Precios actualizados!',
+            success: true
+          });
+          // Actualizar álbum en la señal
+          this.albums.set(this.albums().map(a => a.id === albumId ? res.album : a));
+          setTimeout(() => {
+            if (this.updateFeedback()?.albumId === albumId) {
+              this.updateFeedback.set(null);
+            }
+          }, 3500);
+        }
+      },
+      error: (err) => {
+        this.updatingAlbumId.set(null);
+        this.updateFeedback.set({
+          albumId,
+          message: err.error?.error || 'Error al guardar precios',
+          success: false
+        });
+      }
+    });
+  }
+
+  public togglePublishStatus(album: Album): void {
+    const newStatus = !album.isPublished;
+    this.adminService.updateAlbum(album.id, { isPublished: newStatus }).subscribe({
+      next: (res) => {
+        if (res.success && res.album) {
+          this.albums.set(this.albums().map(a => a.id === album.id ? res.album : a));
+        }
+      }
+    });
+  }
+
+  // --- Navegación Rápida a Subida ---
+  public navigateToUploadWithAlbum(albumId: string): void {
+    this.bulkForm.patchValue({ albumId });
+    this.activeTab.set('upload');
+  }
+
+  public navigateToDriveWithAlbum(albumId: string): void {
+    this.driveForm.patchValue({ albumId });
+    this.activeTab.set('drive');
+  }
+
+  // --- Métodos de Subida Masiva y Drive ---
   public submitDriveImport(): void {
     if (this.driveForm.invalid) {
       this.driveForm.markAllAsTouched();
@@ -165,6 +405,7 @@ export class AdminPanelComponent implements OnInit {
       next: (res) => {
         this.isDriveImporting.set(false);
         this.driveResult.set(res);
+        this.loadAlbums(); // Recargar conteos actualizados
       },
       error: (err) => {
         this.isDriveImporting.set(false);
@@ -229,6 +470,7 @@ export class AdminPanelComponent implements OnInit {
         this.isBulkUploading.set(false);
         this.bulkResult.set(res);
         this.selectedFiles.set([]);
+        this.loadAlbums(); // Recargar conteos actualizados
       },
       error: (err) => {
         this.isBulkUploading.set(false);

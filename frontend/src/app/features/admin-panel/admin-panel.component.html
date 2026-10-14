@@ -12,7 +12,7 @@
         Hola, {{ adminAuthStore.userName() || 'Jenifer "Yuyo" Espeche' }}! 👋
       </h2>
       <p class="text-xs text-zinc-500 mt-0.5">
-        Gestiona tus álbumes de partidos y eventos, procesa fotos con Sharp y supervisa tus ingresos en Mercado Pago.
+        Gestiona tus álbumes de partidos y eventos, ajusta precios en tiempo real y supervisa tus ingresos en Mercado Pago.
       </p>
     </div>
 
@@ -55,7 +55,7 @@
         <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 font-bold text-[10px]">+24%</span>
       </div>
       <div class="my-4">
-        <span class="font-display font-black text-3xl text-zinc-900">\${{ stats().revenueARS.toLocaleString('es-AR') }}</span>
+        <span class="font-display font-black text-3xl text-zinc-900">${{ stats().revenueARS.toLocaleString('es-AR') }}</span>
         <span class="text-xs text-zinc-400 block mt-0.5">ARS en Mercado Pago</span>
       </div>
       <span class="text-[10px] text-zinc-400">Cobros acreditados en tu cuenta</span>
@@ -63,13 +63,12 @@
 
     <!-- Métricas 3: Almacenamiento & Capacidad -->
     <div class="bg-white rounded-[28px] p-6 border border-black/[0.05] shadow-bento flex flex-col justify-between">
-      <span class="font-semibold text-zinc-700 text-xs">Almacenamiento en Servidor</span>
+      <span class="font-semibold text-zinc-700 text-xs">Almacenamiento Cloud</span>
       <div class="my-3">
         <div class="flex items-baseline gap-1">
           <span class="font-display font-bold text-2xl text-zinc-900">{{ stats().storageUsedGB }} GB</span>
           <span class="text-xs text-zinc-400">/ {{ stats().storageLimitGB }} GB</span>
         </div>
-        <!-- Barra de Progreso de Espacio -->
         <div class="w-full bg-zinc-100 rounded-full h-2 mt-2 overflow-hidden">
           <div
             class="bg-amber-400 h-2 rounded-full transition-all duration-500"
@@ -77,15 +76,23 @@
           ></div>
         </div>
       </div>
-      <span class="text-[10px] text-emerald-600 font-semibold">Capa pública WebP 800px optimizada</span>
+      <span class="text-[10px] text-emerald-600 font-semibold">Supabase Storage Dual-Bucket</span>
     </div>
 
     <!-- Métricas 4: Álbumes Activos -->
     <div class="bg-white rounded-[28px] p-6 border border-black/[0.05] shadow-bento flex flex-col justify-between">
-      <span class="font-semibold text-zinc-700 text-xs">Álbumes Activos</span>
+      <div class="flex justify-between items-center text-xs text-zinc-400">
+        <span class="font-semibold text-zinc-700">Álbumes Registrados</span>
+        <button
+          (click)="openCreateModal()"
+          class="text-[11px] font-bold text-amber-600 hover:text-amber-700 hover:underline flex items-center gap-0.5"
+        >
+          + Nuevo
+        </button>
+      </div>
       <div class="my-4">
         <span class="font-display font-black text-3xl text-zinc-900">{{ albums().length }}</span>
-        <span class="text-xs text-zinc-400 block mt-0.5">publicados en portfolio</span>
+        <span class="text-xs text-zinc-400 block mt-0.5">eventos deportivos y sociales</span>
       </div>
       <span class="text-[10px] text-zinc-400">Fútbol, Hockey, Básquet, Fiestas</span>
     </div>
@@ -94,35 +101,229 @@
   <!-- Selector de Pestañas Bento -->
   <div class="flex items-center gap-2 border-b border-black/[0.05] pb-2 overflow-x-auto no-scrollbar">
     <button
+      (click)="activeTab.set('albums')"
+      [class]="activeTab() === 'albums'
+        ? 'px-4 py-2.5 rounded-2xl bg-zinc-950 text-white font-bold text-xs shadow-sm transition flex items-center gap-1.5'
+        : 'px-4 py-2.5 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.04] transition flex items-center gap-1.5'"
+    >
+      <span>📁</span>
+      <span>Álbumes & Precios</span>
+    </button>
+
+    <button
       (click)="activeTab.set('drive')"
       [class]="activeTab() === 'drive'
-        ? 'px-4 py-2.5 rounded-2xl bg-zinc-950 text-white font-bold text-xs shadow-sm transition'
-        : 'px-4 py-2.5 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.04] transition'"
+        ? 'px-4 py-2.5 rounded-2xl bg-zinc-950 text-white font-bold text-xs shadow-sm transition flex items-center gap-1.5'
+        : 'px-4 py-2.5 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.04] transition flex items-center gap-1.5'"
     >
-      ☁️ Importar de Google Drive
+      <span>☁️</span>
+      <span>Importar de Google Drive</span>
     </button>
+
     <button
       (click)="activeTab.set('upload')"
       [class]="activeTab() === 'upload'
-        ? 'px-4 py-2.5 rounded-2xl bg-zinc-950 text-white font-bold text-xs shadow-sm transition'
-        : 'px-4 py-2.5 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.04] transition'"
+        ? 'px-4 py-2.5 rounded-2xl bg-zinc-950 text-white font-bold text-xs shadow-sm transition flex items-center gap-1.5'
+        : 'px-4 py-2.5 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.04] transition flex items-center gap-1.5'"
     >
-      📤 Subida Masiva de Fotos
+      <span>📤</span>
+      <span>Subida Masiva de Fotos</span>
     </button>
+
     @if (adminAuthStore.userRole() === 'admin') {
       <button
         (click)="activeTab.set('photographers')"
         [class]="activeTab() === 'photographers'
-          ? 'px-4 py-2.5 rounded-2xl bg-zinc-950 text-white font-bold text-xs shadow-sm transition'
-          : 'px-4 py-2.5 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.04] transition'"
+          ? 'px-4 py-2.5 rounded-2xl bg-zinc-950 text-white font-bold text-xs shadow-sm transition flex items-center gap-1.5'
+          : 'px-4 py-2.5 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.04] transition flex items-center gap-1.5'"
       >
-        👥 Registro de Fotógrafos
+        <span>👥</span>
+        <span>Registro de Fotógrafos</span>
       </button>
     }
   </div>
 
+  <!-- PESTAÑA 0: GESTIÓN DE ÁLBUMES & EDICIÓN DE PRECIOS -->
+  @if (activeTab() === 'albums') {
+    <div class="space-y-6 animate-fadeIn">
+      <!-- Barra Superior de Álbumes -->
+      <div class="bg-white rounded-[32px] p-6 sm:p-8 border border-black/[0.05] shadow-bento flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 class="font-display font-extrabold text-xl text-zinc-900 tracking-tight">
+            Gestión de Álbumes, Eventos y Precios
+          </h3>
+          <p class="text-xs text-zinc-500 mt-0.5">
+            Crea nuevos eventos, ajusta los precios en pesos argentinos para Mercado Pago y administra la visibilidad en el portfolio.
+          </p>
+        </div>
+
+        <button
+          (click)="openCreateModal()"
+          class="px-5 py-3 rounded-2xl bg-zinc-950 hover:bg-zinc-800 text-white font-display font-extrabold text-xs shadow-md transition active:scale-95 flex items-center gap-2 self-start sm:self-auto"
+        >
+          <span>➕ Crear Nuevo Álbum / Evento</span>
+        </button>
+      </div>
+
+      <!-- Feedback global de guardado de precios si existe -->
+      @if (updateFeedback(); as fb) {
+        <div
+          [class]="fb.success
+            ? 'p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2 animate-fadeIn'
+            : 'p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2 animate-fadeIn'"
+        >
+          <span>{{ fb.success ? '✅' : '⚠️' }}</span>
+          <span>{{ fb.message }}</span>
+        </div>
+      }
+
+      <!-- Grid Bento de Tarjetas de Álbumes -->
+      @if (albums().length === 0 && isLoadingAlbums()) {
+        <div class="p-12 text-center text-zinc-400 text-xs">
+          <span class="inline-block w-6 h-6 border-2 border-zinc-900 border-t-transparent rounded-full animate-spin mb-2"></span>
+          <p>Cargando catálogo de álbumes...</p>
+        </div>
+      } @else {
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          @for (album of albums(); track album.id) {
+            <div class="bg-white rounded-[28px] border border-black/[0.06] shadow-bento p-5 sm:p-6 flex flex-col justify-between space-y-5 transition hover:border-black/[0.12]">
+              <!-- Cabecera de la Tarjeta del Álbum -->
+              <div class="space-y-3">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="flex items-center gap-2">
+                    <span class="px-2.5 py-1 rounded-xl bg-amber-50 border border-amber-200/60 text-amber-900 font-bold text-[10px]">
+                      {{ album.badge || '📸 Evento' }}
+                    </span>
+                    <span
+                      [class]="album.isPublished !== false
+                        ? 'px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold text-[10px]'
+                        : 'px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-500 font-semibold text-[10px]'"
+                    >
+                      {{ album.isPublished !== false ? '🟢 Publicado' : '⚪ Oculto' }}
+                    </span>
+                  </div>
+
+                  <span class="text-[10px] font-mono text-zinc-400">ID: {{ album.id }}</span>
+                </div>
+
+                <div>
+                  <h4 class="font-display font-extrabold text-lg text-zinc-900 leading-tight">
+                    {{ album.title }}
+                  </h4>
+                  @if (album.subtitle) {
+                    <p class="text-xs text-zinc-500 mt-0.5">{{ album.subtitle }}</p>
+                  }
+                  <div class="flex items-center gap-3 text-[11px] text-zinc-400 mt-2">
+                    <span>📅 {{ album.date }}</span>
+                    <span>•</span>
+                    <span class="font-bold text-zinc-700">📸 {{ album.photosCount }} fotos</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Módulo Bento de Precios Editables -->
+              <div class="p-4 rounded-2xl bg-zinc-50 border border-black/[0.04] space-y-3">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="font-bold text-zinc-700 uppercase tracking-wider text-[10px]">
+                    Tarifas Oficiales Mercado Pago (ARS)
+                  </span>
+                  @if (updatingAlbumId() === album.id) {
+                    <span class="text-[10px] text-amber-600 font-semibold flex items-center gap-1">
+                      <span class="w-2.5 h-2.5 border-2 border-amber-600 border-t-transparent rounded-full animate-spin"></span>
+                      Guardando...
+                    </span>
+                  }
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                  <!-- Precio Foto Individual -->
+                  <div>
+                    <label class="block text-[10px] font-semibold text-zinc-500 mb-1">
+                      Foto Suelta
+                    </label>
+                    <div class="relative">
+                      <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400">$</span>
+                      <input
+                        type="number"
+                        [value]="priceDrafts()[album.id]?.unitPrice ?? album.unitPrice"
+                        (input)="onPriceDraftChange(album.id, 'unitPrice', $event)"
+                        min="100"
+                        step="50"
+                        class="w-full pl-6 pr-2 py-2 rounded-xl bg-white border border-zinc-200 text-zinc-900 text-xs font-bold focus:outline-none focus:border-zinc-950 transition"
+                      />
+                    </div>
+                  </div>
+
+                  <!-- Precio Álbum Completo -->
+                  <div>
+                    <label class="block text-[10px] font-semibold text-zinc-500 mb-1">
+                      Pack Completo
+                    </label>
+                    <div class="relative">
+                      <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400">$</span>
+                      <input
+                        type="number"
+                        [value]="priceDrafts()[album.id]?.fullAlbumPrice ?? album.fullAlbumPrice"
+                        (input)="onPriceDraftChange(album.id, 'fullAlbumPrice', $event)"
+                        min="500"
+                        step="100"
+                        class="w-full pl-6 pr-2 py-2 rounded-xl bg-white border border-zinc-200 text-zinc-900 text-xs font-bold focus:outline-none focus:border-zinc-950 transition"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Botón Guardar Precios -->
+                <div class="flex items-center justify-between pt-1">
+                  <span class="text-[10px] text-zinc-400">Impacta directo en el checkout</span>
+                  <button
+                    type="button"
+                    (click)="saveAlbumPrices(album.id)"
+                    [disabled]="updatingAlbumId() === album.id"
+                    class="px-3.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-[11px] shadow-sm transition active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    <span>💾 Guardar Precios</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Acciones Rápidas del Álbum -->
+              <div class="flex items-center justify-between pt-1 text-xs border-t border-black/[0.04]">
+                <div class="flex items-center gap-2">
+                  <button
+                    type="button"
+                    (click)="navigateToUploadWithAlbum(album.id)"
+                    class="px-3 py-1.5 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-700 font-bold text-[11px] transition flex items-center gap-1 active:scale-95"
+                  >
+                    <span>📤 Subir Fotos</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    (click)="navigateToDriveWithAlbum(album.id)"
+                    class="px-3 py-1.5 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-700 font-bold text-[11px] transition flex items-center gap-1 active:scale-95"
+                  >
+                    <span>☁️ Drive</span>
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  (click)="togglePublishStatus(album)"
+                  class="text-[11px] font-semibold text-zinc-500 hover:text-zinc-800 underline transition"
+                >
+                  {{ album.isPublished !== false ? 'Ocultar' : 'Publicar' }}
+                </button>
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+
   <!-- PESTAÑA 1: IMPORTADOR DE GOOGLE DRIVE -->
-  @if (activeTab() === 'drive') {
+  @else if (activeTab() === 'drive') {
     <div class="bg-white rounded-[32px] p-6 sm:p-8 border border-black/[0.05] shadow-bento space-y-6 animate-fadeIn">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
@@ -149,11 +350,20 @@
       <!-- Formulario de Importación -->
       <form [formGroup]="driveForm" (ngSubmit)="submitDriveImport()" class="space-y-5">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <!-- Selector de Álbum Destino -->
+          <!-- Selector de Álbum Destino con Acceso Rápido a Creación -->
           <div>
-            <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1.5">
-              Álbum de Destino
-            </label>
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider">
+                Álbum de Destino
+              </label>
+              <button
+                type="button"
+                (click)="openCreateModal('drive')"
+                class="text-[11px] font-bold text-amber-600 hover:text-amber-700 hover:underline flex items-center gap-1 transition"
+              >
+                ✨ + Crear nuevo álbum
+              </button>
+            </div>
             <select
               formControlName="albumId"
               class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-semibold focus:outline-none focus:border-zinc-950 transition"
@@ -166,9 +376,11 @@
 
           <!-- Texto de Marca de Agua -->
           <div>
-            <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1.5">
-              Marca de Agua Diagonal
-            </label>
+            <div class="mb-1.5">
+              <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider">
+                Marca de Agua Diagonal
+              </label>
+            </div>
             <input
               type="text"
               formControlName="watermarkText"
@@ -294,7 +506,7 @@
           Subida Masiva de Fotografías (Drag & Drop)
         </h3>
         <p class="text-xs text-zinc-500 mt-0.5">
-          Arrastra o selecciona las fotos desde tu computadora o cámara. El servidor generará las marcas de agua quemadas y guardará los archivos originales protegidos.
+          Arrastra o selecciona las fotos desde tu computadora o cámara. El servidor generará las marcas de agua quemadas y guardará los archivos originales protegidos en Supabase Storage.
         </p>
       </div>
 
@@ -309,9 +521,18 @@
       <form [formGroup]="bulkForm" (ngSubmit)="submitBulkUpload()" class="space-y-5">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1.5">
-              Álbum de Destino
-            </label>
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider">
+                Álbum de Destino
+              </label>
+              <button
+                type="button"
+                (click)="openCreateModal('bulk')"
+                class="text-[11px] font-bold text-amber-600 hover:text-amber-700 hover:underline flex items-center gap-1 transition"
+              >
+                ✨ + Crear nuevo álbum
+              </button>
+            </div>
             <select
               formControlName="albumId"
               class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-semibold focus:outline-none focus:border-zinc-950 transition"
@@ -323,9 +544,11 @@
           </div>
 
           <div>
-            <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1.5">
-              Texto Marca de Agua
-            </label>
+            <div class="mb-1.5">
+              <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider">
+                Texto Marca de Agua
+              </label>
+            </div>
             <input
               type="text"
               formControlName="watermarkText"
@@ -447,7 +670,7 @@
     </div>
   }
 
-  <!-- PESTAÑA 3: REGISTRO DE FOTÓGRAFOS COLABORADORES (ESCALABILIDAD FUTURA) -->
+  <!-- PESTAÑA 3: REGISTRO DE FOTÓGRAFOS COLABORADORES -->
   @else if (activeTab() === 'photographers' && adminAuthStore.userRole() === 'admin') {
     <div class="bg-white rounded-[32px] p-6 sm:p-8 border border-black/[0.05] shadow-bento space-y-6 animate-fadeIn">
       <div>
@@ -547,3 +770,205 @@
     </div>
   }
 </div>
+
+<!-- ======================================================================== -->
+<!-- MODAL BENTO: CREACIÓN DE NUEVO ÁLBUM / EVENTO                            -->
+<!-- ======================================================================== -->
+@if (isCreateModalOpen()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-sm animate-fadeIn">
+    <div
+      class="bg-white rounded-[32px] border border-black/[0.08] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 sm:p-8 space-y-6"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="flex items-center justify-between pb-4 border-b border-black/[0.05]">
+        <div>
+          <span class="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-[10px] uppercase tracking-wider">
+            ✨ Nuevo Evento
+          </span>
+          <h3 class="font-display font-extrabold text-2xl text-zinc-900 mt-1">
+            Crear Álbum o Partido
+          </h3>
+          <p class="text-xs text-zinc-500">
+            Completa los detalles y tarifas iniciales. Una vez creado, podrás cargarle fotos de inmediato.
+          </p>
+        </div>
+
+        <button
+          (click)="closeCreateModal()"
+          class="w-8 h-8 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-500 text-xs font-bold transition flex items-center justify-center"
+        >
+          ✕
+        </button>
+      </div>
+
+      <!-- Alerta de Error en Creación -->
+      @if (createAlbumError()) {
+        <div class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
+          <span>⚠️</span>
+          <span>{{ createAlbumError() }}</span>
+        </div>
+      }
+
+      <form [formGroup]="createAlbumForm" (ngSubmit)="submitCreateAlbum()" class="space-y-4">
+        <!-- Título -->
+        <div>
+          <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
+            Título del Evento / Partido *
+          </label>
+          <input
+            type="text"
+            formControlName="title"
+            placeholder="Ej: Defensores de la Boca vs Rioja Juniors"
+            class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition font-medium"
+          />
+        </div>
+
+        <!-- Categoría y Badge -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
+              Disciplina / Categoría *
+            </label>
+            <select
+              formControlName="category"
+              (change)="onCategoryChange($event)"
+              class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-semibold focus:outline-none focus:border-zinc-950 transition"
+            >
+              <option value="futbol">⚽ Fútbol</option>
+              <option value="hockey">🏑 Hockey</option>
+              <option value="basquet">🏀 Básquet</option>
+              <option value="sociales">🎉 Cumpleaños & Social</option>
+              <option value="otros">📸 Evento Especial / Otro</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
+              Insignia / Badge
+            </label>
+            <input
+              type="text"
+              formControlName="badge"
+              placeholder="⚽ Fútbol"
+              class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
+            />
+          </div>
+        </div>
+
+        <!-- Subtítulo -->
+        <div>
+          <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
+            Subtítulo / Torneo / Jornada *
+          </label>
+          <input
+            type="text"
+            formControlName="subtitle"
+            placeholder="Ej: Liga Riojana de Fútbol • Fecha 9"
+            class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
+          />
+        </div>
+
+        <!-- Fecha y Lugar -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
+              Fecha del Evento *
+            </label>
+            <input
+              type="text"
+              formControlName="date"
+              placeholder="Ej: 20 Octubre, 2026"
+              class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
+            />
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
+              Lugar / Estadio / Salón *
+            </label>
+            <input
+              type="text"
+              formControlName="location"
+              placeholder="Ej: Estadio Carlos Mercado Luna"
+              class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
+            />
+          </div>
+        </div>
+
+        <!-- Precios Iniciales (Bento Box) -->
+        <div class="p-4 rounded-2xl bg-amber-50/60 border border-amber-200/60 space-y-3">
+          <span class="block text-xs font-bold text-amber-950 uppercase tracking-wider">
+            💵 Tarifas de Venta Mercado Pago (ARS)
+          </span>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-semibold text-zinc-700 mb-1">
+                Precio Foto Suelta ($) *
+              </label>
+              <input
+                type="number"
+                formControlName="unitPrice"
+                min="100"
+                step="50"
+                class="w-full px-4 py-2.5 rounded-xl bg-white border border-amber-200 text-zinc-900 text-xs font-bold focus:outline-none focus:border-zinc-950 transition"
+              />
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-semibold text-zinc-700 mb-1">
+                Precio Álbum Completo ($) *
+              </label>
+              <input
+                type="number"
+                formControlName="fullAlbumPrice"
+                min="500"
+                step="100"
+                class="w-full px-4 py-2.5 rounded-xl bg-white border border-amber-200 text-zinc-900 text-xs font-bold focus:outline-none focus:border-zinc-950 transition"
+              />
+            </div>
+          </div>
+          <span class="text-[10px] text-zinc-500 block">Podrás ajustar estos precios en cualquier momento desde el panel.</span>
+        </div>
+
+        <!-- Estado de Publicación -->
+        <div class="flex items-center gap-2 pt-1">
+          <input
+            type="checkbox"
+            id="modalIsPublished"
+            formControlName="isPublished"
+            class="w-4 h-4 rounded text-zinc-900 focus:ring-zinc-950 border-zinc-300"
+          />
+          <label for="modalIsPublished" class="text-xs font-medium text-zinc-700 cursor-pointer">
+            Publicar inmediatamente en el catálogo web
+          </label>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="flex items-center justify-end gap-3 pt-3 border-t border-black/[0.05]">
+          <button
+            type="button"
+            (click)="closeCreateModal()"
+            class="px-5 py-3 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-xs transition"
+          >
+            Cancelar
+          </button>
+
+          <button
+            type="submit"
+            [disabled]="createAlbumForm.invalid || isCreatingAlbum()"
+            class="px-6 py-3 rounded-2xl bg-zinc-950 hover:bg-zinc-800 text-white font-display font-extrabold text-xs shadow-md transition active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center gap-2"
+          >
+            @if (isCreatingAlbum()) {
+              <span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              <span>Guardando álbum...</span>
+            } @else {
+              <span>Crear Álbum</span>
+              <span>✨</span>
+            }
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}

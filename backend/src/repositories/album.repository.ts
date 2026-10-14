@@ -15,10 +15,33 @@ export interface AlbumDTO {
   isPublished?: boolean;
 }
 
+export function generateAlbumSlug(title: string, dateStr?: string): string {
+  let base = title
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+
+  const yearMatch = dateStr?.match(/20\d{2}/);
+  const year = yearMatch ? yearMatch[0] : new Date().getFullYear().toString();
+
+  base = base
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  if (!base.includes(year)) {
+    base = `${base}-${year}`;
+  }
+
+  return base.slice(0, 80);
+}
+
 export interface IAlbumRepository {
   listAlbums(category?: string): Promise<AlbumDTO[]>;
+  listAllAdmin(category?: string): Promise<AlbumDTO[]>;
   getAlbumById(id: string): Promise<AlbumDTO | null>;
   createAlbum(album: AlbumDTO): Promise<AlbumDTO>;
+  updateAlbum(id: string, updates: Partial<AlbumDTO>): Promise<AlbumDTO | null>;
   updatePhotosCount(id: string, count: number): Promise<void>;
   
   // Métodos de conveniencia / retrocompatibilidad
@@ -95,11 +118,11 @@ export class MemoryAlbumRepository implements IAlbumRepository {
   }
 
   async listAlbums(category?: string): Promise<AlbumDTO[]> {
-    const list = Array.from(this.albums.values());
+    const list = Array.from(this.albums.values()).filter(a => a.isPublished !== false);
     if (!category || category === 'all') {
-      return list;
+      return list.map(a => ({ ...a }));
     }
-    return list.filter(a => a.category === category);
+    return list.filter(a => a.category === category).map(a => ({ ...a }));
   }
 
   async findAll(category?: string): Promise<AlbumDTO[]> {
@@ -123,6 +146,26 @@ export class MemoryAlbumRepository implements IAlbumRepository {
 
   async create(album: AlbumDTO): Promise<AlbumDTO> {
     return this.createAlbum(album);
+  }
+
+  async listAllAdmin(category?: string): Promise<AlbumDTO[]> {
+    const list = Array.from(this.albums.values());
+    if (!category || category === 'all') return list.map(a => ({ ...a }));
+    return list.filter(a => a.category === category).map(a => ({ ...a }));
+  }
+
+  async updateAlbum(id: string, updates: Partial<AlbumDTO>): Promise<AlbumDTO | null> {
+    const existing = this.albums.get(id);
+    if (!existing) return null;
+
+    const updated: AlbumDTO = {
+      ...existing,
+      ...updates,
+      id: existing.id // Inmutable
+    };
+
+    this.albums.set(id, updated);
+    return { ...updated };
   }
 
   async updatePhotosCount(id: string, count: number): Promise<void> {
@@ -247,6 +290,55 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
 
   async create(album: AlbumDTO): Promise<AlbumDTO> {
     return this.createAlbum(album);
+  }
+
+  async listAllAdmin(category?: string): Promise<AlbumDTO[]> {
+    let query = this.supabase
+      .from('albums')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (category && category !== 'all') {
+      query = query.eq('category', category);
+    }
+
+    const { data, error } = await query;
+    if (error || !data) {
+      return INITIAL_OFFICIAL_ALBUMS;
+    }
+
+    return data.map((row: SupabaseAlbumRow) => this.mapRowToAlbum(row));
+  }
+
+  async updateAlbum(id: string, updates: Partial<AlbumDTO>): Promise<AlbumDTO | null> {
+    const updatePayload: Record<string, unknown> = {
+      updated_at: new Date().toISOString()
+    };
+
+    if (updates.title !== undefined) updatePayload.title = updates.title;
+    if (updates.category !== undefined) updatePayload.category = updates.category;
+    if (updates.subtitle !== undefined) updatePayload.subtitle = updates.subtitle;
+    if (updates.date !== undefined) updatePayload.event_date = updates.date;
+    if (updates.location !== undefined) updatePayload.location = updates.location;
+    if (updates.coverUrl !== undefined) updatePayload.cover_url = updates.coverUrl;
+    if (updates.badge !== undefined) updatePayload.badge = updates.badge;
+    if (updates.isPublished !== undefined) updatePayload.is_published = updates.isPublished;
+    if (updates.unitPrice !== undefined) updatePayload.unit_price = updates.unitPrice;
+    if (updates.fullAlbumPrice !== undefined) updatePayload.full_album_price = updates.fullAlbumPrice;
+    if (updates.photosCount !== undefined) updatePayload.photos_count = updates.photosCount;
+
+    const { data, error } = await this.supabase
+      .from('albums')
+      .update(updatePayload)
+      .eq('id', id)
+      .select()
+      .maybeSingle();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return this.mapRowToAlbum(data as SupabaseAlbumRow);
   }
 
   async updatePhotosCount(id: string, count: number): Promise<void> {

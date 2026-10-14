@@ -50,7 +50,7 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Rutas Administrativas y de Autenticación
 app.use('/api/admin', createAdminRouter(adminAuthService));
-app.use('/api/admin/albums', createAdminAlbumsRouter(adminAuthService));
+app.use('/api/admin/albums', createAdminAlbumsRouter(adminAuthService, albumRepository));
 app.use('/api/downloads', createDownloadsRouter(deliveryService, orderService));
 
 // Multer en memoria para procesamiento directo en streaming con Sharp

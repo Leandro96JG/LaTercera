@@ -8,7 +8,12 @@ import {
   DriveImportResponse,
   BulkUploadResponse,
   RegisterPhotographerRequest,
-  RegisterPhotographerResponse
+  RegisterPhotographerResponse,
+  CreateAlbumRequest,
+  CreateAlbumResponse,
+  UpdateAlbumRequest,
+  UpdateAlbumResponse,
+  AdminListAlbumsResponse
 } from '../models/admin.model';
 
 @Injectable({
@@ -75,6 +80,34 @@ export class AdminService {
     req: RegisterPhotographerRequest
   ): Observable<RegisterPhotographerResponse> {
     return this.http.post<RegisterPhotographerResponse>(`${this.baseUrl}/photographers`, req, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  /**
+   * Obtiene la lista completa de álbumes para el panel de administración
+   */
+  public getAdminAlbums(category?: string): Observable<AdminListAlbumsResponse> {
+    const params = category ? `?category=${encodeURIComponent(category)}` : '';
+    return this.http.get<AdminListAlbumsResponse>(`${this.baseUrl}/albums${params}`, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  /**
+   * Crea un nuevo álbum o evento deportivo/social
+   */
+  public createAlbum(req: CreateAlbumRequest): Observable<CreateAlbumResponse> {
+    return this.http.post<CreateAlbumResponse>(`${this.baseUrl}/albums`, req, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  /**
+   * Actualiza precios y metadatos de un álbum existente
+   */
+  public updateAlbum(albumId: string, updates: UpdateAlbumRequest): Observable<UpdateAlbumResponse> {
+    return this.http.put<UpdateAlbumResponse>(`${this.baseUrl}/albums/${albumId}`, updates, {
       headers: this.getAuthHeaders()
     });
   }

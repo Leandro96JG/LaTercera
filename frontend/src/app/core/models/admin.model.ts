@@ -74,3 +74,50 @@ export interface RegisterPhotographerResponse {
     createdAt: string;
   };
 }
+
+import { Album, AlbumCategory } from './album.model';
+
+export interface CreateAlbumRequest {
+  title: string;
+  category: AlbumCategory;
+  subtitle?: string;
+  date?: string;
+  location?: string;
+  unitPrice: number;
+  fullAlbumPrice: number;
+  badge?: string;
+  coverUrl?: string;
+  isPublished?: boolean;
+  customSlug?: string;
+}
+
+export interface CreateAlbumResponse {
+  success: boolean;
+  album: Album;
+  message: string;
+}
+
+export interface UpdateAlbumRequest {
+  unitPrice?: number;
+  fullAlbumPrice?: number;
+  title?: string;
+  subtitle?: string;
+  date?: string;
+  location?: string;
+  category?: AlbumCategory;
+  badge?: string;
+  coverUrl?: string;
+  isPublished?: boolean;
+}
+
+export interface UpdateAlbumResponse {
+  success: boolean;
+  album: Album;
+  message: string;
+}
+
+export interface AdminListAlbumsResponse {
+  success: boolean;
+  total: number;
+  albums: Album[];
+}
