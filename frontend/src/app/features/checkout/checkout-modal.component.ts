@@ -50,14 +50,14 @@ import { PaymentService } from '../../core/services/payment.service';
                     }
                   </span>
                   <span class="font-bold text-zinc-950 text-sm">
-                    \${{ cartStore.pricing().finalTotal.toLocaleString('es-AR') }} ARS
+                    &dollar;{{ cartStore.pricing().finalTotal.toLocaleString('es-AR') }} ARS
                   </span>
                 </div>
 
                 @if (cartStore.pricing().totalDiscount > 0) {
                   <div class="flex justify-between items-center text-[11px] text-emerald-600 font-semibold pt-1 border-t border-black/[0.03]">
                     <span>Descuento aplicado:</span>
-                    <span>-\${{ cartStore.pricing().totalDiscount.toLocaleString('es-AR') }} ARS</span>
+                    <span>-&dollar;{{ cartStore.pricing().totalDiscount.toLocaleString('es-AR') }} ARS</span>
                   </div>
                 }
 

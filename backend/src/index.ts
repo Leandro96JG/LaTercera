@@ -116,11 +116,28 @@ app.get('/api/albums', async (req: Request, res: Response) => {
   try {
     const rawCat = req.query.category as string | undefined;
     const category = Array.isArray(rawCat) ? rawCat[0] : rawCat;
-    const albums = await albumRepository.findAll(category);
-    res.json({ albums });
+    const rawPage = req.query.page;
+    const rawLimit = req.query.limit;
+
+    // Si NO se envía 'page', preserva el contrato histórico { albums: AlbumDTO[] }
+    if (rawPage === undefined) {
+      const albums = await albumRepository.findAll(category);
+      return res.json({ albums });
+    }
+
+    // Si se envía 'page', devuelve estructura paginada moderna
+    const page = Math.max(1, parseInt(String(rawPage), 10) || 1);
+    const limit = Math.max(1, Math.min(50, parseInt(String(rawLimit), 10) || 8));
+
+    const result = await albumRepository.listAlbumsPaginated({ page, limit, category });
+    return res.json({
+      success: true,
+      albums: result.albums,
+      pagination: result.pagination
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Error al obtener álbumes';
-    res.status(500).json({ error: message });
+    return res.status(500).json({ error: message });
   }
 });
 

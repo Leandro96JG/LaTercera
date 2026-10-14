@@ -129,4 +129,45 @@ describe('AlbumRepository (TDD)', () => {
     expect(slug2).toContain('cumpleanos-de-15-de-martina');
     expect(slug2).toContain(currentYear);
   });
+
+  it('debe paginar el catálogo de álbumes públicos con listAlbumsPaginated', async () => {
+    // Hay 4 álbumes iniciales. Con limit=2, debe devolver 2 álbumes por página y totalPages=2
+    const page1 = await repo.listAlbumsPaginated({ page: 1, limit: 2 });
+    expect(page1.albums.length).toBe(2);
+    expect(page1.pagination.total).toBe(4);
+    expect(page1.pagination.page).toBe(1);
+    expect(page1.pagination.limit).toBe(2);
+    expect(page1.pagination.totalPages).toBe(2);
+    expect(page1.pagination.hasNext).toBe(true);
+    expect(page1.pagination.hasPrev).toBe(false);
+
+    const page2 = await repo.listAlbumsPaginated({ page: 2, limit: 2 });
+    expect(page2.albums.length).toBe(2);
+    expect(page2.pagination.page).toBe(2);
+    expect(page2.pagination.hasNext).toBe(false);
+    expect(page2.pagination.hasPrev).toBe(true);
+
+    // Los álbumes de la página 1 y 2 no deben repetirse
+    const idsPage1 = page1.albums.map(a => a.id);
+    const idsPage2 = page2.albums.map(a => a.id);
+    expect(idsPage1.some(id => idsPage2.includes(id))).toBe(false);
+  });
+
+  it('debe paginar el catálogo administrativo con listAllAdminPaginated incluyendo álbumes no publicados', async () => {
+    await repo.createAlbum({
+      id: 'album-draft-test',
+      category: 'futbol',
+      title: 'Borrador No Publicado',
+      photosCount: 0,
+      unitPrice: 1000,
+      fullAlbumPrice: 8000,
+      coverUrl: '',
+      isPublished: false
+    });
+
+    const res = await repo.listAllAdminPaginated({ page: 1, limit: 10 });
+    expect(res.pagination.total).toBe(5);
+    expect(res.albums.some(a => a.id === 'album-draft-test')).toBe(true);
+  });
 });
+

@@ -64,6 +64,39 @@ export class App implements OnInit {
     return list.filter(a => a.category === cat);
   });
 
+  // Paginación en portfolio público
+  public readonly currentPage = signal<number>(1);
+  public readonly pageSize = signal<number>(8);
+
+  public readonly totalPages = computed(() => {
+    const total = this.filteredAlbums().length;
+    return Math.max(1, Math.ceil(total / this.pageSize()));
+  });
+
+  public readonly paginatedAlbums = computed(() => {
+    const list = this.filteredAlbums();
+    const page = this.currentPage();
+    const size = this.pageSize();
+    const from = (page - 1) * size;
+    return list.slice(from, from + size);
+  });
+
+  public readonly paginationPages = computed<number[]>(() => {
+    const total = this.totalPages();
+    return Array.from({ length: total }, (_, i) => i + 1);
+  });
+
+  public readonly showingFrom = computed(() => {
+    const total = this.filteredAlbums().length;
+    if (total === 0) return 0;
+    return (this.currentPage() - 1) * this.pageSize() + 1;
+  });
+
+  public readonly showingTo = computed(() => {
+    const total = this.filteredAlbums().length;
+    return Math.min(this.currentPage() * this.pageSize(), total);
+  });
+
   // Fotos del álbum actual
   public readonly currentPhotos = computed<readonly Photo[]>(() => {
     const album = this.currentAlbum();
@@ -93,7 +126,7 @@ export class App implements OnInit {
     return p ? this.cartStore.isPhotoSelected(p.id) : false;
   });
 
-  ngOnInit(): void {
+  public loadPublicAlbums(): void {
     this.albumService.getAlbums().subscribe({
       next: (albums) => {
         this.albums.set(albums);
@@ -152,6 +185,10 @@ export class App implements OnInit {
         ]);
       }
     });
+  }
+
+  ngOnInit(): void {
+    this.loadPublicAlbums();
 
     // Detección de retorno de pasarela de pagos (Mercado Pago Checkout Pro) o enlaces directos
     if (typeof window !== 'undefined') {
@@ -186,6 +223,8 @@ export class App implements OnInit {
         this.currentView.set('admin-login');
         return;
       }
+    } else if (view === 'portfolio') {
+      this.loadPublicAlbums();
     }
     this.currentView.set(view);
   }
@@ -197,6 +236,7 @@ export class App implements OnInit {
   public logoutAdmin(): void {
     this.adminAuthStore.logout();
     if (this.currentView() === 'admin' || this.currentView() === 'admin-login') {
+      this.loadPublicAlbums();
       this.currentView.set('portfolio');
     }
   }
@@ -208,11 +248,31 @@ export class App implements OnInit {
   }
 
   public goHome(): void {
+    this.loadPublicAlbums();
     this.currentView.set('portfolio');
   }
 
   public setCategory(cat: string): void {
     this.selectedCategory.set(cat);
+    this.currentPage.set(1);
+  }
+
+  public goToPage(page: number): void {
+    if (page >= 1 && page <= this.totalPages()) {
+      this.currentPage.set(page);
+    }
+  }
+
+  public nextPage(): void {
+    if (this.currentPage() < this.totalPages()) {
+      this.goToPage(this.currentPage() + 1);
+    }
+  }
+
+  public prevPage(): void {
+    if (this.currentPage() > 1) {
+      this.goToPage(this.currentPage() - 1);
+    }
   }
 
   public buyFullAlbum(): void {

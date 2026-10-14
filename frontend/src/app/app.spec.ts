@@ -88,4 +88,35 @@ describe('App Root Component - LA TERCERA', () => {
     app.goHome();
     expect(app.currentView()).toBe('portfolio');
   });
+
+  it('debe paginar los álbumes en el catálogo público y calcular páginas correctamente', () => {
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+
+    app.albums.set([
+      { id: '1', category: 'futbol', title: 'Álbum 1', subtitle: 'Sub 1', date: '2026', badge: '⚽', photosCount: 10, unitPrice: 1000, fullAlbumPrice: 8000, coverUrl: '' },
+      { id: '2', category: 'futbol', title: 'Álbum 2', subtitle: 'Sub 2', date: '2026', badge: '⚽', photosCount: 10, unitPrice: 1000, fullAlbumPrice: 8000, coverUrl: '' },
+      { id: '3', category: 'hockey', title: 'Álbum 3', subtitle: 'Sub 3', date: '2026', badge: '🏑', photosCount: 10, unitPrice: 1000, fullAlbumPrice: 8000, coverUrl: '' },
+      { id: '4', category: 'sociales', title: 'Álbum 4', subtitle: 'Sub 4', date: '2026', badge: '🎉', photosCount: 10, unitPrice: 1000, fullAlbumPrice: 8000, coverUrl: '' }
+    ]);
+
+    app.pageSize.set(2);
+    expect(app.totalPages()).toBe(2);
+    expect(app.paginatedAlbums().length).toBe(2);
+    expect(app.currentPage()).toBe(1);
+
+    app.nextPage();
+    expect(app.currentPage()).toBe(2);
+    expect(app.paginatedAlbums().length).toBe(2);
+
+    app.prevPage();
+    expect(app.currentPage()).toBe(1);
+
+    // Cambiar categoría resetea a página 1
+    app.goToPage(2);
+    expect(app.currentPage()).toBe(2);
+    app.setCategory('futbol');
+    expect(app.currentPage()).toBe(1);
+    expect(app.filteredAlbums().length).toBe(2);
+  });
 });

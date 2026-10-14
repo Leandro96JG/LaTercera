@@ -143,8 +143,30 @@ export interface UpdateAlbumResponse {
   message: string;
 }
 
+export interface PaginationMeta {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
+
+export interface AlbumPaginationOptions {
+  page?: number;
+  limit?: number;
+  category?: string;
+}
+
+export interface PaginatedAlbumsResult {
+  albums: import('../repositories/album.repository').AlbumDTO[];
+  pagination: PaginationMeta;
+}
+
 export interface AdminListAlbumsResponse {
   success: boolean;
   total: number;
   albums: import('../repositories/album.repository').AlbumDTO[];
+  pagination?: PaginationMeta;
 }
+

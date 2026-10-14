@@ -185,7 +185,7 @@
         </div>
       } @else {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-          @for (album of albums(); track album.id) {
+          @for (album of paginatedAlbums(); track album.id) {
             <div class="bg-white rounded-[28px] border border-black/[0.06] shadow-bento p-5 sm:p-6 flex flex-col justify-between space-y-5 transition hover:border-black/[0.12]">
               <!-- Cabecera de la Tarjeta del Álbum -->
               <div class="space-y-3">
@@ -273,16 +273,32 @@
                   </div>
                 </div>
 
-                <!-- Botón Guardar Precios -->
+                <!-- Botón Guardar Precios con Feedback Directo -->
                 <div class="flex items-center justify-between pt-1">
-                  <span class="text-[10px] text-zinc-400">Impacta directo en el checkout</span>
+                  <div>
+                    @if (updateFeedback()?.albumId === album.id) {
+                      <span
+                        [class]="updateFeedback()!.success ? 'text-emerald-600 font-bold text-[11px] flex items-center gap-1 animate-fadeIn' : 'text-rose-600 font-bold text-[11px] flex items-center gap-1 animate-fadeIn'"
+                      >
+                        <span>{{ updateFeedback()!.success ? '✅' : '⚠️' }}</span>
+                        <span>{{ updateFeedback()!.message }}</span>
+                      </span>
+                    } @else {
+                      <span class="text-[10px] text-zinc-400">Impacta directo en el checkout</span>
+                    }
+                  </div>
                   <button
                     type="button"
                     (click)="saveAlbumPrices(album.id)"
                     [disabled]="updatingAlbumId() === album.id"
                     class="px-3.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-[11px] shadow-sm transition active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
                   >
-                    <span>💾 Guardar Precios</span>
+                    @if (updatingAlbumId() === album.id) {
+                      <span class="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      <span>Guardando...</span>
+                    } @else {
+                      <span>💾 Guardar Precios</span>
+                    }
                   </button>
                 </div>
               </div>
@@ -307,17 +323,71 @@
                   </button>
                 </div>
 
+                <!-- Botón de Estado / Visibilidad con Spinner y Feedback -->
                 <button
                   type="button"
                   (click)="togglePublishStatus(album)"
-                  class="text-[11px] font-semibold text-zinc-500 hover:text-zinc-800 underline transition"
+                  [disabled]="isTogglingPublishId() === album.id"
+                  [class]="album.isPublished !== false
+                    ? 'px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold transition flex items-center gap-1 active:scale-95 disabled:opacity-50'
+                    : 'px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border border-zinc-200 text-[11px] font-bold transition flex items-center gap-1 active:scale-95 disabled:opacity-50'"
                 >
-                  {{ album.isPublished !== false ? 'Ocultar' : 'Publicar' }}
+                  @if (isTogglingPublishId() === album.id) {
+                    <span class="w-2.5 h-2.5 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
+                    <span>Actualizando...</span>
+                  } @else {
+                    <span>{{ album.isPublished !== false ? '🟢 Público (Ocultar)' : '⚪ Oculto (Publicar)' }}</span>
+                  }
                 </button>
               </div>
             </div>
           }
         </div>
+
+        <!-- Barra de Paginación Bento de Álbumes en Admin -->
+        @if (albums().length > 0) {
+          <div class="mt-6 pt-5 border-t border-black/[0.05] flex flex-col sm:flex-row items-center justify-between gap-4">
+            <span class="text-xs text-zinc-500 font-medium order-2 sm:order-1">
+              Mostrando <strong class="text-zinc-900 font-bold">{{ showingFrom() }}</strong> a
+              <strong class="text-zinc-900 font-bold">{{ showingTo() }}</strong> de
+              <strong class="text-zinc-900 font-bold">{{ albums().length }}</strong> eventos
+            </span>
+
+            @if (totalPages() > 1) {
+              <div class="inline-flex items-center gap-1.5 p-1 rounded-2xl bg-white border border-black/[0.06] shadow-sm order-1 sm:order-2">
+                <button
+                  type="button"
+                  (click)="prevPage()"
+                  [disabled]="currentPage() === 1"
+                  class="px-3 py-1.5 rounded-xl text-xs font-bold text-zinc-700 hover:bg-zinc-100 disabled:opacity-30 disabled:pointer-events-none transition flex items-center gap-1"
+                >
+                  ← Anterior
+                </button>
+
+                @for (p of paginationPages(); track p) {
+                  <button
+                    type="button"
+                    (click)="goToPage(p)"
+                    [class]="currentPage() === p
+                      ? 'w-8 h-8 rounded-xl bg-zinc-950 text-white font-extrabold text-xs shadow-sm transition'
+                      : 'w-8 h-8 rounded-xl text-zinc-600 hover:bg-zinc-100 font-bold text-xs transition'"
+                  >
+                    {{ p }}
+                  </button>
+                }
+
+                <button
+                  type="button"
+                  (click)="nextPage()"
+                  [disabled]="currentPage() === totalPages()"
+                  class="px-3 py-1.5 rounded-xl text-xs font-bold text-zinc-700 hover:bg-zinc-100 disabled:opacity-30 disabled:pointer-events-none transition flex items-center gap-1"
+                >
+                  Siguiente →
+                </button>
+              </div>
+            }
+          </div>
+        }
       }
     </div>
   }
@@ -775,181 +845,191 @@
 <!-- MODAL BENTO: CREACIÓN DE NUEVO ÁLBUM / EVENTO                            -->
 <!-- ======================================================================== -->
 @if (isCreateModalOpen()) {
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-sm animate-fadeIn">
+  <div
+    class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-zinc-950/70 backdrop-blur-sm animate-fadeIn"
+    (click)="closeCreateModal()"
+  >
     <div
-      class="bg-white rounded-[32px] border border-black/[0.08] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 sm:p-8 space-y-6"
+      class="bg-white rounded-[28px] border border-black/[0.08] shadow-2xl w-full max-w-xl max-h-[85vh] flex flex-col overflow-hidden animate-float-cart-in"
       (click)="$event.stopPropagation()"
     >
-      <div class="flex items-center justify-between pb-4 border-b border-black/[0.05]">
+      <!-- Cabecera Sticky del Modal -->
+      <div class="p-5 sm:p-6 border-b border-black/[0.06] flex items-center justify-between bg-white shrink-0">
         <div>
           <span class="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-[10px] uppercase tracking-wider">
             ✨ Nuevo Evento
           </span>
-          <h3 class="font-display font-extrabold text-2xl text-zinc-900 mt-1">
+          <h3 class="font-display font-extrabold text-xl sm:text-2xl text-zinc-900 mt-1">
             Crear Álbum o Partido
           </h3>
           <p class="text-xs text-zinc-500">
-            Completa los detalles y tarifas iniciales. Una vez creado, podrás cargarle fotos de inmediato.
+            Completa los detalles y tarifas. Podrás cargar fotos de inmediato.
           </p>
         </div>
 
         <button
+          type="button"
           (click)="closeCreateModal()"
-          class="w-8 h-8 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-500 text-xs font-bold transition flex items-center justify-center"
+          class="w-8 h-8 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-500 text-xs font-bold transition flex items-center justify-center active:scale-90"
+          aria-label="Cerrar modal"
         >
           ✕
         </button>
       </div>
 
-      <!-- Alerta de Error en Creación -->
-      @if (createAlbumError()) {
-        <div class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
-          <span>⚠️</span>
-          <span>{{ createAlbumError() }}</span>
-        </div>
-      }
+      <!-- Formulario con Cuerpo Desplazable y Footer Fijo -->
+      <form [formGroup]="createAlbumForm" (ngSubmit)="submitCreateAlbum()" class="flex flex-col flex-1 overflow-hidden">
+        <!-- Cuerpo con Scroll Interno -->
+        <div class="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1">
+          <!-- Alerta de Error en Creación -->
+          @if (createAlbumError()) {
+            <div class="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
+              <span>⚠️</span>
+              <span>{{ createAlbumError() }}</span>
+            </div>
+          }
 
-      <form [formGroup]="createAlbumForm" (ngSubmit)="submitCreateAlbum()" class="space-y-4">
-        <!-- Título -->
-        <div>
-          <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
-            Título del Evento / Partido *
-          </label>
-          <input
-            type="text"
-            formControlName="title"
-            placeholder="Ej: Defensores de la Boca vs Rioja Juniors"
-            class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition font-medium"
-          />
-        </div>
-
-        <!-- Categoría y Badge -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <!-- Título -->
           <div>
             <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
-              Disciplina / Categoría *
-            </label>
-            <select
-              formControlName="category"
-              (change)="onCategoryChange($event)"
-              class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-semibold focus:outline-none focus:border-zinc-950 transition"
-            >
-              <option value="futbol">⚽ Fútbol</option>
-              <option value="hockey">🏑 Hockey</option>
-              <option value="basquet">🏀 Básquet</option>
-              <option value="sociales">🎉 Cumpleaños & Social</option>
-              <option value="otros">📸 Evento Especial / Otro</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
-              Insignia / Badge
+              Título del Evento / Partido *
             </label>
             <input
               type="text"
-              formControlName="badge"
-              placeholder="⚽ Fútbol"
-              class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
-            />
-          </div>
-        </div>
-
-        <!-- Subtítulo -->
-        <div>
-          <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
-            Subtítulo / Torneo / Jornada *
-          </label>
-          <input
-            type="text"
-            formControlName="subtitle"
-            placeholder="Ej: Liga Riojana de Fútbol • Fecha 9"
-            class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
-          />
-        </div>
-
-        <!-- Fecha y Lugar -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
-              Fecha del Evento *
-            </label>
-            <input
-              type="text"
-              formControlName="date"
-              placeholder="Ej: 20 Octubre, 2026"
-              class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
+              formControlName="title"
+              placeholder="Ej: Defensores de la Boca vs Rioja Juniors"
+              class="w-full px-4 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition font-medium"
             />
           </div>
 
-          <div>
-            <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
-              Lugar / Estadio / Salón *
-            </label>
-            <input
-              type="text"
-              formControlName="location"
-              placeholder="Ej: Estadio Carlos Mercado Luna"
-              class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
-            />
-          </div>
-        </div>
-
-        <!-- Precios Iniciales (Bento Box) -->
-        <div class="p-4 rounded-2xl bg-amber-50/60 border border-amber-200/60 space-y-3">
-          <span class="block text-xs font-bold text-amber-950 uppercase tracking-wider">
-            💵 Tarifas de Venta Mercado Pago (ARS)
-          </span>
-
+          <!-- Categoría y Badge -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label class="block text-[11px] font-semibold text-zinc-700 mb-1">
-                Precio Foto Suelta ($) *
+              <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                Disciplina / Categoría *
+              </label>
+              <select
+                formControlName="category"
+                (change)="onCategoryChange($event)"
+                class="w-full px-4 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-semibold focus:outline-none focus:border-zinc-950 transition"
+              >
+                <option value="futbol">⚽ Fútbol</option>
+                <option value="hockey">🏑 Hockey</option>
+                <option value="basquet">🏀 Básquet</option>
+                <option value="sociales">🎉 Cumpleaños & Social</option>
+                <option value="otros">📸 Evento Especial / Otro</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                Insignia / Badge
               </label>
               <input
-                type="number"
-                formControlName="unitPrice"
-                min="100"
-                step="50"
-                class="w-full px-4 py-2.5 rounded-xl bg-white border border-amber-200 text-zinc-900 text-xs font-bold focus:outline-none focus:border-zinc-950 transition"
+                type="text"
+                formControlName="badge"
+                placeholder="⚽ Fútbol"
+                class="w-full px-4 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
+              />
+            </div>
+          </div>
+
+          <!-- Subtítulo -->
+          <div>
+            <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
+              Subtítulo / Torneo / Jornada *
+            </label>
+            <input
+              type="text"
+              formControlName="subtitle"
+              placeholder="Ej: Liga Riojana de Fútbol • Fecha 9"
+              class="w-full px-4 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
+            />
+          </div>
+
+          <!-- Fecha y Lugar -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                Fecha del Evento *
+              </label>
+              <input
+                type="text"
+                formControlName="date"
+                placeholder="Ej: 20 Octubre, 2026"
+                class="w-full px-4 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
               />
             </div>
 
             <div>
-              <label class="block text-[11px] font-semibold text-zinc-700 mb-1">
-                Precio Álbum Completo ($) *
+              <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                Lugar / Estadio / Salón *
               </label>
               <input
-                type="number"
-                formControlName="fullAlbumPrice"
-                min="500"
-                step="100"
-                class="w-full px-4 py-2.5 rounded-xl bg-white border border-amber-200 text-zinc-900 text-xs font-bold focus:outline-none focus:border-zinc-950 transition"
+                type="text"
+                formControlName="location"
+                placeholder="Ej: Estadio Carlos Mercado Luna"
+                class="w-full px-4 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
               />
             </div>
           </div>
-          <span class="text-[10px] text-zinc-500 block">Podrás ajustar estos precios en cualquier momento desde el panel.</span>
+
+          <!-- Precios Iniciales (Bento Box) -->
+          <div class="p-4 rounded-2xl bg-amber-50/60 border border-amber-200/60 space-y-3">
+            <span class="block text-xs font-bold text-amber-950 uppercase tracking-wider">
+              💵 Tarifas de Venta Mercado Pago (ARS)
+            </span>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[11px] font-semibold text-zinc-700 mb-1">
+                  Precio Foto Suelta ($) *
+                </label>
+                <input
+                  type="number"
+                  formControlName="unitPrice"
+                  min="100"
+                  step="50"
+                  class="w-full px-4 py-2 rounded-xl bg-white border border-amber-200 text-zinc-900 text-xs font-bold focus:outline-none focus:border-zinc-950 transition"
+                />
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-semibold text-zinc-700 mb-1">
+                  Precio Álbum Completo ($) *
+                </label>
+                <input
+                  type="number"
+                  formControlName="fullAlbumPrice"
+                  min="500"
+                  step="100"
+                  class="w-full px-4 py-2 rounded-xl bg-white border border-amber-200 text-zinc-900 text-xs font-bold focus:outline-none focus:border-zinc-950 transition"
+                />
+              </div>
+            </div>
+            <span class="text-[10px] text-zinc-500 block">Podrás ajustar estos precios en cualquier momento desde el panel.</span>
+          </div>
+
+          <!-- Estado de Publicación -->
+          <div class="flex items-center gap-2 pt-1">
+            <input
+              type="checkbox"
+              id="modalIsPublished"
+              formControlName="isPublished"
+              class="w-4 h-4 rounded text-zinc-900 focus:ring-zinc-950 border-zinc-300"
+            />
+            <label for="modalIsPublished" class="text-xs font-medium text-zinc-700 cursor-pointer">
+              Publicar inmediatamente en el catálogo web
+            </label>
+          </div>
         </div>
 
-        <!-- Estado de Publicación -->
-        <div class="flex items-center gap-2 pt-1">
-          <input
-            type="checkbox"
-            id="modalIsPublished"
-            formControlName="isPublished"
-            class="w-4 h-4 rounded text-zinc-900 focus:ring-zinc-950 border-zinc-300"
-          />
-          <label for="modalIsPublished" class="text-xs font-medium text-zinc-700 cursor-pointer">
-            Publicar inmediatamente en el catálogo web
-          </label>
-        </div>
-
-        <!-- Botones de Acción -->
-        <div class="flex items-center justify-end gap-3 pt-3 border-t border-black/[0.05]">
+        <!-- Footer Sticky de Botones -->
+        <div class="p-4 sm:p-5 border-t border-black/[0.06] bg-zinc-50 flex items-center justify-end gap-3 shrink-0">
           <button
             type="button"
             (click)="closeCreateModal()"
-            class="px-5 py-3 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-xs transition"
+            class="px-4 py-2.5 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-700 font-bold text-xs transition"
           >
             Cancelar
           </button>
@@ -957,10 +1037,10 @@
           <button
             type="submit"
             [disabled]="createAlbumForm.invalid || isCreatingAlbum()"
-            class="px-6 py-3 rounded-2xl bg-zinc-950 hover:bg-zinc-800 text-white font-display font-extrabold text-xs shadow-md transition active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center gap-2"
+            class="px-5 py-2.5 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white font-display font-extrabold text-xs shadow-md transition active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center gap-2"
           >
             @if (isCreatingAlbum()) {
-              <span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              <span class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
               <span>Guardando álbum...</span>
             } @else {
               <span>Crear Álbum</span>

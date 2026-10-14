@@ -31,11 +31,11 @@ import { CartStore } from '../../core/state/cart.store';
           <!-- Total Calculado Reactivamente -->
           <div>
             <span class="font-display font-extrabold text-sm sm:text-base text-white tracking-wide">
-              \${{ cartStore.pricing().finalTotal.toLocaleString('es-AR') }} ARS
+              &dollar;{{ cartStore.pricing().finalTotal.toLocaleString('es-AR') }} ARS
             </span>
             @if (cartStore.pricing().totalDiscount > 0) {
               <span class="hidden sm:inline-block ml-1.5 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">
-                -\${{ cartStore.pricing().totalDiscount.toLocaleString('es-AR') }} desc
+                -&dollar;{{ cartStore.pricing().totalDiscount.toLocaleString('es-AR') }} desc
               </span>
             }
           </div>

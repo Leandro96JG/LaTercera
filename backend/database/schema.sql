@@ -178,7 +178,7 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE TABLE IF NOT EXISTS order_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-    photo_id VARCHAR(100) REFERENCES photos(id) ON DELETE SET NULL, -- NULL si is_full_album = TRUE
+    photo_id VARCHAR(100), -- Identificador de la foto (desacoplado para resiliencia con fotos dinámicas e histórico inmutable)
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

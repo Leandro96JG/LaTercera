@@ -36,6 +36,26 @@ export function generateAlbumSlug(title: string, dateStr?: string): string {
   return base.slice(0, 80);
 }
 
+export interface PaginationMeta {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
+
+export interface AlbumPaginationOptions {
+  page?: number;
+  limit?: number;
+  category?: string;
+}
+
+export interface PaginatedAlbumsResult {
+  albums: AlbumDTO[];
+  pagination: PaginationMeta;
+}
+
 export interface IAlbumRepository {
   listAlbums(category?: string): Promise<AlbumDTO[]>;
   listAllAdmin(category?: string): Promise<AlbumDTO[]>;
@@ -43,6 +63,8 @@ export interface IAlbumRepository {
   createAlbum(album: AlbumDTO): Promise<AlbumDTO>;
   updateAlbum(id: string, updates: Partial<AlbumDTO>): Promise<AlbumDTO | null>;
   updatePhotosCount(id: string, count: number): Promise<void>;
+  listAlbumsPaginated(options?: AlbumPaginationOptions): Promise<PaginatedAlbumsResult>;
+  listAllAdminPaginated(options?: AlbumPaginationOptions): Promise<PaginatedAlbumsResult>;
   
   // Métodos de conveniencia / retrocompatibilidad
   findAll(category?: string): Promise<AlbumDTO[]>;
@@ -173,6 +195,62 @@ export class MemoryAlbumRepository implements IAlbumRepository {
     if (album) {
       album.photosCount = count;
     }
+  }
+
+  async listAlbumsPaginated(options: AlbumPaginationOptions = {}): Promise<PaginatedAlbumsResult> {
+    const page = Math.max(1, Number(options.page) || 1);
+    const limit = Math.max(1, Math.min(50, Number(options.limit) || 8));
+    const category = options.category;
+
+    let list = Array.from(this.albums.values()).filter(a => a.isPublished !== false);
+    if (category && category !== 'all') {
+      list = list.filter(a => a.category === category);
+    }
+
+    const total = list.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const from = (page - 1) * limit;
+    const paginated = list.slice(from, from + limit).map(a => ({ ...a }));
+
+    return {
+      albums: paginated,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1
+      }
+    };
+  }
+
+  async listAllAdminPaginated(options: AlbumPaginationOptions = {}): Promise<PaginatedAlbumsResult> {
+    const page = Math.max(1, Number(options.page) || 1);
+    const limit = Math.max(1, Math.min(50, Number(options.limit) || 10));
+    const category = options.category;
+
+    let list = Array.from(this.albums.values());
+    if (category && category !== 'all') {
+      list = list.filter(a => a.category === category);
+    }
+
+    const total = list.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const from = (page - 1) * limit;
+    const paginated = list.slice(from, from + limit).map(a => ({ ...a }));
+
+    return {
+      albums: paginated,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1
+      }
+    };
   }
 }
 
@@ -346,5 +424,84 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
       .from('albums')
       .update({ photos_count: count, updated_at: new Date().toISOString() })
       .eq('id', id);
+  }
+
+  async listAlbumsPaginated(options: AlbumPaginationOptions = {}): Promise<PaginatedAlbumsResult> {
+    const page = Math.max(1, Number(options.page) || 1);
+    const limit = Math.max(1, Math.min(50, Number(options.limit) || 8));
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    let query = this.supabase
+      .from('albums')
+      .select('*', { count: 'exact' })
+      .eq('is_published', true)
+      .order('created_at', { ascending: false });
+
+    if (options.category && options.category !== 'all') {
+      query = query.eq('category', options.category);
+    }
+
+    query = query.range(from, to);
+
+    const { data, count, error } = await query;
+    if (error || !data) {
+      const fallback = INITIAL_OFFICIAL_ALBUMS.filter(a => 
+        !options.category || options.category === 'all' || a.category === options.category
+      );
+      const total = fallback.length;
+      const totalPages = Math.max(1, Math.ceil(total / limit));
+      return {
+        albums: fallback.slice(from, from + limit),
+        pagination: { total, page, limit, totalPages, hasNext: page < totalPages, hasPrev: page > 1 }
+      };
+    }
+
+    const total = count ?? data.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+
+    return {
+      albums: data.map((row: SupabaseAlbumRow) => this.mapRowToAlbum(row)),
+      pagination: { total, page, limit, totalPages, hasNext: page < totalPages, hasPrev: page > 1 }
+    };
+  }
+
+  async listAllAdminPaginated(options: AlbumPaginationOptions = {}): Promise<PaginatedAlbumsResult> {
+    const page = Math.max(1, Number(options.page) || 1);
+    const limit = Math.max(1, Math.min(50, Number(options.limit) || 10));
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    let query = this.supabase
+      .from('albums')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false });
+
+    if (options.category && options.category !== 'all') {
+      query = query.eq('category', options.category);
+    }
+
+    query = query.range(from, to);
+
+    const { data, count, error } = await query;
+    if (error || !data) {
+      const fallback = INITIAL_OFFICIAL_ALBUMS.filter(a => 
+        !options.category || options.category === 'all' || a.category === options.category
+      );
+      const total = fallback.length;
+      const totalPages = Math.max(1, Math.ceil(total / limit));
+      return {
+        albums: fallback.slice(from, from + limit),
+        pagination: { total, page, limit, totalPages, hasNext: page < totalPages, hasPrev: page > 1 }
+      };
+    }
+
+    const total = count ?? data.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+
+    return {
+      albums: data.map((row: SupabaseAlbumRow) => this.mapRowToAlbum(row)),
+      pagination: { total, page, limit, totalPages, hasNext: page < totalPages, hasPrev: page > 1 }
+    };
   }
 }

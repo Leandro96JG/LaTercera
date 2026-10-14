@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, signal, OnInit, output } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, computed, OnInit, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { AdminAuthStore } from '../../core/state/admin-auth.store';
@@ -38,6 +38,60 @@ export class AdminPanelComponent implements OnInit {
   // Álbumes disponibles en el sistema (vista administrativa y formularios)
   public readonly albums = signal<readonly Album[]>([]);
   public readonly isLoadingAlbums = signal<boolean>(false);
+
+  // Estado de actualización de visibilidad (Ocultar/Publicar) por tarjeta
+  public readonly isTogglingPublishId = signal<string | null>(null);
+
+  // Paginación en pestaña de álbumes administrativos
+  public readonly currentPage = signal<number>(1);
+  public readonly pageSize = signal<number>(6);
+
+  public readonly totalPages = computed(() => {
+    const total = this.albums().length;
+    return Math.max(1, Math.ceil(total / this.pageSize()));
+  });
+
+  public readonly paginatedAlbums = computed(() => {
+    const list = this.albums();
+    const page = this.currentPage();
+    const size = this.pageSize();
+    const from = (page - 1) * size;
+    return list.slice(from, from + size);
+  });
+
+  public readonly paginationPages = computed<number[]>(() => {
+    const total = this.totalPages();
+    return Array.from({ length: total }, (_, i) => i + 1);
+  });
+
+  public readonly showingFrom = computed(() => {
+    const total = this.albums().length;
+    if (total === 0) return 0;
+    return (this.currentPage() - 1) * this.pageSize() + 1;
+  });
+
+  public readonly showingTo = computed(() => {
+    const total = this.albums().length;
+    return Math.min(this.currentPage() * this.pageSize(), total);
+  });
+
+  public goToPage(page: number): void {
+    if (page >= 1 && page <= this.totalPages()) {
+      this.currentPage.set(page);
+    }
+  }
+
+  public nextPage(): void {
+    if (this.currentPage() < this.totalPages()) {
+      this.goToPage(this.currentPage() + 1);
+    }
+  }
+
+  public prevPage(): void {
+    if (this.currentPage() > 1) {
+      this.goToPage(this.currentPage() - 1);
+    }
+  }
 
   // Estado de Modal de Creación de Álbum
   public readonly isCreateModalOpen = signal<boolean>(false);
@@ -289,6 +343,7 @@ export class AdminPanelComponent implements OnInit {
           // Actualizamos la lista local reactiva
           const updatedList = [newAlbum, ...this.albums()];
           this.setAlbumsData(updatedList);
+          this.currentPage.set(1);
 
           // Si se abrió desde un formulario de subida, autoseleccionar el nuevo álbum
           const target = this.pendingTargetForm();
@@ -376,11 +431,31 @@ export class AdminPanelComponent implements OnInit {
 
   public togglePublishStatus(album: Album): void {
     const newStatus = !album.isPublished;
+    this.isTogglingPublishId.set(album.id);
     this.adminService.updateAlbum(album.id, { isPublished: newStatus }).subscribe({
       next: (res) => {
+        this.isTogglingPublishId.set(null);
         if (res.success && res.album) {
           this.albums.set(this.albums().map(a => a.id === album.id ? res.album : a));
+          this.updateFeedback.set({
+            albumId: album.id,
+            message: newStatus ? 'Álbum publicado en el portfolio' : 'Álbum ocultado del portfolio',
+            success: true
+          });
+          setTimeout(() => {
+            if (this.updateFeedback()?.albumId === album.id) {
+              this.updateFeedback.set(null);
+            }
+          }, 3500);
         }
+      },
+      error: (err) => {
+        this.isTogglingPublishId.set(null);
+        this.updateFeedback.set({
+          albumId: album.id,
+          message: err.error?.error || 'Error al actualizar visibilidad',
+          success: false
+        });
       }
     });
   }

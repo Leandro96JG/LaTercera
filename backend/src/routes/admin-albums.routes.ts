@@ -53,12 +53,28 @@ export function createAdminAlbumsRouter(
   router.get('/', requireAdminAuth, async (req: Request, res: Response) => {
     try {
       const category = typeof req.query.category === 'string' ? req.query.category : undefined;
-      const albums = await albumRepository.listAllAdmin(category);
+      const rawPage = req.query.page;
+      const rawLimit = req.query.limit;
 
+      if (rawPage === undefined) {
+        const albums = await albumRepository.listAllAdmin(category);
+        const response: AdminListAlbumsResponse = {
+          success: true,
+          total: albums.length,
+          albums
+        };
+        return res.status(200).json(response);
+      }
+
+      const page = Math.max(1, parseInt(String(rawPage), 10) || 1);
+      const limit = Math.max(1, Math.min(50, parseInt(String(rawLimit), 10) || 10));
+
+      const result = await albumRepository.listAllAdminPaginated({ page, limit, category });
       const response: AdminListAlbumsResponse = {
         success: true,
-        total: albums.length,
-        albums
+        total: result.pagination.total,
+        albums: result.albums,
+        pagination: result.pagination
       };
 
       return res.status(200).json(response);
@@ -165,7 +181,7 @@ export function createAdminAlbumsRouter(
    */
   router.put('/:id', requireAdminAuth, async (req: Request, res: Response) => {
     try {
-      const { id } = req.params;
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const updates = req.body as UpdateAlbumRequest;
 
       // Validaciones defensivas de precios

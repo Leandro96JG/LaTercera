@@ -62,7 +62,32 @@ Plataforma web e-commerce mobile-first orientada a la venta de fotografías de p
 - [x] Persistencia de Base de Datos Real con **Supabase (PostgreSQL)** y Patrón Repository con **141 tests unitarios pasando en total** (102 backend + 39 frontend).
 - [x] Arquitectura de Almacenamiento Dual en la Nube con **Supabase Storage Buckets** (`previews` CDN público y `originals` privado Zero-Trust con RLS), **149 tests unitarios pasando en total** (110 backend + 39 frontend).
 - [x] Gestión Dinámica de Álbumes, Creación de Eventos y Edición de Precios desde el Panel Administrativo con **169 tests unitarios pasando en total** (122 backend + 47 frontend).
+- [x] Resiliencia de Persistencia en Supabase (FK Desacoplada en `order_items`), Paginación Escalable Bento (Backend/Frontend), Rediseño de Modal y Glitches Tipográficos con **176 tests unitarios pasando en total** (126 backend + 50 frontend).
 - [ ] Preparación para Despliegue en Producción (CI/CD, Railway/Render para Backend, Vercel/Cloudflare Pages para Frontend).
+
+### ADR-017: Resiliencia Transaccional de Órdenes, Paginación Escalable y Refinamiento Bento UX
+- **Motivación & RCA (Root Cause Analysis):**
+  - *FK Constraint Violation en Supabase:* `order_items_photo_id_fkey` fallaba al comprar fotos con identificadores externos o dinámicos que no residían previamente en la tabla `photos`. Provocaba órdenes con `items: []` impidiendo la descarga en `/pago-exitoso`.
+  - *Glitch Tipográfico `\$`:* El escape innecesario de `\$` en plantillas Angular e interpolación TypeScript en strings con backticks generaba una barra literal antes del signo dólar en portada, carrito y checkout.
+  - *Feedback y Estabilidad en Panel Admin:* Los botones de guardado de precios y alternancia de publicación carecían de feedback in-card directo y no refrescaban el catálogo público al regresar al portfolio sin recargar la página (F5).
+  - *Deformación del Modal de Creación:* Ocupaba el 100% del ancho de la pantalla por interacción con el containing block de `backdrop-blur-3xl` en el contenedor padre.
+  - *Escalabilidad de Catálogo (Paginación):* Carga monolítica sin límites amenazaba el rendimiento móvil frente a decenas o cientos de eventos y partidos.
+- **Resolución Arquitectónica:**
+  - **Ledger Inmutable en PostgreSQL (`patch-order-items-fk.sql` & `schema.sql`):** Desacoplamiento de `order_items.photo_id` de la clave foránea dura a `photos(id)`. Las compras quedan blindadas como registros contables históricos inmutables. `order.repository.ts` implementa además un upsert preventivo con `ignoreDuplicates: true` para tolerar entornos no migrados.
+  - **Paginación Escalable Retrocompatible (ODD Nivel 3):**
+    - Contratos `PaginationMeta`, `AlbumPaginationOptions` y `PaginatedAlbumsResult`.
+    - `SupabaseAlbumRepository` implementa `.range(from, to)` con cálculo de límites y cláusulas `order('created_at', { ascending: false })`.
+    - Endpoints `GET /api/albums?page=X` y `GET /api/admin/albums?page=X` con clamping estricto (`Math.max(1, ...)`, `Math.min(50, ...)`).
+    - Preservación del 100% de retrocompatibilidad: omitir `?page` retorna el payload sin paginar histórico.
+    - Controles visuales Bento en Frontend (portfolio público y administración) con botones elásticos `← Anterior`, selector numérico activo y `Siguiente →`.
+  - **Tipografía y Entidades HTML:** Reemplazo por entidad HTML estándar `&dollar;` en componentes con templates inline (`floating-cart.component.ts`, `checkout-modal.component.ts`) y sintaxis limpia `${{ ... }}` en `app.html`.
+  - **Micro-estados y Refresco Automático:** Señales reactivas `isTogglingPublishId` y `updatingAlbumId` con feedback en tarjeta. Navegación en `app.ts` (`goHome`, `switchView('portfolio')`) invoca `loadPublicAlbums()`, manteniendo sincronía instantánea entre panel admin y tienda pública.
+  - **Contención del Modal Bento:** Estructura en columna flex, `max-w-xl` (576px estricto), `max-h-[85vh]`, cabecera y pie fijos (`shrink-0`) y scroll interno suave (`overflow-y-auto flex-1`), eliminando cualquier estiramiento o deformación.
+- **Suite de Pruebas y Evidencia Demostrable:**
+  - 126 tests unitarios pasando en Backend (20 suites).
+  - 50 tests unitarios pasando en Frontend (7 suites).
+  - **176 tests pasando al 100%**.
+  - Auditoría Guardian Angel pre-commit: **APROBADO ✅**.
 
 ### ADR-016: Gestión Dinámica de Álbumes, Creación de Eventos y Edición de Precios desde el Panel Administrativo
 - **Motivación & Requerimiento:**

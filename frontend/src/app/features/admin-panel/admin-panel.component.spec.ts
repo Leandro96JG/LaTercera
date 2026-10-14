@@ -339,4 +339,51 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
     expect(mockAdminService.createAlbum).not.toHaveBeenCalled();
     expect(component.createAlbumError()).toContain('no puede ser mayor');
   });
+
+  it('debe alternar la visibilidad de un álbum con togglePublishStatus y mostrar feedback', () => {
+    mockAdminService.updateAlbum.mockReturnValue(of({
+      success: true,
+      album: {
+        ...initialMockAlbum,
+        isPublished: false
+      },
+      message: 'Álbum actualizado'
+    }));
+
+    component.togglePublishStatus(initialMockAlbum);
+
+    expect(mockAdminService.updateAlbum).toHaveBeenCalledWith('album-1', { isPublished: false });
+    expect(component.isTogglingPublishId()).toBe(null);
+    expect(component.albums().find(a => a.id === 'album-1')?.isPublished).toBe(false);
+    expect(component.updateFeedback()?.success).toBe(true);
+    expect(component.updateFeedback()?.message).toContain('ocultado');
+  });
+
+  it('debe paginar los álbumes en la vista de administración', () => {
+    // Simular 8 álbumes en el panel
+    const mockList = Array.from({ length: 8 }, (_, i) => ({
+      ...initialMockAlbum,
+      id: `album-${i + 1}`,
+      title: `Álbum #${i + 1}`
+    }));
+
+    component.albums.set(mockList);
+    component.pageSize.set(3);
+
+    expect(component.totalPages()).toBe(3);
+    expect(component.paginatedAlbums().length).toBe(3);
+    expect(component.currentPage()).toBe(1);
+
+    component.nextPage();
+    expect(component.currentPage()).toBe(2);
+    expect(component.paginatedAlbums().length).toBe(3);
+
+    component.nextPage();
+    expect(component.currentPage()).toBe(3);
+    expect(component.paginatedAlbums().length).toBe(2);
+
+    component.prevPage();
+    expect(component.currentPage()).toBe(2);
+  });
 });
+

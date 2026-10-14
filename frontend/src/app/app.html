@@ -82,7 +82,7 @@
 
         <!-- Grilla Bento de Álbumes -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          @for (album of filteredAlbums(); track album.id) {
+          @for (album of paginatedAlbums(); track album.id) {
             <div
               (click)="openAlbum(album)"
               class="group bg-white rounded-[30px] p-5 border border-black/[0.05] shadow-bento hover:shadow-bento-hover transition-all duration-300 cursor-pointer flex flex-col justify-between"
@@ -119,7 +119,7 @@
                 <div>
                   <span class="text-[10px] text-zinc-400 block font-medium">Desde</span>
                   <span class="font-display font-extrabold text-sm text-zinc-900">
-                    \${{ album.unitPrice.toLocaleString('es-AR') }} ARS
+                    ${{ album.unitPrice.toLocaleString('es-AR') }} ARS
                   </span>
                 </div>
                 <span class="px-3.5 py-1.5 rounded-xl bg-zinc-100 group-hover:bg-zinc-950 group-hover:text-white text-zinc-800 text-xs font-bold transition">
@@ -129,6 +129,51 @@
             </div>
           }
         </div>
+
+        <!-- Barra de Paginación Bento de Álbumes -->
+        @if (filteredAlbums().length > 0) {
+          <div class="mt-8 pt-6 border-t border-black/[0.05] flex flex-col sm:flex-row items-center justify-between gap-4">
+            <span class="text-xs text-zinc-500 font-medium order-2 sm:order-1">
+              Mostrando <strong class="text-zinc-900 font-bold">{{ showingFrom() }}</strong> a
+              <strong class="text-zinc-900 font-bold">{{ showingTo() }}</strong> de
+              <strong class="text-zinc-900 font-bold">{{ filteredAlbums().length }}</strong> álbumes
+            </span>
+
+            @if (totalPages() > 1) {
+              <div class="inline-flex items-center gap-1.5 p-1 rounded-2xl bg-white border border-black/[0.06] shadow-sm order-1 sm:order-2">
+                <button
+                  type="button"
+                  (click)="prevPage()"
+                  [disabled]="currentPage() === 1"
+                  class="px-3 py-1.5 rounded-xl text-xs font-bold text-zinc-700 hover:bg-zinc-100 disabled:opacity-30 disabled:pointer-events-none transition flex items-center gap-1"
+                >
+                  ← Anterior
+                </button>
+
+                @for (p of paginationPages(); track p) {
+                  <button
+                    type="button"
+                    (click)="goToPage(p)"
+                    [class]="currentPage() === p
+                      ? 'w-8 h-8 rounded-xl bg-zinc-950 text-white font-extrabold text-xs shadow-sm transition'
+                      : 'w-8 h-8 rounded-xl text-zinc-600 hover:bg-zinc-100 font-bold text-xs transition'"
+                  >
+                    {{ p }}
+                  </button>
+                }
+
+                <button
+                  type="button"
+                  (click)="nextPage()"
+                  [disabled]="currentPage() === totalPages()"
+                  class="px-3 py-1.5 rounded-xl text-xs font-bold text-zinc-700 hover:bg-zinc-100 disabled:opacity-30 disabled:pointer-events-none transition flex items-center gap-1"
+                >
+                  Siguiente →
+                </button>
+              </div>
+            }
+          </div>
+        }
       </section>
     </div>
   }
@@ -172,7 +217,7 @@
             (click)="buyFullAlbum()"
             class="px-5 py-3 rounded-2xl bg-zinc-950 hover:bg-zinc-800 text-white font-bold text-xs shadow-md transition active:scale-95 flex items-center gap-2"
           >
-            <span>Comprar Álbum Completo (\${{ album.fullAlbumPrice.toLocaleString('es-AR') }})</span>
+            <span>Comprar Álbum Completo (${{ album.fullAlbumPrice.toLocaleString('es-AR') }})</span>
             <span>⚡</span>
           </button>
         </div>
@@ -218,7 +263,7 @@
             <div class="flex items-center justify-between pt-3 px-1">
               <div>
                 <span class="text-[11px] font-bold text-zinc-800 block">Foto #{{ idx + 1 }}</span>
-                <span class="text-[10px] text-zinc-400">4K Original • \$1.200 ARS</span>
+                <span class="text-[10px] text-zinc-400">4K Original • ${{ album.unitPrice.toLocaleString('es-AR') }} ARS</span>
               </div>
 
               <!-- Botón Toggle Selección -->

@@ -295,5 +295,34 @@ describe('Admin Albums API Endpoints (/api/admin/albums)', () => {
       const data = await res.json();
       expect(data.error).toContain('no encontrado');
     });
+
+    it('GET /api/admin/albums?page=1&limit=2 debe retornar álbumes paginados con metadata', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/albums?page=1&limit=2`, {
+        headers: {
+          Authorization: `Bearer ${adminToken}`
+        }
+      });
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(data.albums.length).toBeLessThanOrEqual(2);
+      expect(data.pagination).toBeDefined();
+      expect(data.pagination.page).toBe(1);
+      expect(data.pagination.limit).toBe(2);
+      expect(data.pagination.total).toBeGreaterThanOrEqual(1);
+    });
+
+    it('GET /api/albums?page=1&limit=2 público debe retornar catálogo paginado', async () => {
+      const res = await fetch(`${baseUrl}/api/albums?page=1&limit=2`);
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(data.albums.length).toBeLessThanOrEqual(2);
+      expect(data.pagination).toBeDefined();
+      expect(data.pagination.page).toBe(1);
+      expect(data.pagination.limit).toBe(2);
+    });
   });
 });
+

@@ -194,6 +194,19 @@ export class SupabaseOrderRepository implements IOrderRepository {
 
     // 2. Insertar items individuales si no es full album
     if (!order.isFullAlbum && order.photoIds.length > 0) {
+      // Aseguramos que las fotos existan en la tabla 'photos' para prevenir fallas de FK
+      const photoUpserts = order.photoIds.map(pId => ({
+        id: pId,
+        album_id: order.albumId,
+        filename: `${pId}.jpg`,
+        original_path: `originals/${order.albumId}/${pId}.jpg`,
+        preview_url: `previews/${order.albumId}/${pId}.webp`
+      }));
+
+      await this.supabase
+        .from('photos')
+        .upsert(photoUpserts, { onConflict: 'id', ignoreDuplicates: true });
+
       const items = order.photoIds.map(pId => ({
         order_id: order.id,
         photo_id: pId
@@ -204,7 +217,7 @@ export class SupabaseOrderRepository implements IOrderRepository {
         .insert(items);
 
       if (itemsError) {
-        console.warn(`[Supabase Warning order_items] ${itemsError.message}`);
+        console.error(`[Supabase Error order_items] ${itemsError.message}`);
       }
     }
 
@@ -297,7 +310,7 @@ export class SupabaseOrderRepository implements IOrderRepository {
     paymentId?: string,
     downloadToken?: string
   ): Promise<Order | null> {
-    const updates: any = {
+    const updates: Record<string, unknown> = {
       status,
       updated_at: new Date().toISOString()
     };

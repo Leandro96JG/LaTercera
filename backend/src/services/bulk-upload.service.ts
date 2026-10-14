@@ -145,7 +145,7 @@ export class BulkUploadService {
           height: processed.height,
           originalSize: file.buffer.length,
           previewSize: processed.previewBuffer.length,
-          format: processed.format,
+          format: 'webp' as const,
           isHD
         };
       },

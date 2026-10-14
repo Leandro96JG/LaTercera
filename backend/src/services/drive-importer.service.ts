@@ -227,7 +227,7 @@ export class GoogleDriveImporterService {
           height: processed.height,
           originalSize: rawBuffer.length,
           previewSize: processed.previewBuffer.length,
-          format: processed.format,
+          format: 'webp' as const,
           isHD
         };
       },
