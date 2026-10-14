@@ -60,7 +60,8 @@ Plataforma web e-commerce mobile-first orientada a la venta de fotografías de p
 - [x] Panel administrativo completo con subida masiva drag-and-drop, métricas en vivo y registro de fotógrafos colaboradores para escalabilidad futura.
 - [x] Flujo de Entrega Post-Pago, Streaming de Descargas y Pantalla de Éxito (`/pago-exitoso`) con **127 tests unitarios pasando en total** (88 backend + 39 frontend).
 - [x] Persistencia de Base de Datos Real con **Supabase (PostgreSQL)** y Patrón Repository con **141 tests unitarios pasando en total** (102 backend + 39 frontend).
-- [ ] Configuración asistida de variables de entorno de Supabase por el usuario (`.env`) y verificación de conectividad live.
+- [x] Configuración de variables de entorno de Supabase y verificación de conectividad live exitosa (4 álbumes, fotógrafa Jenifer Espeche, órdenes e inserciones comprobadas en tiempo real).
+- [ ] Preparación para Despliegue en Producción (CI/CD, Railway/Render para Backend, Vercel/Cloudflare Pages para Frontend).
 
 ### ADR-014: Persistencia en Supabase (PostgreSQL) y Patrón Repository Desacoplado
 - **Esquema Relacional (`backend/database/schema.sql`):**
