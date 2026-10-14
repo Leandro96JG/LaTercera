@@ -61,7 +61,21 @@ Plataforma web e-commerce mobile-first orientada a la venta de fotografías de p
 - [x] Flujo de Entrega Post-Pago, Streaming de Descargas y Pantalla de Éxito (`/pago-exitoso`) con **127 tests unitarios pasando en total** (88 backend + 39 frontend).
 - [x] Persistencia de Base de Datos Real con **Supabase (PostgreSQL)** y Patrón Repository con **141 tests unitarios pasando en total** (102 backend + 39 frontend).
 - [x] Configuración de variables de entorno de Supabase y verificación de conectividad live exitosa (4 álbumes, fotógrafa Jenifer Espeche, órdenes e inserciones comprobadas en tiempo real).
+- [x] Arquitectura de Almacenamiento Dual en la Nube con **Supabase Storage Buckets** (`previews` CDN público y `originals` privado Zero-Trust con RLS), **149 tests unitarios pasando en total** (110 backend + 39 frontend).
 - [ ] Preparación para Despliegue en Producción (CI/CD, Railway/Render para Backend, Vercel/Cloudflare Pages para Frontend).
+
+### ADR-015: Arquitectura de Almacenamiento Dual en Supabase Storage (Zero-Trust & CDN Caching)
+- **Capa Dual de Buckets:**
+  - `previews` (Público): Miniaturas WebP de 800px procesadas con Sharp y marca de agua repetida en píxeles. Caché CDN inmutable (1 año) con entrega ultra-rápida en frontend. Límite de 5 MB por archivo.
+  - `originals` (Privado Zero-Trust): Fotos HD originales sin marca de agua (hasta 50 MB). Bloqueo total de lectura anónima en RLS. Solo accesible mediante URLs firmadas con vencimiento de 72 horas (`createSignedDownloadUrl`) o streaming seguro por el backend Express con `SERVICE_ROLE_KEY`.
+- **Contratos e Implementación Desacoplada (`src/services/storage.service.ts`):**
+  - Interfaz abstracta `IStorageService` con métodos `saveOriginal`, `savePreview`, `getOriginalBuffer`, `createSignedDownloadUrl` y `ensureBucketsExist`.
+  - Implementaciones: `SupabaseStorageService` (Cloud), `LocalDiskStorageService` (disco local) y `MemoryStorageService` (memoria pura para tests).
+  - Factory híbrido `createStorageService()` con detección automática de variables de entorno y fallback defensivo offline/CI.
+- **Seguridad RLS (`backend/database/storage.sql`):**
+  - Función de seguridad `is_storage_admin()` basada en roles y verificación contra tabla `photographers`.
+  - Políticas de inserción, actualización y borrado restringidas exclusivamente a administradores y Service Role en ambos buckets.
+- **Suite de Pruebas y Evidencia:** 110 tests pasando en backend (20 archivos) y 39 tests pasando en frontend (7 archivos), totalizando 149 tests pasando al 100%. Auditoría Guardian Angel pre-commit APROBADA.
 
 ### ADR-014: Persistencia en Supabase (PostgreSQL) y Patrón Repository Desacoplado
 - **Esquema Relacional (`backend/database/schema.sql`):**
