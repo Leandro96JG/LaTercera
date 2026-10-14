@@ -59,6 +59,20 @@ Plataforma web e-commerce mobile-first orientada a la venta de fotografías de p
 - [x] Importador de carpetas compartidas de Google Drive con Sharp (Anti-OOM worker pool concurrente, validación de magic bytes y generación de WebP 800px protegidos).
 - [x] Panel administrativo completo con subida masiva drag-and-drop, métricas en vivo y registro de fotógrafos colaboradores para escalabilidad futura.
 - [x] Flujo de Entrega Post-Pago, Streaming de Descargas y Pantalla de Éxito (`/pago-exitoso`) con **127 tests unitarios pasando en total** (88 backend + 39 frontend).
+- [x] Persistencia de Base de Datos Real con **Supabase (PostgreSQL)** y Patrón Repository con **136 tests unitarios pasando en total** (97 backend + 39 frontend).
+
+### ADR-014: Persistencia en Supabase (PostgreSQL) y Patrón Repository Desacoplado
+- **Esquema Relacional (`backend/database/schema.sql`):**
+  - Tablas: `photographers` (scrypt hash, multi-rol), `albums` (disciplinas deportivas y sociales, precios, fechas), `photos` (rutas públicas y privadas), `orders` (Zero-Trust, ARS), `order_items` (fotos adquiridas) y `processed_webhook_events` (idempotencia transaccional).
+  - Índices B-Tree optimizados en `album_id`, `status`, `customer_email`, `payment_id` y `created_at`.
+  - Políticas Row Level Security (RLS) habilitadas: lectura anónima acotada a álbumes publicados y fotos preview; operaciones de modificación protegidas con `SERVICE_ROLE_KEY` en el backend.
+- **Patrón Repository Híbrido (`src/repositories/`):**
+  - Interfaces desacopladas `IOrderRepository` e `IAlbumRepository`.
+  - Implementaciones duales: `SupabaseOrderRepository` / `SupabaseAlbumRepository` (producción) y `MemoryOrderRepository` / `MemoryAlbumRepository` (pruebas locales/CI sin conexión).
+  - Factory de inyección defensiva (`createOrderRepository`, `createAlbumRepository`) con detección automática de variables de entorno (`isSupabaseConfigured()`).
+  - Cache sincronizado Write-Through en `OrderService` para máxima velocidad de lectura sin sacrificar persistencia ACID.
+- **Variables de Entorno y Secretos:**
+  - `SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY` registradas en `.env.example`.
 
 ### ADR-013: Flujo de Entrega Post-Pago, Streaming de Descargas y Pantalla de Éxito (/pago-exitoso)
 - **Endpoints de Entrega y Streaming:**

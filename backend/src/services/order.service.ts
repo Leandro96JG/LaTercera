@@ -53,6 +53,8 @@ export interface PaymentVerificationInput {
   transactionAmount: number;
 }
 
+import { IOrderRepository, MemoryOrderRepository } from '../repositories/order.repository';
+
 export interface ProcessWebhookPaymentInput extends PaymentVerificationInput {
   eventId: string;
   orderId: string;
@@ -62,9 +64,11 @@ export class OrderService {
   private orders: Map<string, Order> = new Map();
   private processedEventIds: Set<string> = new Set();
   private tokenService: DownloadTokenService;
+  private repository: IOrderRepository;
 
-  constructor(tokenService: DownloadTokenService) {
+  constructor(tokenService: DownloadTokenService, repository?: IOrderRepository) {
     this.tokenService = tokenService;
+    this.repository = repository || new MemoryOrderRepository();
   }
 
   /**
@@ -113,6 +117,9 @@ export class OrderService {
     };
 
     this.orders.set(order.id, order);
+    this.repository.create(order).catch(err => {
+      console.warn(`[Persistencia Warning] Error guardando orden en repositorio: ${err.message}`);
+    });
     return order;
   }
 
@@ -120,11 +127,26 @@ export class OrderService {
     return this.orders.get(id);
   }
 
+  public async getOrderAsync(id: string): Promise<Order | null> {
+    const cached = this.orders.get(id);
+    if (cached) return cached;
+
+    const fromDb = await this.repository.findById(id);
+    if (fromDb) {
+      this.orders.set(fromDb.id, fromDb);
+      return fromDb;
+    }
+    return null;
+  }
+
   public updateOrderPreferenceId(orderId: string, preferenceId: string): void {
     const order = this.orders.get(orderId);
     if (order) {
       order.preferenceId = preferenceId;
       order.updatedAt = new Date().toISOString();
+      this.repository.update(order).catch(err => {
+        console.warn(`[Persistencia Warning] Error actualizando preferencia: ${err.message}`);
+      });
     }
   }
 
@@ -187,6 +209,10 @@ export class OrderService {
     order.downloadToken = downloadToken;
     order.updatedAt = new Date().toISOString();
 
+    this.repository.updateStatus(order.id, 'PAID', payment.paymentId, downloadToken).catch(err => {
+      console.warn(`[Persistencia Warning] Error actualizando estado de pago: ${err.message}`);
+    });
+
     return { success: true };
   }
 
@@ -209,6 +235,7 @@ export class OrderService {
     // Si la orden ya está pagada (por una notificación previa concurrente)
     if (order.status === 'PAID') {
       this.processedEventIds.add(input.eventId);
+      this.repository.markEventProcessed(input.eventId, input.orderId).catch(() => {});
       return { success: true, alreadyProcessed: true };
     }
 
@@ -216,6 +243,7 @@ export class OrderService {
 
     if (result.success || result.fraudAlert) {
       this.processedEventIds.add(input.eventId);
+      this.repository.markEventProcessed(input.eventId, input.orderId).catch(() => {});
     }
 
     return {

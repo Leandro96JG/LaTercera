@@ -15,6 +15,8 @@ import { createAdminRouter } from './routes/admin.routes';
 import { createAdminAlbumsRouter, adminAlbumsRouter } from './routes/admin-albums.routes';
 import { createDownloadsRouter } from './routes/downloads.routes';
 
+import { createOrderRepository, createAlbumRepository } from './repositories';
+
 dotenv.config();
 
 const app = express();
@@ -32,8 +34,10 @@ const MP_WEBHOOK_SECRET =
 const JWT_SECRET =
   process.env.JWT_SECRET || 'secreto_para_autenticacion_jwt_admin_la_tercera_32c';
 
+export const orderRepository = createOrderRepository();
+export const albumRepository = createAlbumRepository();
 export const tokenService = new DownloadTokenService(DOWNLOAD_TOKEN_SECRET);
-export const orderService = new OrderService(tokenService);
+export const orderService = new OrderService(tokenService, orderRepository);
 export const mpService = new MercadoPagoService(MP_ACCESS_TOKEN, MP_WEBHOOK_SECRET, orderService);
 export const adminAuthService = new AdminAuthService(JWT_SECRET);
 export const storageService = new LocalDiskStorageService();
@@ -107,60 +111,17 @@ app.post('/api/images/process', upload.single('photo'), async (req: Request, res
   }
 });
 
-// Endpoint: Catálogo de Álbumes
-app.get('/api/albums', (req: Request, res: Response) => {
-  const sampleAlbums = [
-    {
-      id: 'album-1',
-      category: 'futbol',
-      title: 'Atlético Tesorieri vs Andino SC',
-      subtitle: 'Liga Riojana de Fútbol • Fecha 7',
-      date: '12 Octubre, 2026',
-      photosCount: 48,
-      unitPrice: 1200,
-      fullAlbumPrice: 9500,
-      coverUrl: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=800&q=80',
-      badge: '⚽ Fútbol'
-    },
-    {
-      id: 'album-2',
-      category: 'hockey',
-      title: 'Torneo Provincial de Hockey Femenino',
-      subtitle: 'Polideportivo Evita • Semifinales',
-      date: '5 Octubre, 2026',
-      photosCount: 36,
-      unitPrice: 1200,
-      fullAlbumPrice: 9500,
-      coverUrl: 'https://images.unsplash.com/photo-1589487391730-58f20eb2c308?auto=format&fit=crop&w=800&q=80',
-      badge: '🏑 Hockey'
-    },
-    {
-      id: 'album-3',
-      category: 'basquet',
-      title: 'Facundo vs Banco Rioja (Primera Básquet)',
-      subtitle: 'Torneo Clausura de Básquetbol',
-      date: '28 Septiembre, 2026',
-      photosCount: 42,
-      unitPrice: 1200,
-      fullAlbumPrice: 9500,
-      coverUrl: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=800&q=80',
-      badge: '🏀 Básquet'
-    },
-    {
-      id: 'album-4',
-      category: 'sociales',
-      title: 'Cumpleaños de 15 de Martina',
-      subtitle: 'Salón Las Retamas • Festejo & Baile',
-      date: '20 Septiembre, 2026',
-      photosCount: 85,
-      unitPrice: 1200,
-      fullAlbumPrice: 9500,
-      coverUrl: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=800&q=80',
-      badge: '🎉 Cumpleaños & Social'
-    }
-  ];
-
-  res.json({ albums: sampleAlbums });
+// Endpoint: Catálogo de Álbumes (Conectado a Persistencia Repository / Supabase)
+app.get('/api/albums', async (req: Request, res: Response) => {
+  try {
+    const rawCat = req.query.category as string | undefined;
+    const category = Array.isArray(rawCat) ? rawCat[0] : rawCat;
+    const albums = await albumRepository.findAll(category);
+    res.json({ albums });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Error al obtener álbumes';
+    res.status(500).json({ error: message });
+  }
 });
 
 // Endpoint: Creación de Preferencia de Pago en Mercado Pago (Zero-Trust)
