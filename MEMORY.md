@@ -63,7 +63,27 @@ Plataforma web e-commerce mobile-first orientada a la venta de fotografías de p
 - [x] Arquitectura de Almacenamiento Dual en la Nube con **Supabase Storage Buckets** (`previews` CDN público y `originals` privado Zero-Trust con RLS), **149 tests unitarios pasando en total** (110 backend + 39 frontend).
 - [x] Gestión Dinámica de Álbumes, Creación de Eventos y Edición de Precios desde el Panel Administrativo con **169 tests unitarios pasando en total** (122 backend + 47 frontend).
 - [x] Resiliencia de Persistencia en Supabase (FK Desacoplada en `order_items`), Paginación Escalable Bento (Backend/Frontend), Rediseño de Modal y Glitches Tipográficos con **176 tests unitarios pasando en total** (126 backend + 50 frontend).
+- [x] Diagnóstico en Caliente del Proceso Backend (PID 2324 obsoleto eliminado, servidor reiniciado y validado en vivo con 200 OK en PUT y persistencia Supabase confirmada).
 - [ ] Preparación para Despliegue en Producción (CI/CD, Railway/Render para Backend, Vercel/Cloudflare Pages para Frontend).
+
+### ADR-018: Diagnóstico en Caliente del Servidor y Verificación Integral de Persistencia Supabase
+- **Causa Raíz Diagnosticada (RCA):**
+  - El servidor backend en el puerto 4000 estaba ejecutándose sobre un proceso obsoleto (PID 2324) iniciado a las 11:49 a. m., antes de la compilación y montaje de las rutas `PUT /api/admin/albums/:id` y de las mejoras en `order.repository.ts`.
+  - El navegador recibía `404 Cannot PUT /api/admin/albums/...`, lo que provocaba que el frontend mostrara los errores genéricos de "Error al guardar precios" y "Error al actualizar visibilidad".
+  - La base de datos Supabase PostgreSQL siempre estuvo operativa, pero el proceso en memoria anterior no tenía registrada la ruta PUT.
+- **Acciones Ejecutadas:**
+  - Terminación del proceso obsoleto (PID 2324) y liberación del puerto 4000.
+  - Recompilación limpia del backend (`tsc`).
+  - Inicio del servidor actualizado en modo daemon en el puerto 4000.
+  - Verificación en caliente con sondeo HTTP y token JWT:
+    - `PUT /api/admin/albums/album-1` (modificación de precios): `200 OK`.
+    - `PUT /api/admin/albums/album-1` (alternancia `isPublished` true/false): `200 OK`.
+    - Verificación directa en base de datos Supabase: persistencia y timestamp `updated_at` confirmados en tiempo real.
+    - `GET /api/albums?page=1&limit=6`: `200 OK` con respuesta paginada de 6 álbumes sobre 14 totales.
+- **Resiliencia de Base de Datos:**
+  - Se confirmó que el método defensivo `upsert` en `photos` implementado en `order.repository.ts` previene al 100% el error de clave foránea `order_items_photo_id_fkey`, incluso si la migración DDL no se hubiese ejecutado manualmente en Supabase.
+- **Suite de Pruebas:** 176 tests pasando al 100% (126 backend + 50 frontend).
+
 
 ### ADR-017: Resiliencia Transaccional de Órdenes, Paginación Escalable y Refinamiento Bento UX
 - **Motivación & RCA (Root Cause Analysis):**
