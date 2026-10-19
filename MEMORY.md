@@ -104,6 +104,34 @@ Plataforma web e-commerce mobile-first orientada a la venta de fotografías de p
 - [x] Concurrencia Atómica en Cupones Supabase, Validación de Pertenencia & Anti-Traversal de Fotos en Checkout y Métricas Dinámicas de Almacenamiento con **415 tests unitarios pasando al 100%** (212 backend + 203 frontend).
 - [x] Optimización de Consulta por Email en Supabase (`findOrdersByEmail`), Respaldo por Correo de Recuperación en Segundo Plano, Comprobante Opcional en Modal y Enlace Oficial de Instagram con **416 tests unitarios pasando al 100%** (212 backend + 204 frontend).
 - [x] Configuración de Despliegue en Producción: Dockerfile Multi-Stage en Alpine 20 con Sharp, Railway Healthcheck `/api/health`, Vercel SPA Rewrites, Cloudflare Pages `_redirects` y `environment.ts` Reactivo con **425 tests unitarios pasando al 100%** (214 backend + 211 frontend).
+- [x] Vinculación Vercel-Railway en Vivo (Proxy API `laterceralr.up.railway.app`), Deselección de Álbum Completo en Carrito y Optimización Touch 3D 120fps con **426 tests unitarios pasando al 100%** (214 backend + 212 frontend).
+
+### ADR-059: Vinculación Vercel-Railway en Vivo, Deselección de Álbum Completo en Carrito y Optimización Touch 3D 120fps
+- **Motivación y Diagnóstico:**
+  1. *Desconexión entre Frontend (Vercel) y Backend (Railway):* Al desplegar el frontend en `https://la-tercera.vercel.app`, las llamadas HTTP a `/api/...` fallaban con 404 porque Vercel no ejecutaba el backend Express. Esto activaba el modo de respaldo offline mostrando álbumes de muestra viejos en lugar del catálogo limpio de Supabase.
+  2. *Imposibilidad de Deseleccionar Álbum Completo en el Carrito:* Al seleccionar el modo de Álbum Completo (`isFullAlbum: true`), el botón "Vaciar" se ocultaba y la tarjeta del pack no ofrecía ninguna acción interactiva para cancelar o deseleccionar el álbum.
+  3. *Caídas de Frames (Jank/Lag) en Celulares durante el Scroll:* `album-card-3d.component.ts` ejecutaba `getBoundingClientRect()` en cada evento `touchmove` mientras el usuario arrastraba el feed con el dedo, forzando recálculos sincrónicos continuos de geometría (layout thrashing) en el hilo principal del navegador móvil.
+- **Solución Técnica Implementada:**
+  1. **Proxy Reverso de API en Vercel (`frontend/vercel.json` y `vercel.json`):**
+     - Añadida regla de reescritura hacia el backend en producción:
+       ```json
+       {
+         "source": "/api/(.*)",
+         "destination": "https://laterceralr.up.railway.app/api/$1"
+       }
+       ```
+     - Todas las peticiones del frontend a `/api/...` se envían con mismo origen (Zero-CORS) a través de la red Edge de Vercel hacia Railway.
+  2. **Deselección de Álbum Completo (`CartStore` y `FloatingCartComponent`):**
+     - Creado método `removeFullAlbum()` en `CartStore` para desactivar el modo de paquete preservando las fotos seleccionadas previamente.
+     - Botón "Vaciar" ahora visible siempre que `cartStore.hasItems()` sea true.
+     - Agregado botón explícito `🗑️ Quitar Álbum` dentro de la tarjeta destacada de Álbum Completo en el drawer deslizable.
+     - Test unitario agregado en `cart.store.spec.ts` validando el comportamiento.
+  3. **Optimización de Scroll Móvil a 120fps en `AlbumCard3dComponent`:**
+     - Eliminado el listener de host `(touchmove)` que disparaba `getBoundingClientRect()`.
+     - Preservada la apertura suave con `IntersectionObserver` y aceleración por GPU compuesta (`transform-gpu`, `will-change: transform`).
+- **Evidencia y Validación:**
+  - Backend en vivo validado con 200 OK: `https://laterceralr.up.railway.app/api/health` y `/api/categories`.
+  - Frontend con 212 tests unitarios pasando al 100%. Backend con 214 tests unitarios pasando al 100%. Total: 426 tests.
 
 ### ADR-058: Configuración de Despliegue en Producción (Docker Multi-Stage Alpine 20 con Sharp, Railway Healthcheck, Vercel SPA Rewrites, Cloudflare Pages `_redirects` y `environment.ts` Reactivo)
 - **Motivación y Diagnóstico:**
