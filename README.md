@@ -221,20 +221,6 @@ El repositorio está preconfigurado para despliegues continuos automatizados:
 
 ---
 
-## 🔐 Acceso al Panel de Administración
-
-El panel administrativo es privado y está protegido por criptografía de grado militar:
-
-- **Rutas de Acceso:**
-  1. Escribiendo la URL directa: `https://la-tercera.vercel.app/admin` (o añadiendo `?admin=true`).
-  2. Haciendo clic en el botón discreto del pie de página: **`🔒 Acceso Fotógrafa`**.
-  3. Presionando el atajo de teclado en PC: **`Ctrl + Shift + A`**.
-- **Credenciales Iniciales:**
-  - **Email:** `fotografa@latercera.com.ar` *(o el configurado en `ADMIN_EMAIL`)*.
-  - **Contraseña:** El valor asignado a la variable de entorno `ADMIN_PASSWORD` en Railway.
-
----
-
 ## 📄 Licencia y Derechos
 
 © 2026 **LA TERCERA Fotografía**. Desarrollado con dedicación para **Jenifer "Yuyo" Espeche** en La Rioja Capital, Argentina. Todos los derechos reservados sobre las imágenes y la identidad de marca.
