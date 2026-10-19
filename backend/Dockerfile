@@ -3,7 +3,7 @@
 # ==========================================
 # Etapa 1: Compilación (Build Stage)
 # ==========================================
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -29,7 +29,7 @@ RUN npm prune --production
 # ==========================================
 # Etapa 2: Entorno de Ejecución (Runtime Stage)
 # ==========================================
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 
 WORKDIR /app
 
