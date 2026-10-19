@@ -105,6 +105,24 @@ Plataforma web e-commerce mobile-first orientada a la venta de fotografías de p
 - [x] Optimización de Consulta por Email en Supabase (`findOrdersByEmail`), Respaldo por Correo de Recuperación en Segundo Plano, Comprobante Opcional en Modal y Enlace Oficial de Instagram con **416 tests unitarios pasando al 100%** (212 backend + 204 frontend).
 - [x] Configuración de Despliegue en Producción: Dockerfile Multi-Stage en Alpine 20 con Sharp, Railway Healthcheck `/api/health`, Vercel SPA Rewrites, Cloudflare Pages `_redirects` y `environment.ts` Reactivo con **425 tests unitarios pasando al 100%** (214 backend + 211 frontend).
 - [x] Vinculación Vercel-Railway en Vivo (Proxy API `laterceralr.up.railway.app`), Deselección de Álbum Completo en Carrito y Optimización Touch 3D 120fps con **426 tests unitarios pasando al 100%** (214 backend + 212 frontend).
+- [x] Ruta Directa /admin en Inicialización SPA, Documentación Integral en README.md y Guía de Autenticación de Fotógrafa con **426 tests unitarios pasando al 100%** (214 backend + 212 frontend).
+
+### ADR-060: Ruta Directa /admin en Inicialización SPA, Documentación Integral en README.md y Guía de Autenticación de Fotógrafa
+- **Motivación y Diagnóstico:**
+  1. *Acceso Directo al Panel de Administración:* En dispositivos móviles y navegadores web, ingresar a `https://la-tercera.vercel.app/admin` o `?admin` cargaba la portada general en lugar de abrir el formulario de inicio de sesión administrativo. El acceso dependía exclusivamente del enlace del footer o del atajo de teclado (`Ctrl + Shift + A`), el cual no existe en smartphones o tablets.
+  2. *Presentación Profesional del Proyecto:* El repositorio requería un `README.md` de nivel producción con badges oficiales, enlaces en vivo, arquitectura del sistema en Mermaid, guía de instalación local, instrucciones de despliegue en Vercel/Railway y detalles de seguridad Zero-Trust.
+- **Solución Técnica Implementada:**
+  1. **Detección Temprana de Ruta en `frontend/src/app/app.ts`:**
+     - Agregada lógica en `ngOnInit()` para inspeccionar `window.location.pathname` y `window.location.search`.
+     - Si la URL contiene `/admin` o el parámetro `?admin`, el componente redirige reactivamente al panel administrativo (`admin-panel`) si ya existe una sesión activa y válida en `AdminAuthStore`, o a la pantalla de login (`admin-login`) si no hay token.
+  2. **Documentación Integral en `README.md`:**
+     - Badges de Angular 21, Node.js 22, Supabase, Mercado Pago, Docker, Railway, Vercel y Vitest.
+     - Enlaces a entornos de producción en vivo.
+     - Diagrama Mermaid del flujo completo (Frontend SPA -> Vercel Edge -> Railway API -> Supabase PostgreSQL & Storage / Mercado Pago).
+     - Explicación de credenciales (`fotografa@latercera.com.ar` + `ADMIN_PASSWORD`), registro de fotógrafos colaboradores y recuperación de compras.
+- **Evidencia y Validación:**
+  - 212 tests unitarios pasando en frontend (incluyendo `app.spec.ts` con 21 tests).
+  - 214 tests unitarios pasando en backend. Total de 426 tests sin regresiones.
 
 ### ADR-059: Vinculación Vercel-Railway en Vivo, Deselección de Álbum Completo en Carrito y Optimización Touch 3D 120fps
 - **Motivación y Diagnóstico:**

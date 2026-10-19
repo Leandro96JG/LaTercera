@@ -518,8 +518,16 @@ export class App implements OnInit, OnDestroy {
         params.has('token') ||
         window.location.pathname.includes('pago-exitoso');
 
+      const isAdminRoute =
+        params.has('admin') ||
+        window.location.pathname.includes('admin');
+
       if (isPaymentReturn) {
         this.transitionView(() => this.currentView.set('payment-success'));
+      } else if (isAdminRoute) {
+        this.transitionView(() => {
+          this.currentView.set(this.adminAuthStore.isAuthenticated() ? 'admin' : 'admin-login');
+        });
       }
 
       // Atajo administrativo discreto: Ctrl + Shift + A
