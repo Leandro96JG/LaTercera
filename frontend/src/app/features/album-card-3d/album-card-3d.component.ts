@@ -19,7 +19,8 @@ import { Album } from '../../core/models/album.model';
   imports: [CommonModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
-    'class': 'block select-none',
+    'class': 'block select-none animate-stagger-fade-in',
+    '[style.animation-delay]': 'staggerDelay()',
     '(pointerenter)': 'onPointerEnter()',
     '(pointerleave)': 'onPointerLeave()',
     '(pointermove)': 'onPointerMove($event)',
@@ -248,6 +249,13 @@ import { Album } from '../../core/models/album.model';
       box-shadow: 12px 14px 28px rgba(0, 0, 0, 0.55);
     }
 
+    @media (max-width: 640px) {
+      .flap-open {
+        transform: rotateY(-18deg) scale(0.98);
+        box-shadow: 8px 10px 20px rgba(0, 0, 0, 0.45);
+      }
+    }
+
     /* Brillo Especular Dinámico */
     .specular-shine {
       background: radial-gradient(
@@ -284,8 +292,14 @@ export class AlbumCard3dComponent {
 
   // Inputs
   public readonly album = input.required<Album>();
+  public readonly index = input<number>(0);
   public readonly isUnlocked = input<boolean>(false);
   public readonly isSelected = input<boolean>(false);
+
+  // Retraso de animación de entrada en cascada a 60fps
+  public readonly staggerDelay = computed<string>(() => {
+    return ((this.index() % 8) * 45) + 'ms';
+  });
 
   // View transition name único para morphing con el hero
   public readonly viewTransitionName = computed<string>(() => {

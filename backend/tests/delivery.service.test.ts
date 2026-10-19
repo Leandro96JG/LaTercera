@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { PassThrough } from 'stream';
 import { DownloadTokenService } from '../src/services/token.service';
 import { OrderService } from '../src/services/order.service';
 import { DeliveryService } from '../src/services/delivery.service';
@@ -283,5 +284,133 @@ describe('DeliveryService (TDD)', () => {
     const fileResult = await deliveryWithRepo.resolvePhotoFile(token, 'photo-1');
     expect(fileResult.success).toBe(true);
     expect(fileResult.photoId).toBe('photo-1');
+  });
+
+  it('debe empaquetar un archivo ZIP con formatos mixtos (.png, .jpg, .webp) preservando las extensiones correctas', async () => {
+    const albumRepo = new MemoryAlbumRepository();
+    const album = await albumRepo.createAlbum({
+      id: 'album-mix',
+      title: 'Torneo Multiformato La Rioja',
+      category: 'futbol',
+      photosCount: 3,
+      unitPrice: 1000,
+      fullAlbumPrice: 8000,
+      coverUrl: '/cover.webp'
+    });
+
+    // Guardar 3 fotos con extensiones mixtas en el repositorio
+    await albumRepo.addPhotosToAlbum(album.id, [
+      { id: 'foto-png', albumId: album.id, filename: 'jugada_gol.png', previewUrl: '/p1.webp', isSampleHd: false },
+      { id: 'foto-jpg', albumId: album.id, filename: 'festejo.jpg', previewUrl: '/p2.webp', isSampleHd: true },
+      { id: 'foto-webp', albumId: album.id, filename: 'equipo_completo.webp', previewUrl: '/p3.webp', isSampleHd: false }
+    ]);
+
+    // Guardar los buffers correspondientes en storageService con sus extensiones reales
+    const pngBuffer = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+    const jpgBuffer = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46]);
+    const webpBuffer = Buffer.from([0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50]);
+
+    await storageService.saveOriginal(album.id, 'foto-png', '.png', pngBuffer);
+    await storageService.saveOriginal(album.id, 'foto-jpg', '.jpg', jpgBuffer);
+    await storageService.saveOriginal(album.id, 'foto-webp', '.webp', webpBuffer);
+
+    const deliveryWithRepo = new DeliveryService(orderService, tokenService, storageService, albumRepo);
+
+    const order = orderService.createOrder({
+      albumId: album.id,
+      photoIds: ['foto-png', 'foto-jpg', 'foto-webp'],
+      customer: { email: 'comprador@mix.com', name: 'Marcos' }
+    });
+
+    orderService.verifyAndCompletePayment(order.id, {
+      paymentId: 'pay-mix-123',
+      status: 'approved',
+      currencyId: 'ARS',
+      transactionAmount: order.totalAmount
+    });
+
+    const paidOrder = orderService.getOrder(order.id)!;
+    const token = paidOrder.downloadToken!;
+
+    // Usamos PassThrough como mock de Response de Express
+    const chunks: Buffer[] = [];
+    const headers: Record<string, string> = {};
+    const mockRes: any = new PassThrough();
+    mockRes.setHeader = (name: string, val: string) => {
+      headers[name] = val;
+    };
+    mockRes.status = () => mockRes;
+    mockRes.json = () => {};
+
+    mockRes.on('data', (chunk: Buffer) => {
+      chunks.push(chunk);
+    });
+
+    const streamPromise = new Promise<void>((resolve, reject) => {
+      mockRes.on('finish', resolve);
+      mockRes.on('error', reject);
+    });
+
+    await deliveryWithRepo.streamOrderZip(token, mockRes);
+    await streamPromise;
+
+    expect(headers['Content-Type']).toBe('application/zip');
+    expect(headers['Content-Disposition']).toContain('LA_TERCERA_album-mix_FOTOS_HD.zip');
+
+    const zipBuffer = Buffer.concat(chunks);
+    expect(zipBuffer.length).toBeGreaterThan(0);
+
+    const zipString = zipBuffer.toString('latin1');
+    // Verificar que los nombres de archivo dentro del ZIP preservaron las extensiones reales
+    expect(zipString).toContain('LA_TERCERA_album-mix_foto-png.png');
+    expect(zipString).toContain('LA_TERCERA_album-mix_foto-jpg.jpg');
+    expect(zipString).toContain('LA_TERCERA_album-mix_foto-webp.webp');
+
+    // Verificar que NO se incluyó ningún placeholder de texto plano
+    expect(zipString).not.toContain('LA_TERCERA_HD_IMAGE_');
+  });
+
+  it('debe generar un buffer JPEG válido con Sharp en lugar de texto plano cuando el archivo no se encuentra en storage', async () => {
+    const order = orderService.createOrder({
+      albumId: 'album-1',
+      photoIds: ['foto-sin-archivo-fisico'],
+      customer: { email: 'nofile@test.com' }
+    });
+
+    orderService.verifyAndCompletePayment(order.id, {
+      paymentId: 'pay-no-phys-file',
+      status: 'approved',
+      currencyId: 'ARS',
+      transactionAmount: order.totalAmount
+    });
+
+    const paidOrder = orderService.getOrder(order.id)!;
+    const token = paidOrder.downloadToken!;
+
+    const chunks: Buffer[] = [];
+    const mockRes: any = new PassThrough();
+    mockRes.setHeader = () => {};
+    mockRes.status = () => mockRes;
+    mockRes.json = () => {};
+
+    mockRes.on('data', (chunk: Buffer) => {
+      chunks.push(chunk);
+    });
+
+    const streamPromise = new Promise<void>((resolve, reject) => {
+      mockRes.on('finish', resolve);
+      mockRes.on('error', reject);
+    });
+
+    await deliveryService.streamOrderZip(token, mockRes);
+    await streamPromise;
+
+    const zipBuffer = Buffer.concat(chunks);
+    const zipString = zipBuffer.toString('latin1');
+
+    // Debe contener el archivo como .jpg
+    expect(zipString).toContain('LA_TERCERA_album-1_foto-sin-archivo-fisico.jpg');
+    // Nunca debe contener texto plano que corrompa la estructura
+    expect(zipString).not.toContain('LA_TERCERA_HD_IMAGE_');
   });
 });

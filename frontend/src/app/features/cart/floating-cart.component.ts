@@ -20,7 +20,7 @@ import { CartStore } from '../../core/state/cart.store';
 
         <!-- Drawer Bento Deslizable -->
         <aside
-          class="fixed inset-x-0 bottom-0 z-50 flex justify-center p-2 sm:p-6 pointer-events-none"
+          class="fixed inset-x-0 bottom-0 z-50 flex justify-center p-2 sm:p-6 pointer-events-none w-full max-w-[100vw] overflow-x-hidden"
           role="dialog"
           aria-modal="true"
           aria-label="Detalle de fotos seleccionadas en el carrito"
@@ -173,10 +173,26 @@ import { CartStore } from '../../core/state/cart.store';
                 <div class="flex items-center justify-between text-xs text-emerald-400 bg-emerald-500/10 px-3 py-2 rounded-xl border border-emerald-500/20">
                   <span class="font-semibold flex items-center gap-1.5">
                     <span>🎉</span>
-                    <span>Descuento por cantidad aplicado</span>
+                    <span>
+                      @if (cartStore.pricing().couponCode) {
+                        Cupón {{ cartStore.pricing().couponCode }} aplicado
+                      } @else {
+                        {{ cartStore.pricing().baseDiscountPercentage }}% OFF por cantidad ({{ cartStore.pricing().photoCount }} fotos)
+                      }
+                    </span>
                   </span>
                   <span class="font-bold">
                     -&dollar;{{ cartStore.pricing().totalDiscount.toLocaleString('es-AR') }} ARS
+                  </span>
+                </div>
+              } @else if (!cartStore.isFullAlbum() && cartStore.tierConfig().enableTierDiscounts) {
+                <div class="flex items-center justify-between text-[11px] text-zinc-400 bg-white/5 px-3 py-2 rounded-xl border border-white/10">
+                  <span class="flex items-center gap-1.5">
+                    <span>💡</span>
+                    <span>Beneficio activo:</span>
+                  </span>
+                  <span class="font-semibold text-amber-300">
+                    {{ cartStore.tier3DiscountPercent() }}% OFF en 3+ fotos • {{ cartStore.tier5DiscountPercent() }}% OFF en 5+ fotos
                   </span>
                 </div>
               }
@@ -218,63 +234,61 @@ import { CartStore } from '../../core/state/cart.store';
       <!-- ============================================================ -->
       @if (!isExpanded()) {
         <aside
-          class="fixed bottom-6 inset-x-0 z-40 flex flex-col items-center pointer-events-none transition-all duration-300 px-3"
+          class="fixed bottom-4 sm:bottom-6 inset-x-0 z-40 w-full max-w-[100vw] overflow-x-hidden px-3 sm:px-6 flex flex-col items-center pointer-events-none transition-all duration-300"
           aria-label="Carrito de fotos seleccionadas"
         >
           <!-- BANNER FLOTANTE DE RECOMENDACIÓN INTELIGENTE DE PACK -->
           @if (cartStore.shouldRecommendFullAlbum()) {
-            <div class="pointer-events-auto mb-2 max-w-md w-full bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 text-zinc-950 px-4 py-2 rounded-2xl shadow-xl flex items-center justify-between gap-3 text-xs font-bold border border-amber-500/30 animate-cart-pulse">
-              <span class="flex items-center gap-1.5 truncate">
-                <span>💡</span>
-                <span class="truncate">
-                  Llevas <strong>{{ cartStore.selectedPhotosArray().length }} fotos</strong>: ¡Te conviene el <strong>Pack Completo</strong>!
-                </span>
-              </span>
+            <div class="pointer-events-auto mb-2.5 w-full max-w-[calc(100vw-1.5rem)] sm:max-w-md bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 text-zinc-950 px-3 py-2 sm:px-4 sm:py-2.5 rounded-2xl shadow-xl flex items-center justify-between gap-2 text-[11px] sm:text-xs font-bold border border-amber-500/30 animate-float-cart-in box-border">
+              <div class="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
+                <span class="shrink-0">💡</span>
+                <span class="truncate block">Llevas <strong>{{ cartStore.selectedPhotosArray().length }} fotos</strong>: ¡Te conviene el <strong>Pack</strong>!</span>
+              </div>
               <button
                 type="button"
                 (click)="cartStore.switchToFullAlbum()"
-                class="px-3 py-1 rounded-xl bg-zinc-950 text-white hover:bg-zinc-800 text-[11px] font-black tracking-wide uppercase transition active:scale-95 shrink-0"
+                class="shrink-0 whitespace-nowrap px-2.5 py-1.5 rounded-xl bg-zinc-950 text-white hover:bg-zinc-800 text-[10px] sm:text-[11px] font-black uppercase transition active:scale-95"
               >
                 Pasar a Pack ⚡
               </button>
             </div>
           }
 
-          <div class="pointer-events-auto bg-zinc-950 text-white rounded-full p-2 sm:px-5 sm:py-3 shadow-2xl border border-white/20 flex items-center gap-3 sm:gap-6 backdrop-blur-xl animate-float-cart-in animate-cart-pulse">
+          <div class="pointer-events-auto w-auto max-w-[calc(100vw-1.5rem)] sm:max-w-fit bg-zinc-950/95 text-white rounded-full p-1.5 pl-3 sm:px-5 sm:py-3 shadow-2xl border border-white/20 flex items-center justify-between gap-2 sm:gap-5 backdrop-blur-xl box-border overflow-hidden animate-float-cart-in">
             <!-- Zona Clickeable para Expandir Selección -->
             <button
               type="button"
               (click)="toggleExpanded()"
-              class="flex items-center gap-2.5 sm:gap-3 text-left hover:opacity-85 transition pl-2 sm:pl-0 group"
+              class="flex items-center gap-1.5 sm:gap-3 text-left hover:opacity-85 transition pl-1 sm:pl-0 group min-w-0 shrink"
               title="Haz clic para ver las fotos en tu carrito"
             >
               <!-- Contador Circular -->
-              <span class="w-6 h-6 rounded-full bg-white text-zinc-950 text-xs font-bold flex items-center justify-center animate-counter-pop group-hover:scale-105 transition-transform">
+              <span class="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-white text-zinc-950 text-[11px] sm:text-xs font-bold flex items-center justify-center animate-counter-pop group-hover:scale-105 transition-transform shrink-0">
                 {{ cartStore.totalItemsCount() }}
               </span>
 
-              <div class="flex flex-col">
-                <span class="text-xs sm:text-sm font-medium text-zinc-200 flex items-center gap-1">
+              <div class="flex flex-col min-w-0">
+                <span class="text-[11px] sm:text-sm font-medium text-zinc-200 flex items-center gap-1 truncate">
                   @if (cartStore.isFullAlbum()) {
-                    Álbum completo
+                    <span class="truncate max-w-[80px] sm:max-w-none">Álbum completo</span>
                   } @else {
-                    foto{{ cartStore.totalItemsCount() > 1 ? 's' : '' }} elegida{{ cartStore.totalItemsCount() > 1 ? 's' : '' }}
+                    <span class="truncate">foto{{ cartStore.totalItemsCount() > 1 ? 's' : '' }} <span class="hidden xs:inline">elegida{{ cartStore.totalItemsCount() > 1 ? 's' : '' }}</span></span>
                   }
-                  <span class="text-[10px] text-zinc-400 group-hover:text-amber-300 transition-colors">▴ Ver fotos</span>
+                  <span class="text-[9px] sm:text-[10px] text-zinc-400 group-hover:text-amber-300 transition-colors shrink-0">▴ Ver</span>
                 </span>
               </div>
             </button>
 
-            <div class="h-4 w-px bg-white/20"></div>
+            <div class="h-4 w-px bg-white/20 shrink-0"></div>
 
             <!-- Total Calculado Reactivamente -->
             <button
               type="button"
               (click)="toggleExpanded()"
-              class="text-left hover:opacity-85 transition"
+              class="text-left hover:opacity-85 transition shrink-0"
             >
-              <span class="font-display font-extrabold text-sm sm:text-base text-white tracking-wide">
-                &dollar;{{ cartStore.pricing().finalTotal.toLocaleString('es-AR') }} ARS
+              <span class="font-display font-extrabold text-xs sm:text-base text-white tracking-tight sm:tracking-wide">
+                &dollar;{{ cartStore.pricing().finalTotal.toLocaleString('es-AR') }}<span class="hidden sm:inline"> ARS</span>
               </span>
               @if (cartStore.pricing().totalDiscount > 0) {
                 <span class="hidden sm:inline-block ml-1.5 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">
@@ -286,7 +300,7 @@ import { CartStore } from '../../core/state/cart.store';
             <!-- Botón Comprar con Micro-interacción Directa -->
             <button
               (click)="checkout.emit()"
-              class="px-4 sm:px-5 py-2 rounded-full bg-white text-zinc-950 hover:bg-zinc-200 font-bold text-xs sm:text-sm transition flex items-center gap-1.5 shadow-md active:scale-95 group shrink-0"
+              class="px-3 sm:px-5 py-1.5 sm:py-2 rounded-full bg-white text-zinc-950 hover:bg-zinc-200 font-bold text-xs sm:text-sm transition flex items-center gap-1 sm:gap-1.5 shadow-md active:scale-95 group shrink-0"
             >
               <span>Comprar</span>
               <span class="transition-transform group-hover:translate-x-1">→</span>

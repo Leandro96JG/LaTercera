@@ -1,6 +1,6 @@
 import { Photo } from './photo.model';
 
-export type AlbumCategory = 'futbol' | 'hockey' | 'basquet' | 'sociales' | 'otros';
+export type AlbumCategory = string;
 
 export interface Album {
   readonly id: string;

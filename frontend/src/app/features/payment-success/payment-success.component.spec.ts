@@ -128,4 +128,38 @@ describe('PaymentSuccessComponent (TDD)', () => {
       photo.filename
     );
   });
+
+  it('debe disparar triggerConfetti al pasar a estado ready con colores de La Tercera', () => {
+    const confettiSpy = vi.spyOn(component, 'triggerConfetti');
+    deliveryServiceMock.getDeliveryInfo.mockReturnValue(of(sampleInfo));
+
+    component.loadDeliveryInfo('token123');
+
+    expect(component.state()).toBe('ready');
+    expect(confettiSpy).toHaveBeenCalled();
+  });
+
+  it('debe transicionar a estado error si el polling de orden supera 10 intentos y permitir reintentar con retryPolling', () => {
+    const pendingStatus: DeliveryStatusResponse = {
+      orderId: 'order-pend-456',
+      status: 'PENDING'
+    };
+    deliveryServiceMock.getOrderStatus.mockReturnValue(of(pendingStatus));
+
+    // Simular que ya se agotaron los 10 intentos de polling
+    component.pollingAttempt.set(10);
+    component.loadByOrderId('order-pend-456');
+
+    expect(component.state()).toBe('error');
+    expect(component.currentOrderId()).toBe('order-pend-456');
+    expect(component.errorMessage()).toContain('El pago sigue procesándose en Mercado Pago');
+
+    // Al invocar retryPolling, debe resetear pollingAttempt a 0 y volver a consultar
+    deliveryServiceMock.getOrderStatus.mockClear();
+    component.retryPolling();
+
+    expect(component.pollingAttempt()).toBe(1); // 0 al iniciar, incrementado a 1 en el nuevo intento de polling
+    expect(component.state()).toBe('polling');
+    expect(deliveryServiceMock.getOrderStatus).toHaveBeenCalledWith('order-pend-456');
+  });
 });

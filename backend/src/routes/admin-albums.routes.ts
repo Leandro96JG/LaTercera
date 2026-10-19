@@ -19,17 +19,20 @@ import {
   AdminTrashListResponse,
   TrashActionResponse
 } from '../contracts/admin-albums.contract';
-import { IAlbumRepository, AlbumDTO, PhotoDTO, generateAlbumSlug } from '../repositories/album.repository';
+import { IAlbumRepository, AlbumDTO, PhotoDTO, generateAlbumSlug, normalizePreviewUrl } from '../repositories/album.repository';
+import { ICategoryRepository } from '../repositories/category.repository';
 import { createAlbumRepository } from '../repositories';
 import { AdminAuthService } from '../services/admin-auth.service';
 import { createRequireAdminAuth } from '../middleware/admin-auth.middleware';
 
 export function createAdminAlbumsRouter(
   authService?: AdminAuthService,
-  albumRepo?: IAlbumRepository
+  albumRepo?: IAlbumRepository,
+  categoryRepo?: ICategoryRepository
 ): Router {
   const router = Router();
   const albumRepository = albumRepo || createAlbumRepository();
+  const categoryRepository = categoryRepo;
   const storageService = createStorageService();
   const driveHttpClient = new DefaultDriveHttpClient();
   const driveImporterService = new GoogleDriveImporterService(driveHttpClient, storageService);
@@ -119,16 +122,29 @@ export function createAdminAlbumsRouter(
       if (!body.title || !body.title.trim()) {
         return res.status(400).json({ success: false, error: 'El título del álbum es obligatorio' });
       }
-      if (!body.category) {
+      if (!body.category || typeof body.category !== 'string' || !body.category.trim()) {
         return res.status(400).json({ success: false, error: 'La categoría es obligatoria' });
       }
-      const validCategories: AlbumCategory[] = ['futbol', 'hockey', 'basquet', 'sociales', 'otros'];
-      if (!validCategories.includes(body.category)) {
+
+      const normalizedCategory = body.category.trim().toLowerCase();
+      const baseCategories = ['futbol', 'hockey', 'basquet', 'sociales', 'otros'];
+
+      let dynamicCategory = null;
+      if (categoryRepository) {
+        try {
+          dynamicCategory = await categoryRepository.getCategoryById(normalizedCategory);
+        } catch (catErr) {
+          console.warn('[AdminAlbums] Error consultando categoría:', catErr);
+        }
+      }
+
+      if (!dynamicCategory && !baseCategories.includes(normalizedCategory)) {
         return res.status(400).json({
           success: false,
-          error: `Categoría no válida. Permitidas: ${validCategories.join(', ')}`
+          error: `Categoría no válida. Permitidas: ${baseCategories.join(', ')} o categorías dinámicas creadas.`
         });
       }
+
       if (typeof body.unitPrice !== 'number' || body.unitPrice <= 0) {
         return res.status(400).json({ success: false, error: 'El precio por foto debe ser mayor a 0 ARS' });
       }
@@ -151,27 +167,38 @@ export function createAdminAlbumsRouter(
         targetSlug = `${targetSlug}-${Date.now().toString().slice(-4)}`;
       }
 
-      // 3. Badges e Imágenes de Portada por Defecto
-      const defaultBadges: Record<AlbumCategory, string> = {
+      // 3. Badges e Imágenes de Portada por Defecto (Base + Dinámicas)
+      const defaultBadges: Record<string, string> = {
         futbol: '⚽ Fútbol',
         hockey: '🏑 Hockey',
         basquet: '🏀 Básquet',
         sociales: '🎉 Cumpleaños & Social',
-        otros: '📸 Evento Especial'
+        otros: '📸 Evento Especial',
+        motos: '🏍️ Motos'
       };
 
-      const defaultCovers: Record<AlbumCategory, string> = {
+      const defaultCovers: Record<string, string> = {
         futbol: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=800&q=80',
         hockey: 'https://images.unsplash.com/photo-1589487391730-58f20eb2c308?auto=format&fit=crop&w=800&q=80',
         basquet: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=800&q=80',
         sociales: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=800&q=80',
-        otros: 'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=800&q=80'
+        otros: 'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=800&q=80',
+        motos: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=800&q=80'
       };
+
+      const resolvedBadge = body.badge?.trim() ||
+        dynamicCategory?.badgeLabel ||
+        defaultBadges[normalizedCategory] ||
+        `📸 ${dynamicCategory?.name || normalizedCategory}`;
+
+      const resolvedCover = body.coverUrl?.trim() ||
+        defaultCovers[normalizedCategory] ||
+        'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=800&q=80';
 
       const newAlbum: AlbumDTO = {
         id: targetSlug,
         title: body.title.trim(),
-        category: body.category,
+        category: normalizedCategory,
         subtitle: body.subtitle?.trim() || 'Cobertura Oficial • La Tercera',
         date: body.date?.trim() || new Date().toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' }),
         eventDate: body.eventDate?.trim(),
@@ -180,8 +207,8 @@ export function createAdminAlbumsRouter(
         photosCount: 0,
         unitPrice: Math.round(body.unitPrice),
         fullAlbumPrice: Math.round(body.fullAlbumPrice),
-        coverUrl: body.coverUrl?.trim() || defaultCovers[body.category],
-        badge: body.badge?.trim() || defaultBadges[body.category],
+        coverUrl: resolvedCover,
+        badge: resolvedBadge,
         isPublished: body.isPublished ?? true,
         isFreeDownload: body.isFreeDownload ?? false,
         isPrivate: body.isPrivate ?? false,
@@ -218,6 +245,30 @@ export function createAdminAlbumsRouter(
       }
       if (updates.fullAlbumPrice !== undefined && (typeof updates.fullAlbumPrice !== 'number' || updates.fullAlbumPrice <= 0)) {
         return res.status(400).json({ success: false, error: 'El precio del álbum completo debe ser mayor a 0 ARS' });
+      }
+
+      // Validación y normalización de categoría si se provee
+      if (updates.category) {
+        const normalizedCat = updates.category.trim().toLowerCase();
+        let dynamicCategory = null;
+        if (categoryRepository) {
+          try {
+            dynamicCategory = await categoryRepository.getCategoryById(normalizedCat);
+          } catch (catErr) {
+            console.warn('[AdminAlbums PUT] Error consultando categoría:', catErr);
+          }
+        }
+        const baseCategories = ['futbol', 'hockey', 'basquet', 'sociales', 'otros'];
+        if (!dynamicCategory && !baseCategories.includes(normalizedCat)) {
+          return res.status(400).json({
+            success: false,
+            error: `Categoría "${normalizedCat}" no válida o no encontrada.`
+          });
+        }
+        updates.category = normalizedCat;
+        if (!updates.badge) {
+          updates.badge = dynamicCategory?.badgeLabel || `📸 ${dynamicCategory?.name || normalizedCat}`;
+        }
       }
 
       // Validar invariante de negocio de precios si alguno de los dos se modifica
@@ -631,22 +682,44 @@ export function createAdminAlbumsRouter(
       const rawId = req.params.id;
       const albumId = Array.isArray(rawId) ? rawId[0] : rawId;
 
-      const album = await albumRepository.getAlbumById(albumId);
-      if (!album) {
-        return res.status(404).json({
+      if (!albumId || typeof albumId !== 'string' || !albumId.trim()) {
+        return res.status(400).json({
           success: false,
-          error: 'Álbum no encontrado'
+          error: 'ID de álbum no proporcionado o inválido'
         });
       }
 
-      const photos = await albumRepository.getPhotosByAlbumId(albumId);
+      const cleanAlbumId = albumId.trim();
+
+      // Blindaje defensivo: si albumRepository.getAlbumById(cleanAlbumId) es null pero el ID existe o es válido,
+      // en lugar de responder 404 Not Found, inicializa o busca las fotos del álbum.
+      let photos: PhotoDTO[] = [];
+      try {
+        photos = typeof (albumRepository as any).getPhotosByAlbum === 'function'
+          ? await (albumRepository as any).getPhotosByAlbum(cleanAlbumId)
+          : await albumRepository.getPhotosByAlbumId(cleanAlbumId);
+      } catch (photoErr: unknown) {
+        console.warn(`[AdminAlbumsRoutes] Advertencia recuperando fotos para álbum "${cleanAlbumId}":`, photoErr);
+        photos = [];
+      }
+
+      // Normalización defensiva de previewUrl absoluta
+      const backendUrl = (process.env.APP_URL || process.env.BACKEND_URL || 'http://localhost:4000').replace(/\/+$/, '');
+      const normalizedPhotos = (photos || []).map(p => ({
+        ...p,
+        previewUrl: p.previewUrl && p.previewUrl.startsWith('/')
+          ? `${backendUrl}${p.previewUrl}`
+          : p.previewUrl
+      }));
+
       return res.status(200).json({
         success: true,
-        albumId,
-        total: photos.length,
-        photos
+        albumId: cleanAlbumId,
+        total: normalizedPhotos.length,
+        photos: normalizedPhotos
       });
     } catch (error: unknown) {
+      console.warn('[AdminAlbumsRoutes] Error no controlado en GET /:id/photos:', error);
       const message = error instanceof Error ? error.message : 'Error al obtener fotos del álbum';
       return res.status(500).json({ success: false, error: message });
     }
@@ -700,8 +773,11 @@ export function createAdminAlbumsRouter(
 
       return res.status(200).json({
         success: true,
-        photo: updatedPhoto,
-        coverUrl: updatedCoverUrl,
+        photo: {
+          ...updatedPhoto,
+          previewUrl: normalizePreviewUrl(updatedPhoto.previewUrl)
+        },
+        coverUrl: normalizePreviewUrl(updatedCoverUrl),
         message: 'Foto y portada actualizadas correctamente'
       });
     } catch (error: unknown) {
@@ -744,12 +820,8 @@ export function createAdminAlbumsRouter(
         await storageService.deletePhotoFiles(albumId, photoId, ext);
       }
 
-      // Eliminar de base de datos / repositorio
+      // Eliminar de base de datos / repositorio (albumRepository.deletePhoto actualiza el conteo automáticamente)
       await albumRepository.deletePhoto(albumId, photoId);
-
-      // Decrementar conteo del álbum
-      const newCount = Math.max(0, (album.photosCount || 1) - 1);
-      await albumRepository.updatePhotosCount(albumId, newCount);
 
       // Si la foto eliminada era la coverUrl, actualizar a otra o vaciar
       if (album.coverUrl === photo.previewUrl) {
@@ -771,5 +843,3 @@ export function createAdminAlbumsRouter(
 
   return router;
 }
-
-export const adminAlbumsRouter = createAdminAlbumsRouter();

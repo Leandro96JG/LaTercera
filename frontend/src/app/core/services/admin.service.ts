@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { HttpClient, HttpHeaders, HttpEventType } from '@angular/common/http';
+import { Observable, tap, filter, map } from 'rxjs';
 import { AdminAuthStore } from '../state/admin-auth.store';
 import {
   AdminStats,
@@ -18,10 +18,16 @@ import {
   TrashActionResponse,
   AdminOrdersResponse,
   RegenerateTokenResponse,
+  AdminAlbumPhoto,
   AdminAlbumPhotosResponse,
   UpdateAlbumPhotoRequest,
   UpdateAlbumPhotoResponse,
-  DeleteAlbumPhotoResponse
+  DeleteAlbumPhotoResponse,
+  AdminPromotionsResponse,
+  PricingTierConfig,
+  CouponDTO,
+  CreateCouponRequest,
+  UpdateCouponRequest
 } from '../models/admin.model';
 import { environment } from '../../../environments/environment';
 
@@ -59,13 +65,14 @@ export class AdminService {
   }
 
   /**
-   * Realiza la subida masiva de fotos (multipart/form-data)
+   * Realiza la subida masiva de fotos (multipart/form-data) con reporte de progreso HTTP
    */
   public bulkUpload(
     albumId: string,
     files: File[],
     watermarkText: string = 'LA TERCERA • MUESTRA',
-    hdPhotoIndices: number[] = [0, 1]
+    hdPhotoIndices: number[] = [0, 1],
+    onProgress?: (percent: number) => void
   ): Observable<BulkUploadResponse> {
     const formData = new FormData();
     formData.append('albumId', albumId);
@@ -76,10 +83,33 @@ export class AdminService {
       formData.append('photos', file, file.name);
     }
 
-    // Al enviar FormData, Angular/HttpClient asigna automáticamente el Content-Type multipart con boundary
+    // Al enviar FormData con reportProgress y observe: 'events', se calculan porcentajes reales de subida
     return this.http.post<BulkUploadResponse>(`${this.baseUrl}/albums/bulk-upload`, formData, {
-      headers: this.getAuthHeaders()
-    });
+      headers: this.getAuthHeaders(),
+      reportProgress: true,
+      observe: 'events'
+    }).pipe(
+      tap((event: any) => {
+        if (event && event.type === HttpEventType.UploadProgress) {
+          const total = event.total || event.loaded;
+          const percent = total > 0 ? Math.round((event.loaded / total) * 100) : 0;
+          onProgress?.(percent);
+        }
+      }),
+      filter((event: any) => {
+        // Si es un evento HTTP tipado, solo emitir cuando la respuesta final esté lista
+        if (event && typeof event.type === 'number') {
+          return event.type === HttpEventType.Response;
+        }
+        return true;
+      }),
+      map((event: any) => {
+        if (event && event.type === HttpEventType.Response && 'body' in event) {
+          return event.body as BulkUploadResponse;
+        }
+        return event as BulkUploadResponse;
+      })
+    );
   }
 
   /**
@@ -209,7 +239,27 @@ export class AdminService {
   public getAlbumPhotos(albumId: string): Observable<AdminAlbumPhotosResponse> {
     return this.http.get<AdminAlbumPhotosResponse>(`${this.baseUrl}/albums/${albumId}/photos`, {
       headers: this.getAuthHeaders()
-    });
+    }).pipe(
+      map(res => {
+        if (!res || !Array.isArray(res.photos)) return res;
+        const backendOrigin = environment.apiUrl.replace(/\/api\/?$/, '');
+        const normalizedPhotos: AdminAlbumPhoto[] = res.photos.map((p: any) => {
+          let previewUrl = (p.previewUrl || p.preview_url || '').toString();
+          if (previewUrl.startsWith('/')) {
+            previewUrl = backendOrigin ? `${backendOrigin}${previewUrl}` : previewUrl;
+          }
+          return {
+            ...p,
+            previewUrl,
+            isSampleHd: Boolean(p.isSampleHd ?? p.is_sample_hd ?? p.is_sample)
+          };
+        });
+        return {
+          ...res,
+          photos: normalizedPhotos
+        };
+      })
+    );
   }
 
   /**
@@ -233,6 +283,67 @@ export class AdminService {
   public deleteAlbumPhoto(albumId: string, photoId: string): Observable<DeleteAlbumPhotoResponse> {
     return this.http.delete<DeleteAlbumPhotoResponse>(
       `${this.baseUrl}/albums/${albumId}/photos/${photoId}`,
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  /**
+   * Obtiene la configuración de descuentos por cantidad y la lista de cupones
+   */
+  public getPromotions(): Observable<AdminPromotionsResponse> {
+    return this.http.get<AdminPromotionsResponse>(`${this.baseUrl}/promotions`, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  /**
+   * Actualiza la configuración global de descuentos por volumen (3+ y 5+ fotos)
+   */
+  public updatePricingConfig(
+    config: Partial<PricingTierConfig>
+  ): Observable<{ success: boolean; config: PricingTierConfig; message: string }> {
+    return this.http.put<{ success: boolean; config: PricingTierConfig; message: string }>(
+      `${this.baseUrl}/promotions/config`,
+      config,
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  /**
+   * Crea un nuevo cupón de descuento en el catálogo
+   */
+  public createCoupon(
+    req: CreateCouponRequest
+  ): Observable<{ success: boolean; coupon: CouponDTO; message: string }> {
+    return this.http.post<{ success: boolean; coupon: CouponDTO; message: string }>(
+      `${this.baseUrl}/promotions/coupons`,
+      req,
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  /**
+   * Modifica el estado activo o porcentaje de un cupón existente
+   */
+  public updateCoupon(
+    code: string,
+    updates: UpdateCouponRequest
+  ): Observable<{ success: boolean; coupon: CouponDTO; message: string }> {
+    return this.http.patch<{ success: boolean; coupon: CouponDTO; message: string }>(
+      `${this.baseUrl}/promotions/coupons/${code}`,
+      updates,
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  /**
+   * Elimina un cupón del catálogo
+   */
+  public deleteCoupon(
+    code: string
+  ): Observable<{ success: boolean; code: string; message: string }> {
+    return this.http.delete<{ success: boolean; code: string; message: string }>(
+      `${this.baseUrl}/promotions/coupons/${code}`,
       { headers: this.getAuthHeaders() }
     );
   }

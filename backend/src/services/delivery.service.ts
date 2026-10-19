@@ -1,5 +1,6 @@
 import path from 'path';
 import archiver from 'archiver';
+import sharp from 'sharp';
 import { Response } from 'express';
 import { OrderService } from './order.service';
 import { DownloadTokenService } from './token.service';
@@ -20,6 +21,7 @@ export interface ResolvePhotoResult {
   albumId?: string;
   photoId?: string;
   filename?: string;
+  extension?: string;
 }
 
 // Catálogo de títulos de álbumes conocidos (fallback defensivo)
@@ -31,6 +33,7 @@ const KNOWN_ALBUMS: Record<string, { title: string; date: string }> = {
 };
 
 export class DeliveryService {
+  public static readonly SUPPORTED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'];
   private orderService: OrderService;
   private tokenService: DownloadTokenService;
   private storageService: IStorageService;
@@ -167,6 +170,111 @@ export class DeliveryService {
   }
 
   /**
+   * Recupera el buffer original y la extensión real probando el orden de extensiones soportadas
+   */
+  public async getOriginalBufferWithExtension(
+    albumId: string,
+    photoId: string,
+    preferredExt?: string
+  ): Promise<{ buffer: Buffer; extension: string } | null> {
+    const cleanAlbum = this.sanitizeId(albumId);
+    const cleanPhoto = this.sanitizeId(photoId);
+
+    if (!this.storageService.getOriginalBuffer) {
+      return null;
+    }
+
+    // 1. Si viene una extensión preferida obtenida de originalPath/filename, consultar directamente en 1 sola llamada
+    if (preferredExt) {
+      const cleanPref = preferredExt.startsWith('.') ? preferredExt.toLowerCase() : `.${preferredExt.toLowerCase()}`;
+      try {
+        const buffer = await this.storageService.getOriginalBuffer(cleanAlbum, cleanPhoto, cleanPref);
+        if (buffer && buffer.length > 0) {
+          return { buffer, extension: cleanPref };
+        }
+      } catch {
+        // Fallback al resto de extensiones
+      }
+    }
+
+    // 2. Fallback: probar el resto de extensiones soportadas
+    const supported = DeliveryService.SUPPORTED_EXTENSIONS;
+    const candidates = preferredExt
+      ? supported.filter(e => e.toLowerCase() !== preferredExt.toLowerCase())
+      : supported;
+
+    for (const ext of candidates) {
+      try {
+        const buffer = await this.storageService.getOriginalBuffer(cleanAlbum, cleanPhoto, ext);
+        if (buffer && buffer.length > 0) {
+          return { buffer, extension: ext };
+        }
+      } catch {
+        // continuar probando siguiente extensión
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Resuelve el buffer HD de una foto para la orden; en producción no genera fallbacks ficticios si falta en Storage
+   */
+  public async resolveOrderPhotoBuffer(
+    albumId: string,
+    photoId: string,
+    preferredExt?: string
+  ): Promise<{ buffer: Buffer; extension: string } | null> {
+    const cleanAlbum = this.sanitizeId(albumId);
+    const cleanPhoto = this.sanitizeId(photoId);
+
+    const originalData = await this.getOriginalBufferWithExtension(cleanAlbum, cleanPhoto, preferredExt);
+    if (originalData) {
+      return originalData;
+    }
+
+    if (process.env.NODE_ENV === 'production') {
+      console.error(`[DeliveryService] Archivo original faltante en Storage para ${cleanAlbum}/${cleanPhoto}`);
+      return null;
+    }
+
+    try {
+      const buffer = await this.generateFallbackJpegBuffer(cleanPhoto);
+      return { buffer, extension: '.jpg' };
+    } catch (err) {
+      console.warn(`[DeliveryService] Error generando buffer JPEG de respaldo para ${cleanPhoto}:`, err);
+      return null;
+    }
+  }
+
+  /**
+   * Resuelve el buffer HD de una foto de álbum liberado de cortesía
+   */
+  public async resolveAlbumPhotoBuffer(
+    albumId: string,
+    photoId: string,
+    preferredExt?: string
+  ): Promise<{ buffer: Buffer; extension: string } | null> {
+    return this.resolveOrderPhotoBuffer(albumId, photoId, preferredExt);
+  }
+
+  /**
+   * Genera un buffer JPEG de respaldo válido con Sharp si no se encuentra el archivo en Storage (Solo Dev/Tests)
+   */
+  public async generateFallbackJpegBuffer(label: string = 'FOTO HD'): Promise<Buffer> {
+    return await sharp({
+      create: {
+        width: 1200,
+        height: 800,
+        channels: 3,
+        background: { r: 30, g: 30, b: 35 }
+      }
+    })
+      .jpeg({ quality: 80 })
+      .toBuffer();
+  }
+
+  /**
    * Valida y resuelve el archivo de una foto individual dentro de la orden
    */
   public async resolvePhotoFile(token: string, photoId?: string): Promise<ResolvePhotoResult> {
@@ -225,11 +333,34 @@ export class DeliveryService {
     }
 
     const cleanAlbumId = this.sanitizeId(order.albumId);
+
+    // Detección de la extensión real registrada o en Storage
+    let detectedExt = '.jpg';
+    if (this.albumRepository) {
+      try {
+        const photo = await this.albumRepository.getPhotoById(order.albumId, requestedId);
+        if (photo) {
+          const ext = path.extname(photo.filename || photo.originalPath || '').toLowerCase();
+          if (DeliveryService.SUPPORTED_EXTENSIONS.includes(ext)) {
+            detectedExt = ext;
+          }
+        }
+      } catch (err) {
+        console.warn('[DeliveryService] Error al buscar foto en repositorio:', err);
+      }
+    }
+
+    const found = await this.getOriginalBufferWithExtension(cleanAlbumId, cleanPhotoId, detectedExt);
+    if (found) {
+      detectedExt = found.extension;
+    }
+
     return {
       success: true,
       albumId: cleanAlbumId,
       photoId: cleanPhotoId,
-      filename: `LA_TERCERA_${cleanAlbumId}_${cleanPhotoId}.jpg`
+      extension: detectedExt,
+      filename: `LA_TERCERA_${cleanAlbumId}_${cleanPhotoId}${detectedExt}`
     };
   }
 
@@ -257,7 +388,8 @@ export class DeliveryService {
     res.setHeader('Cache-Control', 'private, no-transform, max-age=0');
 
     const archive = archiver('zip', {
-      zlib: { level: 6 } // Balance óptimo compresión/CPU
+      store: true,
+      zlib: { level: 0 } // Modo store instantáneo sin recomprimir archivos ya comprimidos
     });
 
     archive.on('error', (err) => {
@@ -275,41 +407,42 @@ export class DeliveryService {
 
     archive.pipe(res);
 
+    // Pre-cargar mapa de fotos del álbum para resolver la extensión real en 1 sola consulta
+    let photoMap = new Map<string, { originalPath?: string; filename?: string }>();
+    if (this.albumRepository) {
+      try {
+        const albumPhotos = await this.albumRepository.getPhotosByAlbumId(order.albumId);
+        if (albumPhotos && albumPhotos.length > 0) {
+          photoMap = new Map(albumPhotos.map(p => [this.sanitizeId(p.id), p]));
+        }
+      } catch (err) {
+        console.warn('[DeliveryService] Error al obtener fotos para ZIP:', err);
+      }
+    }
+
     let photosToPack: string[] = order.photoIds;
     if (order.isFullAlbum) {
-      if (this.albumRepository) {
-        try {
-          const albumPhotos = await this.albumRepository.getPhotosByAlbumId(order.albumId);
-          if (albumPhotos && albumPhotos.length > 0) {
-            photosToPack = albumPhotos.map(p => p.id);
-          }
-        } catch (err) {
-          console.warn('[DeliveryService] Error al obtener fotos para ZIP:', err);
-        }
-      }
-      if (photosToPack.length === 0) {
+      if (photoMap.size > 0) {
+        photosToPack = Array.from(photoMap.keys());
+      } else if (photosToPack.length === 0) {
         photosToPack = Array.from({ length: 10 }, (_, i) => `foto_${i + 1}`);
       }
     }
 
     for (const pId of photosToPack) {
       const cleanPhoto = this.sanitizeId(pId);
-      const photoName = `LA_TERCERA_${cleanAlbumId}_${cleanPhoto}.jpg`;
+      const photoMeta = photoMap.get(cleanPhoto);
+      const preferredExt = photoMeta
+        ? path.extname(photoMeta.originalPath || photoMeta.filename || '').toLowerCase()
+        : undefined;
 
-      // Intentamos leer el archivo original si existe (en Supabase Storage o local), o enviamos un placeholder HD
-      try {
-        let buffer: Buffer | null = null;
-        if (this.storageService.getOriginalBuffer) {
-          buffer = await this.storageService.getOriginalBuffer(cleanAlbumId, cleanPhoto, '.jpg');
-        }
-        if (buffer) {
-          archive.append(buffer, { name: photoName });
-        } else {
-          archive.append(Buffer.from(`LA_TERCERA_HD_IMAGE_${cleanPhoto}`), { name: photoName });
-        }
-      } catch {
-        archive.append(Buffer.from(`LA_TERCERA_HD_IMAGE_${cleanPhoto}`), { name: photoName });
+      const photoData = await this.resolveOrderPhotoBuffer(cleanAlbumId, cleanPhoto, preferredExt);
+      if (!photoData) {
+        continue;
       }
+
+      const photoName = `LA_TERCERA_${cleanAlbumId}_${cleanPhoto}${photoData.extension}`;
+      archive.append(photoData.buffer, { name: photoName });
     }
 
     await archive.finalize();
@@ -328,7 +461,8 @@ export class DeliveryService {
     res.setHeader('Cache-Control', 'private, no-transform, max-age=0');
 
     const archive = archiver('zip', {
-      zlib: { level: 6 }
+      store: true,
+      zlib: { level: 0 } // Modo store instantáneo
     });
 
     archive.on('error', (err) => {
@@ -346,13 +480,15 @@ export class DeliveryService {
 
     archive.pipe(res);
 
-    // Fotos reales del álbum completo o fallback defensivo
+    // Pre-cargar fotos reales del álbum completo para mapear extensiones directas
+    let photoMap = new Map<string, { originalPath?: string; filename?: string }>();
     let photosToPack: string[] = [];
     if (this.albumRepository) {
       try {
         const albumPhotos = await this.albumRepository.getPhotosByAlbumId(albumId);
         if (albumPhotos && albumPhotos.length > 0) {
-          photosToPack = albumPhotos.map(p => p.id);
+          photosToPack = albumPhotos.map(p => this.sanitizeId(p.id));
+          photoMap = new Map(albumPhotos.map(p => [this.sanitizeId(p.id), p]));
         }
       } catch (err) {
         console.warn('[DeliveryService] Error al obtener fotos para ZIP de cortesía:', err);
@@ -364,21 +500,18 @@ export class DeliveryService {
 
     for (const pId of photosToPack) {
       const cleanPhoto = this.sanitizeId(pId);
-      const photoName = `LA_TERCERA_${cleanAlbumId}_${cleanPhoto}.jpg`;
+      const photoMeta = photoMap.get(cleanPhoto);
+      const preferredExt = photoMeta
+        ? path.extname(photoMeta.originalPath || photoMeta.filename || '').toLowerCase()
+        : undefined;
 
-      try {
-        let buffer: Buffer | null = null;
-        if (this.storageService.getOriginalBuffer) {
-          buffer = await this.storageService.getOriginalBuffer(cleanAlbumId, cleanPhoto, '.jpg');
-        }
-        if (buffer) {
-          archive.append(buffer, { name: photoName });
-        } else {
-          archive.append(Buffer.from(`LA_TERCERA_HD_IMAGE_${cleanPhoto}`), { name: photoName });
-        }
-      } catch {
-        archive.append(Buffer.from(`LA_TERCERA_HD_IMAGE_${cleanPhoto}`), { name: photoName });
+      const photoData = await this.resolveAlbumPhotoBuffer(cleanAlbumId, cleanPhoto, preferredExt);
+      if (!photoData) {
+        continue;
       }
+
+      const photoName = `LA_TERCERA_${cleanAlbumId}_${cleanPhoto}${photoData.extension}`;
+      archive.append(photoData.buffer, { name: photoName });
     }
 
     await archive.finalize();

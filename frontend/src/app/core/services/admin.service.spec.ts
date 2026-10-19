@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpEventType } from '@angular/common/http';
 import { of } from 'rxjs';
 import { AdminService } from './admin.service';
 import { AdminAuthStore } from '../state/admin-auth.store';
@@ -92,6 +92,21 @@ describe('AdminService - Llamadas HTTP de Administración con JWT', () => {
         headers: expect.anything()
       })
     );
+  });
+
+  it('debe reportar progreso porcentual durante la subida masiva cuando se emite UploadProgress', () => {
+    const progressSpy = vi.fn();
+    mockHttpClient.post.mockReturnValue(of(
+      { type: HttpEventType.UploadProgress, loaded: 50, total: 100 },
+      { type: HttpEventType.Response, body: { success: true, albumId: 'alb_2', photos: [] } }
+    ));
+
+    const mockFile = new File(['image-bytes'], 'partido.jpg', { type: 'image/jpeg' });
+    service.bulkUpload('alb_2', [mockFile], 'LA TERCERA', [0], progressSpy).subscribe((res) => {
+      expect(res.success).toBe(true);
+    });
+
+    expect(progressSpy).toHaveBeenCalledWith(50);
   });
 
   it('debe registrar un nuevo fotógrafo colaborador', () => {
@@ -270,6 +285,39 @@ describe('AdminService - Llamadas HTTP de Administración con JWT', () => {
     );
   });
 
+  it('debe normalizar previewUrl relativa a absoluta y mapear isSampleHd defensivamente en getAlbumPhotos', () => {
+    mockHttpClient.get.mockReturnValue(of({
+      success: true,
+      albumId: 'album-1',
+      total: 2,
+      photos: [
+        {
+          id: 'photo-rel',
+          albumId: 'album-1',
+          filename: 'rel.jpg',
+          originalPath: 'originals/album-1/rel.jpg',
+          previewUrl: '/uploads/previews/album-1/rel.webp',
+          is_sample_hd: true
+        },
+        {
+          id: 'photo-abs',
+          albumId: 'album-1',
+          filename: 'abs.jpg',
+          originalPath: 'originals/album-1/abs.jpg',
+          preview_url: 'https://cdn.example.com/abs.webp',
+          is_sample: false
+        }
+      ]
+    }));
+
+    service.getAlbumPhotos('album-1').subscribe((res) => {
+      expect(res.photos[0].previewUrl).toBe('http://localhost:4000/uploads/previews/album-1/rel.webp');
+      expect(res.photos[0].isSampleHd).toBe(true);
+      expect(res.photos[1].previewUrl).toBe('https://cdn.example.com/abs.webp');
+      expect(res.photos[1].isSampleHd).toBe(false);
+    });
+  });
+
   it('debe actualizar una foto (portada y muestra HD) con PATCH /api/admin/albums/:id/photos/:photoId', () => {
     const updatePayload = { setAsCover: true, isSampleHD: true };
     mockHttpClient.patch.mockReturnValue(of({
@@ -317,6 +365,100 @@ describe('AdminService - Llamadas HTTP de Administración con JWT', () => {
       expect.objectContaining({
         headers: expect.anything()
       })
+    );
+  });
+
+  it('debe obtener la configuración de promociones y cupones con getPromotions', () => {
+    mockHttpClient.get.mockReturnValue(of({
+      success: true,
+      config: { enableTierDiscounts: true, tier3DiscountPercent: 20, tier5DiscountPercent: 30, capAtFullAlbumPrice: true },
+      coupons: [{ code: 'YUYO10', discountPercent: 10, isActive: true, usedCount: 3 }]
+    }));
+
+    service.getPromotions().subscribe((res) => {
+      expect(res.success).toBe(true);
+      expect(res.config.enableTierDiscounts).toBe(true);
+      expect(res.coupons.length).toBe(1);
+    });
+
+    expect(mockHttpClient.get).toHaveBeenCalledWith(
+      'http://localhost:4000/api/admin/promotions',
+      expect.objectContaining({ headers: expect.anything() })
+    );
+  });
+
+  it('debe actualizar la configuración de descuentos por volumen con updatePricingConfig', () => {
+    mockHttpClient.put.mockReturnValue(of({
+      success: true,
+      config: { enableTierDiscounts: true, tier3DiscountPercent: 25, tier5DiscountPercent: 35, capAtFullAlbumPrice: true },
+      message: 'Configuración actualizada'
+    }));
+
+    service.updatePricingConfig({ tier3DiscountPercent: 25 }).subscribe((res) => {
+      expect(res.success).toBe(true);
+      expect(res.config.tier3DiscountPercent).toBe(25);
+    });
+
+    expect(mockHttpClient.put).toHaveBeenCalledWith(
+      'http://localhost:4000/api/admin/promotions/config',
+      { tier3DiscountPercent: 25 },
+      expect.objectContaining({ headers: expect.anything() })
+    );
+  });
+
+  it('debe crear un nuevo cupón con createCoupon', () => {
+    mockHttpClient.post.mockReturnValue(of({
+      success: true,
+      coupon: { code: 'FIESTA20', discountPercent: 20, isActive: true, usedCount: 0 },
+      message: 'Cupón creado'
+    }));
+
+    service.createCoupon({ code: 'FIESTA20', discountPercent: 20 }).subscribe((res) => {
+      expect(res.success).toBe(true);
+      expect(res.coupon.code).toBe('FIESTA20');
+    });
+
+    expect(mockHttpClient.post).toHaveBeenCalledWith(
+      'http://localhost:4000/api/admin/promotions/coupons',
+      { code: 'FIESTA20', discountPercent: 20 },
+      expect.objectContaining({ headers: expect.anything() })
+    );
+  });
+
+  it('debe actualizar o alternar el estado de un cupón con updateCoupon', () => {
+    mockHttpClient.patch.mockReturnValue(of({
+      success: true,
+      coupon: { code: 'FIESTA20', discountPercent: 20, isActive: false, usedCount: 0 },
+      message: 'Cupón actualizado'
+    }));
+
+    service.updateCoupon('FIESTA20', { isActive: false }).subscribe((res) => {
+      expect(res.success).toBe(true);
+      expect(res.coupon.isActive).toBe(false);
+    });
+
+    expect(mockHttpClient.patch).toHaveBeenCalledWith(
+      'http://localhost:4000/api/admin/promotions/coupons/FIESTA20',
+      { isActive: false },
+      expect.objectContaining({ headers: expect.anything() })
+    );
+  });
+
+  it('debe eliminar un cupón con deleteCoupon', () => {
+    mockHttpClient.delete.mockReturnValue(of({
+      success: true,
+      code: 'FIESTA20',
+      message: 'Cupón eliminado'
+    }));
+
+    service.deleteCoupon('FIESTA20').subscribe((res) => {
+      expect(res.success).toBe(true);
+      expect(res.code).toBe('FIESTA20');
+    });
+
+    expect(mockHttpClient.delete).toHaveBeenCalledWith(
+      'http://localhost:4000/api/admin/promotions/coupons/FIESTA20',
+      expect.objectContaining({ headers: expect.anything() })
     );
   });
 });

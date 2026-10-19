@@ -37,7 +37,7 @@ import { Component, ChangeDetectionStrategy } from '@angular/core';
           <!-- Redes Sociales de la Fotógrafa -->
           <div class="flex items-center justify-center sm:justify-start gap-2.5 mt-4 pt-3 border-t border-black/[0.04]">
             <a
-              href="https://instagram.com"
+              href="https://www.instagram.com/la.tercera.es/"
               target="_blank"
               rel="noopener noreferrer"
               class="px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-semibold flex items-center gap-1.5 transition"

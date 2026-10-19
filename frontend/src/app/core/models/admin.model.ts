@@ -249,4 +249,54 @@ export interface DeleteAlbumPhotoResponse {
   message: string;
 }
 
+export interface PricingTierConfig {
+  enableTierDiscounts: boolean;
+  tier3DiscountPercent: number;
+  tier5DiscountPercent: number;
+  capAtFullAlbumPrice: boolean;
+}
+
+export interface CouponDTO {
+  code: string;
+  discountPercent: number;
+  isActive: boolean;
+  albumId?: string | null;
+  maxUses?: number | null;
+  usedCount: number;
+  maxPhotos?: number | null;
+  expiresAt?: string | null;
+  createdAt?: string;
+}
+
+export interface AdminPromotionsResponse {
+  success: boolean;
+  config: PricingTierConfig;
+  coupons: CouponDTO[];
+}
+
+export interface ValidateCouponResponse {
+  valid: boolean;
+  code?: string;
+  discountPercentage?: number;
+  message: string;
+}
+
+export interface CreateCouponRequest {
+  code: string;
+  discountPercent: number;
+  isActive?: boolean;
+  albumId?: string | null;
+  maxUses?: number | null;
+  maxPhotos?: number | null;
+  expiresAt?: string | null;
+}
+
+export interface UpdateCouponRequest {
+  discountPercent?: number;
+  isActive?: boolean;
+  maxUses?: number | null;
+  maxPhotos?: number | null;
+  expiresAt?: string | null;
+}
+
 

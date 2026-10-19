@@ -1,0 +1,21 @@
+{
+  "config": {
+    "enableTierDiscounts": true,
+    "tier3DiscountPercent": 20,
+    "tier5DiscountPercent": 30,
+    "capAtFullAlbumPrice": true
+  },
+  "coupons": [
+    {
+      "code": "YUYO10",
+      "discountPercent": 10,
+      "isActive": true,
+      "albumId": null,
+      "maxUses": null,
+      "usedCount": 0,
+      "maxPhotos": null,
+      "expiresAt": null,
+      "createdAt": "2026-10-16T20:01:40.458Z"
+    }
+  ]
+}

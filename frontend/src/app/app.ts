@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, computed, effect, untracked, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HeaderComponent } from './features/header/header.component';
 import { HeroComponent } from './features/hero/hero.component';
@@ -11,10 +11,14 @@ import { PaymentSuccessComponent } from './features/payment-success/payment-succ
 import { AlbumCard3dComponent } from './features/album-card-3d/album-card-3d.component';
 import { PhotoCardPolaroidComponent } from './features/photo-card-polaroid/photo-card-polaroid.component';
 import { PinUnlockModalComponent } from './features/pin-unlock/pin-unlock-modal.component';
+import { OrderRecoveryModalComponent } from './features/order-recovery/order-recovery-modal.component';
 import { AlbumService } from './core/services/album.service';
 import { CartStore } from './core/state/cart.store';
 import { AdminAuthStore } from './core/state/admin-auth.store';
 import { AlbumAccessStore } from './core/state/album-access.store';
+import { PaymentService } from './core/services/payment.service';
+import { CategoryService } from './core/services/category.service';
+import { CategoryDTO, DEFAULT_CATEGORIES } from './core/models/category.model';
 import { Album, AlbumCategory } from './core/models/album.model';
 import { Photo } from './core/models/photo.model';
 
@@ -33,17 +37,72 @@ import { Photo } from './core/models/photo.model';
     PaymentSuccessComponent,
     AlbumCard3dComponent,
     PhotoCardPolaroidComponent,
-    PinUnlockModalComponent
+    PinUnlockModalComponent,
+    OrderRecoveryModalComponent
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './app.html',
   styleUrl: './app.css'
 })
-export class App implements OnInit {
+export class App implements OnInit, OnDestroy {
   public readonly albumService = inject(AlbumService);
   public readonly cartStore = inject(CartStore);
   public readonly adminAuthStore = inject(AdminAuthStore);
   public readonly albumAccessStore = inject(AlbumAccessStore);
+  public readonly paymentService = inject(PaymentService);
+  public readonly categoryService = inject(CategoryService);
+
+  // Categorías dinámicas consultadas desde la API / Supabase
+  public readonly apiCategories = signal<readonly CategoryDTO[]>(DEFAULT_CATEGORIES);
+
+  public readonly publicCategories = computed(() => {
+    const albums = this.albums();
+    const baseCategories = this.apiCategories();
+    const map = new Map<string, { id: string; name: string; icon: string; count: number }>();
+
+    for (const cat of baseCategories) {
+      if (cat.isActive) {
+        map.set(cat.id, {
+          id: cat.id,
+          name: cat.name,
+          icon: cat.icon,
+          count: 0
+        });
+      }
+    }
+
+    for (const album of albums) {
+      const catKey = album.category || 'otros';
+      if (!map.has(catKey)) {
+        const badgeParts = (album.badge || '').trim().split(' ');
+        const icon = badgeParts.length > 1 ? badgeParts[0] : '📸';
+        const name = badgeParts.length > 1 ? badgeParts.slice(1).join(' ') : (album.category || 'Evento');
+        map.set(catKey, {
+          id: catKey,
+          name: name.charAt(0).toUpperCase() + name.slice(1),
+          icon,
+          count: 0
+        });
+      }
+      const existing = map.get(catKey)!;
+      existing.count += 1;
+    }
+
+    return Array.from(map.values()).filter(
+      c => c.count > 0 || ['futbol', 'motos', 'hockey', 'basquet', 'sociales'].includes(c.id)
+    );
+  });
+
+  // Splash Screen de Inicio
+  public readonly showSplash = signal<boolean>(true);
+  private splashTimer: any = null;
+
+  // Estado de carga de álbumes públicos
+  public readonly isLoadingPublicAlbums = signal<boolean>(true);
+
+  // Estado de carga de fotografías del álbum seleccionado
+  public readonly isLoadingAlbumPhotos = signal<boolean>(false);
+  public readonly albumPhotosLoaded = signal<boolean>(false);
 
   // Modal de desbloqueo de álbum privado con PIN
   public readonly selectedPrivateAlbum = signal<Album | null>(null);
@@ -68,12 +127,17 @@ export class App implements OnInit {
   // Estado del Checkout Modal
   public readonly isCheckoutOpen = signal<boolean>(false);
 
-  // Álbumes filtrados
+  // Estado del Modal de Recuperación de Órdenes
+  public readonly isOrderRecoveryOpen = signal<boolean>(false);
+
+  // Álbumes filtrados y búsqueda
   public readonly searchQuery = signal<string>('');
+  public readonly selectedDate = signal<string>('');
 
   public readonly filteredAlbums = computed(() => {
     const cat = this.selectedCategory();
     const query = this.searchQuery().trim().toLowerCase();
+    const targetDate = this.selectedDate().trim();
     let list = this.albums();
 
     if (cat !== 'all') {
@@ -87,6 +151,12 @@ export class App implements OnInit {
         (a.location && a.location.toLowerCase().includes(query)) ||
         (a.date && a.date.toLowerCase().includes(query)) ||
         (a.badge && a.badge.toLowerCase().includes(query))
+      );
+    }
+
+    if (targetDate) {
+      list = list.filter(a =>
+        a.eventDate === targetDate || (a.date && a.date.includes(targetDate))
       );
     }
 
@@ -104,9 +174,9 @@ export class App implements OnInit {
     this.currentPage.set(1);
   }
 
-  // Paginación en portfolio público
+  // Paginación en portfolio público (6 tarjetas por página)
   public readonly currentPage = signal<number>(1);
-  public readonly pageSize = signal<number>(8);
+  public readonly pageSize = signal<number>(6);
 
   public readonly totalPages = computed(() => {
     const total = this.filteredAlbums().length;
@@ -137,6 +207,114 @@ export class App implements OnInit {
     return Math.min(this.currentPage() * this.pageSize(), total);
   });
 
+  // --- Paginación y Filtros de la Galería Interna de Fotos (12 fotos por página) ---
+  public readonly photosCurrentPage = signal<number>(1);
+  public readonly photosPageSize = signal<number>(12);
+  public readonly photosFilterMode = signal<'todas' | 'elegidas' | 'hd'>('todas');
+
+  public readonly filteredAlbumPhotos = computed<readonly Photo[]>(() => {
+    const mode = this.photosFilterMode();
+    const allPhotos = this.currentPhotos();
+    if (mode === 'elegidas') {
+      return allPhotos.filter(p => this.cartStore.isPhotoSelected(p.id));
+    }
+    if (mode === 'hd') {
+      return allPhotos.filter(p => Boolean(p.isSampleHD));
+    }
+    return allPhotos;
+  });
+
+  public readonly photosTotalPages = computed(() => {
+    const total = this.filteredAlbumPhotos().length;
+    return Math.max(1, Math.ceil(total / this.photosPageSize()));
+  });
+
+  public readonly paginatedAlbumPhotos = computed<readonly { photo: Photo; originalIndex: number }[]>(() => {
+    const filtered = this.filteredAlbumPhotos();
+    const allPhotos = this.currentPhotos();
+    const page = this.photosCurrentPage();
+    const size = this.photosPageSize();
+    const from = (page - 1) * size;
+    const slice = filtered.slice(from, from + size);
+
+    return slice.map(photo => {
+      const originalIndex = allPhotos.findIndex(p => p.id === photo.id);
+      return {
+        photo,
+        originalIndex: originalIndex >= 0 ? originalIndex : 0
+      };
+    });
+  });
+
+  public readonly photosPaginationPages = computed<number[]>(() => {
+    const total = this.photosTotalPages();
+    return Array.from({ length: total }, (_, i) => i + 1);
+  });
+
+  public readonly photosShowingFrom = computed(() => {
+    const total = this.filteredAlbumPhotos().length;
+    if (total === 0) return 0;
+    return (this.photosCurrentPage() - 1) * this.photosPageSize() + 1;
+  });
+
+  public readonly photosShowingTo = computed(() => {
+    const total = this.filteredAlbumPhotos().length;
+    return Math.min(this.photosCurrentPage() * this.photosPageSize(), total);
+  });
+
+  public setPhotosFilterMode(mode: 'todas' | 'elegidas' | 'hd'): void {
+    this.photosFilterMode.set(mode);
+    this.photosCurrentPage.set(1);
+  }
+
+  public goToPhotosPage(page: number): void {
+    if (page >= 1 && page <= this.photosTotalPages()) {
+      this.photosCurrentPage.set(page);
+    }
+  }
+
+  public nextPhotosPage(): void {
+    if (this.photosCurrentPage() < this.photosTotalPages()) {
+      this.goToPhotosPage(this.photosCurrentPage() + 1);
+    }
+  }
+
+  public prevPhotosPage(): void {
+    if (this.photosCurrentPage() > 1) {
+      this.goToPhotosPage(this.photosCurrentPage() - 1);
+    }
+  }
+
+  constructor() {
+    // Resetear a página 1 del portfolio cuando cambian filtros
+    effect(() => {
+      this.selectedCategory();
+      this.searchQuery();
+      this.selectedDate();
+      untracked(() => {
+        this.currentPage.set(1);
+      });
+    });
+
+    // Ajustar currentPage si totalPages disminuye
+    effect(() => {
+      const total = this.totalPages();
+      const curr = untracked(() => this.currentPage());
+      if (curr > total) {
+        untracked(() => this.currentPage.set(total));
+      }
+    });
+
+    // Ajustar photosCurrentPage si photosTotalPages disminuye
+    effect(() => {
+      const total = this.photosTotalPages();
+      const curr = untracked(() => this.photosCurrentPage());
+      if (curr > total) {
+        untracked(() => this.photosCurrentPage.set(total));
+      }
+    });
+  }
+
   // Fotos reales dinámicas del álbum actual
   public readonly activeAlbumPhotos = signal<readonly Photo[]>([]);
 
@@ -144,6 +322,11 @@ export class App implements OnInit {
   public readonly currentPhotos = computed<readonly Photo[]>(() => {
     const album = this.currentAlbum();
     if (!album) return [];
+
+    // Si aún está cargando desde el servidor, retornar vacío para evitar fotos dummy parpadeantes
+    if (this.isLoadingAlbumPhotos()) {
+      return [];
+    }
 
     // 1. Fotos reales dinámicas consultadas desde la API (/api/albums/:id/photos)
     const fetched = this.activeAlbumPhotos();
@@ -154,16 +337,20 @@ export class App implements OnInit {
     // 2. Fotos presentes directamente en el modelo de álbum
     if (album.photos && album.photos.length > 0) return album.photos;
 
-    // 3. Fallback de fotos de demostración basadas en el conteo del álbum
-    return Array.from({ length: Math.min(album.photosCount, 24) }, (_, i) => ({
-      id: `${album.id}-photo-${i + 1}`,
-      albumId: album.id,
-      title: `${album.title} • Foto ${i + 1}`,
-      previewUrl: album.coverUrl,
-      originalWidth: 4000,
-      originalHeight: 3000,
-      isSampleHD: i < 3 // Primeras 3 fotos son muestras HD destacadas
-    }));
+    // 3. Fallback de fotos de demostración solo cuando ya terminó la carga y no hay fotos reales
+    if (this.albumPhotosLoaded() && this.activeAlbumPhotos().length === 0) {
+      return Array.from({ length: Math.min(album.photosCount, 24) }, (_, i) => ({
+        id: `${album.id}-photo-${i + 1}`,
+        albumId: album.id,
+        title: `${album.title} • Foto ${i + 1}`,
+        previewUrl: album.coverUrl,
+        originalWidth: 4000,
+        originalHeight: 3000,
+        isSampleHD: i < 3 // Primeras 3 fotos son muestras HD destacadas
+      }));
+    }
+
+    return [];
   });
 
   public readonly currentLightboxPhoto = computed<Photo | null>(() => {
@@ -177,13 +364,48 @@ export class App implements OnInit {
     return p ? this.cartStore.isPhotoSelected(p.id) : false;
   });
 
+  public dismissSplash(): void {
+    if (this.splashTimer) {
+      clearTimeout(this.splashTimer);
+      this.splashTimer = null;
+    }
+    this.showSplash.set(false);
+    if (typeof sessionStorage !== 'undefined') {
+      try {
+        sessionStorage.setItem('la_tercera_splash_seen', 'true');
+      } catch {}
+    }
+  }
+
+  public initSplashScreen(): void {
+    if (typeof sessionStorage !== 'undefined') {
+      try {
+        const seen = sessionStorage.getItem('la_tercera_splash_seen');
+        if (seen === 'true') {
+          this.showSplash.set(false);
+          return;
+        }
+      } catch {}
+    }
+
+    if (typeof window !== 'undefined') {
+      this.splashTimer = setTimeout(() => {
+        this.dismissSplash();
+      }, 900);
+    }
+  }
+
   public loadPublicAlbums(): void {
+    this.isLoadingPublicAlbums.set(true);
     this.albumService.getAlbums().subscribe({
       next: (albums) => {
+        this.isLoadingPublicAlbums.set(false);
         this.albums.set(albums);
         this.checkDirectAlbumLink();
+        this.dismissSplash();
       },
       error: () => {
+        this.isLoadingPublicAlbums.set(false);
         // Fallback local con álbumes oficiales de La Tercera
         this.albums.set([
           {
@@ -236,6 +458,7 @@ export class App implements OnInit {
           }
         ]);
         this.checkDirectAlbumLink();
+        this.dismissSplash();
       }
     });
   }
@@ -255,8 +478,36 @@ export class App implements OnInit {
     }
   }
 
+  public loadCategories(): void {
+    this.categoryService.getCategories().subscribe({
+      next: (cats) => {
+        if (cats && cats.length > 0) {
+          this.apiCategories.set(cats);
+        }
+      },
+      error: () => {
+        // Fallback defensivo a DEFAULT_CATEGORIES
+      }
+    });
+  }
+
   ngOnInit(): void {
+    this.initSplashScreen();
     this.loadPublicAlbums();
+    this.loadCategories();
+    this.cartStore.refreshPricingConfig();
+
+    // Sincronización de configuración de descuentos por volumen desde el backend
+    this.paymentService.getPricingConfig().subscribe({
+      next: (config) => {
+        if (config) {
+          this.cartStore.setTierConfig(config);
+        }
+      },
+      error: () => {
+        // Fallback defensivo a valores por defecto
+      }
+    });
 
     // Detección de retorno de pasarela de pagos (Mercado Pago Checkout Pro) o enlaces directos
     if (typeof window !== 'undefined') {
@@ -284,6 +535,13 @@ export class App implements OnInit {
           });
         }
       });
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (this.splashTimer) {
+      clearTimeout(this.splashTimer);
+      this.splashTimer = null;
     }
   }
 
@@ -364,6 +622,11 @@ export class App implements OnInit {
       return;
     }
 
+    this.isLoadingAlbumPhotos.set(true);
+    this.albumPhotosLoaded.set(false);
+    this.photosCurrentPage.set(1);
+    this.photosFilterMode.set('todas');
+
     this.transitionView(() => {
       this.currentAlbum.set(album);
       this.cartStore.setAlbumPricing(album.id, album.fullAlbumPrice, album.unitPrice);
@@ -374,11 +637,15 @@ export class App implements OnInit {
     // Cargar fotos reales del álbum desde el backend / Supabase
     this.albumService.getAlbumPhotos(album.id).subscribe({
       next: (photos) => {
+        this.isLoadingAlbumPhotos.set(false);
+        this.albumPhotosLoaded.set(true);
         if (photos && photos.length > 0) {
           this.activeAlbumPhotos.set(photos);
         }
       },
       error: (err) => {
+        this.isLoadingAlbumPhotos.set(false);
+        this.albumPhotosLoaded.set(true);
         console.warn('[App] No se pudieron cargar fotos desde el backend, usando fallback:', err);
       }
     });
@@ -391,6 +658,10 @@ export class App implements OnInit {
   public goHome(): void {
     this.transitionView(() => {
       this.activeAlbumPhotos.set([]);
+      this.isLoadingAlbumPhotos.set(false);
+      this.albumPhotosLoaded.set(false);
+      this.photosCurrentPage.set(1);
+      this.photosFilterMode.set('todas');
       this.loadPublicAlbums();
       this.currentView.set('portfolio');
     });
@@ -427,7 +698,8 @@ export class App implements OnInit {
   }
 
   public openLightbox(photo: Photo, index: number): void {
-    this.lightboxIndex.set(index);
+    const realIndex = this.currentPhotos().findIndex(p => p.id === photo.id);
+    this.lightboxIndex.set(realIndex >= 0 ? realIndex : index);
     this.isLightboxOpen.set(true);
   }
 
@@ -447,8 +719,12 @@ export class App implements OnInit {
     this.lightboxIndex.update(i => (i - 1 + total) % total);
   }
 
-  public togglePhotoFromLightbox(photo: Photo): void {
+  public togglePhoto(photo: Photo): void {
     this.cartStore.togglePhoto(photo);
+  }
+
+  public togglePhotoFromLightbox(photo: Photo): void {
+    this.togglePhoto(photo);
   }
 
   public openCheckout(): void {
@@ -458,4 +734,13 @@ export class App implements OnInit {
   public closeCheckout(): void {
     this.isCheckoutOpen.set(false);
   }
+
+  public openOrderRecovery(): void {
+    this.isOrderRecoveryOpen.set(true);
+  }
+
+  public closeOrderRecovery(): void {
+    this.isOrderRecoveryOpen.set(false);
+  }
 }
+

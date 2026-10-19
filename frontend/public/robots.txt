@@ -1,0 +1,10 @@
+# robots.txt para LA TERCERA - Fotografía Profesional
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /admin/
+Disallow: /pago-exitoso
+Disallow: /pago-exitoso/
+Disallow: /api/
+
+Sitemap: https://latercerafotografia.com.ar/sitemap.xml

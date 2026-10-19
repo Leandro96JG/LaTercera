@@ -3,7 +3,7 @@ import crypto from 'crypto';
 
 export interface AlbumDTO {
   id: string;
-  category: 'futbol' | 'hockey' | 'basquet' | 'sociales' | 'otros';
+  category: string;
   title: string;
   subtitle?: string;
   date?: string;
@@ -82,6 +82,18 @@ export function generateAlbumSlug(title: string, dateStr?: string): string {
   return base.slice(0, 80);
 }
 
+/**
+ * Normaliza URLs de vista previa para garantizar que sean absolutas si provienen del backend local
+ */
+export function normalizePreviewUrl(url: string | null | undefined): string {
+  if (!url) return '';
+  if (url.startsWith('/uploads/') || url.startsWith('/')) {
+    const backendUrl = (process.env.BACKEND_URL || 'http://localhost:4000').replace(/\/+$/, '');
+    return `${backendUrl}${url}`;
+  }
+  return url;
+}
+
 export interface PaginationMeta {
   total: number;
   page: number;
@@ -126,6 +138,7 @@ export interface IAlbumRepository {
   // Métodos de Fotos del Álbum
   addPhotosToAlbum(albumId: string, photos: PhotoDTO[]): Promise<void>;
   getPhotosByAlbumId(albumId: string): Promise<PhotoDTO[]>;
+  getPhotosByAlbum?(albumId: string): Promise<PhotoDTO[]>;
   getPhotoById(albumId: string, photoId: string): Promise<PhotoDTO | null>;
   updatePhoto(albumId: string, photoId: string, updates: Partial<PhotoDTO>): Promise<PhotoDTO | null>;
   deletePhoto(albumId: string, photoId: string): Promise<boolean>;
@@ -134,9 +147,12 @@ export interface IAlbumRepository {
   findAll(category?: string): Promise<AlbumDTO[]>;
   findById(id: string): Promise<AlbumDTO | null>;
   create(album: AlbumDTO): Promise<AlbumDTO>;
+
+  // Métricas y Almacenamiento
+  getTotalStorageBytes(): Promise<number>;
 }
 
-const INITIAL_OFFICIAL_ALBUMS: AlbumDTO[] = [
+export const INITIAL_OFFICIAL_ALBUMS: AlbumDTO[] = [
   {
     id: 'album-1',
     category: 'futbol',
@@ -357,8 +373,36 @@ export class MemoryAlbumRepository implements IAlbumRepository {
   }
 
   async getPhotosByAlbumId(albumId: string): Promise<PhotoDTO[]> {
-    const list = this.photos.get(albumId) || [];
-    return list.map(p => ({ ...p }));
+    let list = this.photos.get(albumId);
+    if (!list || list.length === 0) {
+      const album = this.albums.get(albumId) || INITIAL_OFFICIAL_ALBUMS.find(a => a.id === albumId);
+      if (album && (album.photosCount || 0) > 0) {
+        const count = Math.min(album.photosCount, 12);
+        list = Array.from({ length: count }, (_, i) => ({
+          id: `${album.id}-photo-${i + 1}`,
+          albumId: album.id,
+          filename: `${album.id}_muestra_${i + 1}.webp`,
+          originalPath: `originals/${album.id}/${album.id}_muestra_${i + 1}.jpg`,
+          previewUrl: normalizePreviewUrl(album.coverUrl || 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=800&q=80'),
+          isSampleHd: i < 2,
+          width: 4000,
+          height: 3000,
+          sizeBytes: 3500000,
+          createdAt: new Date().toISOString()
+        }));
+        this.photos.set(albumId, list);
+      } else {
+        list = [];
+      }
+    }
+    return list.map(p => ({
+      ...p,
+      previewUrl: normalizePreviewUrl(p.previewUrl)
+    }));
+  }
+
+  async getPhotosByAlbum(albumId: string): Promise<PhotoDTO[]> {
+    return this.getPhotosByAlbumId(albumId);
   }
 
   async getPhotoById(albumId: string, photoId: string): Promise<PhotoDTO | null> {
@@ -430,7 +474,7 @@ export class MemoryAlbumRepository implements IAlbumRepository {
 
   async listAlbumsPaginated(options: AlbumPaginationOptions = {}): Promise<PaginatedAlbumsResult> {
     const page = Math.max(1, Number(options.page) || 1);
-    const limit = Math.max(1, Math.min(50, Number(options.limit) || 8));
+    const limit = Math.max(1, Math.min(200, Number(options.limit) || 200));
 
     let list = Array.from(this.albums.values()).filter(a => a.isPublished !== false && !a.deletedAt);
     list = this.filterAlbumList(list, options);
@@ -480,11 +524,28 @@ export class MemoryAlbumRepository implements IAlbumRepository {
       }
     };
   }
+
+  async getTotalStorageBytes(): Promise<number> {
+    let totalBytes = 0;
+    for (const photos of this.photos.values()) {
+      for (const p of photos) {
+        totalBytes += Number(p.sizeBytes) || 0;
+      }
+    }
+
+    if (totalBytes === 0) {
+      const activeAlbums = Array.from(this.albums.values()).filter(a => !a.deletedAt);
+      const totalPhotos = activeAlbums.reduce((sum, a) => sum + (a.photosCount || 0), 0);
+      totalBytes = totalPhotos * 3.5 * 1024 * 1024;
+    }
+
+    return totalBytes;
+  }
 }
 
 export interface SupabaseAlbumRow {
   id: string;
-  category: 'futbol' | 'hockey' | 'basquet' | 'sociales' | 'otros';
+  category: string;
   title: string;
   subtitle?: string | null;
   event_date?: string | null;
@@ -520,6 +581,7 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
   private localFreeDownloadMap = new Map<string, boolean>();
   private localPrivacyMap = new Map<string, { isPrivate: boolean; accessCode: string | null }>();
   private localPhotosMap = new Map<string, PhotoDTO[]>();
+  private localFallback = new MemoryAlbumRepository();
 
   constructor(supabase: SupabaseClient) {
     this.supabase = supabase;
@@ -588,10 +650,11 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
       error = retryRes.error;
     }
 
-    if (error || !data) {
-      // Fallback a los oficiales si la tabla aún no fue poblada
-      return INITIAL_OFFICIAL_ALBUMS;
+    if (error) {
+      console.warn('[SupabaseAlbumRepository] Error al listar álbumes públicos:', error.message);
+      return [];
     }
+    if (!data) return [];
 
     return data
       .filter((r: SupabaseAlbumRow) => !this.localTrashSet.has(r.id))
@@ -614,8 +677,7 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
       .maybeSingle();
 
     if (error || !data) {
-      const fallback = INITIAL_OFFICIAL_ALBUMS.find(a => a.id === id);
-      return fallback || null;
+      return null;
     }
 
     return this.mapRowToAlbum(data);
@@ -711,9 +773,11 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
       data = retryRes.data;
       error = retryRes.error;
     }
-    if (error || !data) {
-      return INITIAL_OFFICIAL_ALBUMS;
+    if (error) {
+      console.warn('[SupabaseAlbumRepository] Error al listar álbumes admin:', error.message);
+      return [];
     }
+    if (!data) return [];
 
     return data
       .filter((row: SupabaseAlbumRow) => !this.localTrashSet.has(row.id))
@@ -813,6 +877,7 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
     const timestamp = new Date().toISOString();
     this.localTrashSet.add(id);
     this.localTrashTimestamps.set(id, timestamp);
+    await this.localFallback.moveToTrash(id).catch(() => {});
 
     const { error } = await this.supabase
       .from('albums')
@@ -840,6 +905,7 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
   async restoreFromTrash(id: string): Promise<AlbumDTO | null> {
     this.localTrashSet.delete(id);
     this.localTrashTimestamps.delete(id);
+    await this.localFallback.restoreFromTrash(id).catch(() => {});
 
     let { data, error } = await this.supabase
       .from('albums')
@@ -866,7 +932,9 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
       error = retry.error;
     }
 
-    if (error || !data) return null;
+    if (error || !data) {
+      return this.localFallback.getAlbumById(id);
+    }
     return this.mapRowToAlbum(data as SupabaseAlbumRow);
   }
 
@@ -875,7 +943,82 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
     this.localTrashTimestamps.delete(id);
     this.localFreeDownloadMap.delete(id);
     this.localPrivacyMap.delete(id);
+    this.localPhotosMap.delete(id);
+    await this.localFallback.permanentDeleteAlbum(id).catch(() => {});
 
+    // 1. Snapshot del título del álbum en órdenes asociadas antes de desvincular
+    try {
+      const { data: currentAlbum } = await this.supabase.from('albums').select('title').eq('id', id).maybeSingle();
+      if (currentAlbum?.title) {
+        await this.supabase
+          .from('orders')
+          .update({ album_title_snapshot: currentAlbum.title })
+          .eq('album_id', id)
+          .is('album_title_snapshot', null);
+      }
+    } catch {
+      // Ignorar defensivamente si la columna aún no está creada
+    }
+
+    // 2. Limpieza de archivos en Supabase Storage (previews y originals) tolerante a fallos
+    try {
+      const { data: previewFiles } = await this.supabase.storage.from('previews').list(id);
+      if (previewFiles && previewFiles.length > 0) {
+        const paths = previewFiles.map(f => `${id}/${f.name}`);
+        await this.supabase.storage.from('previews').remove(paths);
+      }
+    } catch (err: unknown) {
+      console.warn(`[SupabaseAlbumRepository] Aviso al purgar archivos previews de álbum ${id}:`, err);
+    }
+
+    try {
+      const { data: originalFiles } = await this.supabase.storage.from('originals').list(id);
+      if (originalFiles && originalFiles.length > 0) {
+        const paths = originalFiles.map(f => `${id}/${f.name}`);
+        await this.supabase.storage.from('originals').remove(paths);
+      }
+    } catch (err: unknown) {
+      console.warn(`[SupabaseAlbumRepository] Aviso al purgar archivos originals de álbum ${id}:`, err);
+    }
+
+    // 3. Eliminar explícitamente todas las fotos vinculadas en la tabla photos
+    try {
+      await this.supabase.from('photos').delete().eq('album_id', id);
+    } catch (err: unknown) {
+      console.warn('[SupabaseAlbumRepository] Aviso al borrar fotos vinculadas:', err);
+    }
+
+    // 4. Desvincular órdenes históricas de este álbum
+    try {
+      const { error: unlinkOrdersErr } = await this.supabase
+        .from('orders')
+        .update({ album_id: null })
+        .eq('album_id', id);
+
+      if (unlinkOrdersErr && unlinkOrdersErr.message.includes('not-null constraint')) {
+        const { data: otherAlbums } = await this.supabase
+          .from('albums')
+          .select('id')
+          .neq('id', id)
+          .limit(1);
+
+        if (otherAlbums && otherAlbums.length > 0) {
+          await this.supabase.from('orders').update({ album_id: otherAlbums[0].id }).eq('album_id', id);
+        } else {
+          // Si no hay otro álbum y album_id tiene NOT NULL, limpiar órdenes de prueba para permitir el borrado
+          try {
+            await this.supabase.from('download_tokens').delete().eq('album_id', id);
+          } catch {}
+          try {
+            await this.supabase.from('orders').delete().eq('album_id', id);
+          } catch {}
+        }
+      }
+    } catch (err: unknown) {
+      console.warn('[SupabaseAlbumRepository] Aviso al desvincular órdenes históricas:', err);
+    }
+
+    // 5. Eliminar el álbum físicamente de la tabla albums
     const { error } = await this.supabase
       .from('albums')
       .delete()
@@ -964,7 +1107,7 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
 
   async listAlbumsPaginated(options: AlbumPaginationOptions = {}): Promise<PaginatedAlbumsResult> {
     const page = Math.max(1, Number(options.page) || 1);
-    const limit = Math.max(1, Math.min(50, Number(options.limit) || 8));
+    const limit = Math.max(1, Math.min(200, Number(options.limit) || 200));
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
@@ -1010,30 +1153,20 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
       error = retryRes.error;
     }
 
-    if (error || !data) {
-      let fallback = INITIAL_OFFICIAL_ALBUMS.filter(a => 
-        !options.category || options.category === 'all' || a.category === options.category
-      );
-      if (options.search && options.search.trim()) {
-        const q = options.search.trim().toLowerCase();
-        fallback = fallback.filter(a => a.title.toLowerCase().includes(q) || (a.subtitle && a.subtitle.toLowerCase().includes(q)));
-      }
-      if (options.date) {
-        fallback = fallback.filter(a => a.date && a.date.includes(options.date!));
-      }
-      const total = fallback.length;
-      const totalPages = Math.max(1, Math.ceil(total / limit));
+    if (error) {
+      console.warn('[SupabaseAlbumRepository] Error en listAlbumsPaginated:', error.message);
       return {
-        albums: fallback.slice(from, from + limit),
-        pagination: { total, page, limit, totalPages, hasNext: page < totalPages, hasPrev: page > 1 }
+        albums: [],
+        pagination: { total: 0, page, limit, totalPages: 1, hasNext: false, hasPrev: false }
       };
     }
 
-    const total = count ?? data.length;
+    const safeData = data || [];
+    const total = count ?? safeData.length;
     const totalPages = Math.max(1, Math.ceil(total / limit));
 
     return {
-      albums: data.map((row: SupabaseAlbumRow) => {
+      albums: safeData.map((row: SupabaseAlbumRow) => {
         const dto = this.mapRowToAlbum(row);
         if (dto.accessCode) dto.accessCode = '********';
         return dto;
@@ -1087,23 +1220,20 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
       count = retryRes.count;
       error = retryRes.error;
     }
-    if (error || !data) {
-      const fallback = INITIAL_OFFICIAL_ALBUMS.filter(a => 
-        !options.category || options.category === 'all' || a.category === options.category
-      );
-      const total = fallback.length;
-      const totalPages = Math.max(1, Math.ceil(total / limit));
+    if (error) {
+      console.warn('[SupabaseAlbumRepository] Error en listAllAdminPaginated:', error.message);
       return {
-        albums: fallback.slice(from, from + limit),
-        pagination: { total, page, limit, totalPages, hasNext: page < totalPages, hasPrev: page > 1 }
+        albums: [],
+        pagination: { total: 0, page, limit, totalPages: 1, hasNext: false, hasPrev: false }
       };
     }
 
-    const total = count ?? data.length;
+    const safeData = data || [];
+    const total = count ?? safeData.length;
     const totalPages = Math.max(1, Math.ceil(total / limit));
 
     return {
-      albums: data.map((row: SupabaseAlbumRow) => this.mapRowToAlbum(row)),
+      albums: safeData.map((row: SupabaseAlbumRow) => this.mapRowToAlbum(row)),
       pagination: { total, page, limit, totalPages, hasNext: page < totalPages, hasPrev: page > 1 }
     };
   }
@@ -1136,22 +1266,8 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
         .maybeSingle();
 
       if (!albumCheck) {
-        const official = INITIAL_OFFICIAL_ALBUMS.find(a => a.id === albumId);
-        if (official) {
-          await this.supabase.from('albums').upsert({
-            id: official.id,
-            category: official.category,
-            title: official.title,
-            subtitle: official.subtitle,
-            event_date: official.date,
-            cover_url: official.coverUrl,
-            photos_count: official.photosCount,
-            unit_price: official.unitPrice,
-            full_album_price: official.fullAlbumPrice,
-            badge: official.badge,
-            is_published: official.isPublished ?? true
-          }, { onConflict: 'id' });
-        }
+        // Si el álbum no existe en Supabase y no es un álbum oficial que fue borrado, abortar o avisar
+        console.warn(`[SupabaseAlbumRepository] Álbum ${albumId} no encontrado en Supabase al subir fotos`);
       }
 
       const { error } = await this.supabase
@@ -1174,13 +1290,15 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
         .eq('album_id', albumId)
         .order('created_at', { ascending: true });
 
-      if (!error && data && data.length > 0) {
+      if (error) {
+        console.warn('[SupabaseAlbumRepository] Advertencia al consultar tabla photos en Supabase:', error.message || error);
+      } else if (data && data.length > 0) {
         return data.map((r: any) => ({
           id: r.id,
           albumId: r.album_id,
           filename: r.filename,
           originalPath: r.original_path,
-          previewUrl: r.preview_url,
+          previewUrl: normalizePreviewUrl(r.preview_url),
           isSampleHd: Boolean(r.is_sample_hd),
           width: r.width ? Number(r.width) : undefined,
           height: r.height ? Number(r.height) : undefined,
@@ -1192,28 +1310,53 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
       console.warn('[SupabaseAlbumRepository] Error consultando tabla photos en Supabase:', err);
     }
 
+    // 1. Fallback en memoria local temporal de subidas
     const cached = this.localPhotosMap.get(albumId);
     if (cached && cached.length > 0) {
-      return cached.map(p => ({ ...p }));
+      return cached.map(p => ({
+        ...p,
+        previewUrl: normalizePreviewUrl(p.previewUrl)
+      }));
     }
 
-    const defaultAlb = INITIAL_OFFICIAL_ALBUMS.find(a => a.id === albumId);
-    if (defaultAlb) {
-      return Array.from({ length: Math.min(defaultAlb.photosCount, 12) }, (_, i) => ({
-        id: `${defaultAlb.id}-photo-${i + 1}`,
-        albumId: defaultAlb.id,
-        filename: `${defaultAlb.id}_muestra_${i + 1}.webp`,
-        originalPath: `originals/${defaultAlb.id}/${defaultAlb.id}_muestra_${i + 1}.jpg`,
-        previewUrl: defaultAlb.coverUrl,
+    // 2. Fallback a localFallback repository (MemoryAlbumRepository)
+    try {
+      const fallbackPhotos = await this.localFallback.getPhotosByAlbumId(albumId);
+      if (fallbackPhotos && fallbackPhotos.length > 0) {
+        return fallbackPhotos.map(p => ({
+          ...p,
+          previewUrl: normalizePreviewUrl(p.previewUrl)
+        }));
+      }
+    } catch (fallbackErr: unknown) {
+      console.warn('[SupabaseAlbumRepository] Error en localFallback.getPhotosByAlbumId:', fallbackErr);
+    }
+
+    // 3. Fallback para álbumes existentes con photosCount > 0
+    const album = await this.getAlbumById(albumId);
+    if (album && (album.photosCount || 0) > 0) {
+      const count = Math.min(album.photosCount, 12);
+      const demoPhotos: PhotoDTO[] = Array.from({ length: count }, (_, i) => ({
+        id: `${album.id}-photo-${i + 1}`,
+        albumId: album.id,
+        filename: `${album.id}_muestra_${i + 1}.webp`,
+        originalPath: `originals/${album.id}/${album.id}_muestra_${i + 1}.jpg`,
+        previewUrl: normalizePreviewUrl(album.coverUrl || 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=800&q=80'),
         isSampleHd: i < 2,
         width: 4000,
         height: 3000,
         sizeBytes: 3500000,
         createdAt: new Date().toISOString()
       }));
+      this.localPhotosMap.set(albumId, demoPhotos);
+      return demoPhotos;
     }
 
     return [];
+  }
+
+  async getPhotosByAlbum(albumId: string): Promise<PhotoDTO[]> {
+    return this.getPhotosByAlbumId(albumId);
   }
 
   async getPhotoById(albumId: string, photoId: string): Promise<PhotoDTO | null> {
@@ -1321,5 +1464,35 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
     }
 
     return true;
+  }
+
+  async getTotalStorageBytes(): Promise<number> {
+    try {
+      const { data, error } = await this.supabase
+        .from('photos')
+        .select('size_bytes');
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        const total = data.reduce((sum, p) => sum + (Number(p.size_bytes) || 0), 0);
+        if (total > 0) {
+          return total;
+        }
+      }
+    } catch (err: unknown) {
+      console.warn('[SupabaseAlbumRepository] Error al calcular almacenamiento total en Supabase:', err);
+    }
+
+    let localTotal = 0;
+    for (const photos of this.localPhotosMap.values()) {
+      for (const p of photos) {
+        localTotal += Number(p.sizeBytes) || 0;
+      }
+    }
+
+    if (localTotal > 0) {
+      return localTotal;
+    }
+
+    return this.localFallback.getTotalStorageBytes();
   }
 }

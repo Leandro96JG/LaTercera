@@ -52,6 +52,17 @@ import { Component, ChangeDetectionStrategy, output, input } from '@angular/core
           </button>
         }
 
+        <!-- Botón Recuperar Fotos Compradas (Mis Compras) -->
+        <button
+          type="button"
+          (click)="openRecoveryModal.emit()"
+          class="px-3.5 py-2 rounded-2xl bg-white hover:bg-zinc-100 border border-black/[0.06] flex items-center gap-1.5 text-zinc-800 text-xs font-semibold shadow-sm transition active:scale-95"
+          title="Recuperar fotos de compras anteriores"
+        >
+          <span>📥</span>
+          <span>Mis Compras</span>
+        </button>
+
         <!-- Botón Contacto WhatsApp para Contrataciones -->
         <a
           href="https://wa.me/5493804868714?text=Hola%20Yuyo!%20Me%20gustar%C3%ADa%20consultar%20por%20cobertura%20fotogr%C3%A1fica%20para%20un%20evento"
@@ -72,4 +83,6 @@ export class HeaderComponent {
   public readonly goHome = output<void>();
   public readonly changeView = output<'portfolio' | 'admin'>();
   public readonly logout = output<void>();
+  public readonly openRecoveryModal = output<void>();
 }
+

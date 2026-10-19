@@ -5,6 +5,7 @@ import { OrderService } from '../src/services/order.service';
 import { MemoryStorageService } from '../src/services/storage.service';
 import { DeliveryService } from '../src/services/delivery.service';
 import { createDownloadsRouter } from '../src/routes/downloads.routes';
+import { MemoryAlbumRepository } from '../src/repositories/album.repository';
 
 describe('Downloads API Routes (TDD)', () => {
   const SECRET = 'clave_secreta_super_segura_de_al_menos_32_caracteres_12345';
@@ -162,5 +163,103 @@ describe('Downloads API Routes (TDD)', () => {
 
     expect(Buffer.isBuffer(sentBuffer)).toBe(true);
     expect(sentBuffer.toString()).toBe('LA_TERCERA_HD_ORIGINAL_photo-no-fisica');
+  });
+
+  describe('GET /api/downloads/free/:albumId/photo/:photoId (Descarga Individual Gratuita)', () => {
+    it('debe responder 404 si el álbum no existe o está eliminado', async () => {
+      const albumRepo = new MemoryAlbumRepository();
+      const router = createDownloadsRouter(deliveryService, orderService, storageService, albumRepo);
+      const handler = (router as any).stack.find((s: any) => s.route?.path === '/free/:albumId/photo/:photoId')?.route?.stack[0]?.handle;
+
+      let statusCode = 200;
+      let jsonResult: any = null;
+      const req: any = { params: { albumId: 'inexistente', photoId: 'p1' }, headers: {}, query: {} };
+      const res: any = {
+        status: (code: number) => {
+          statusCode = code;
+          return res;
+        },
+        json: (data: any) => {
+          jsonResult = data;
+        }
+      };
+
+      await handler(req, res);
+      expect(statusCode).toBe(404);
+      expect(jsonResult.error).toContain('Álbum no encontrado');
+    });
+
+    it('debe responder 403 si el álbum no tiene isFreeDownload habilitado', async () => {
+      const albumRepo = new MemoryAlbumRepository();
+      await albumRepo.createAlbum({
+        id: 'alb-pago',
+        title: 'Álbum Pago',
+        category: 'futbol',
+        unitPrice: 1200,
+        fullAlbumPrice: 8000,
+        coverUrl: 'https://example.com/cover.jpg',
+        photosCount: 1,
+        isFreeDownload: false
+      });
+
+      const router = createDownloadsRouter(deliveryService, orderService, storageService, albumRepo);
+      const handler = (router as any).stack.find((s: any) => s.route?.path === '/free/:albumId/photo/:photoId')?.route?.stack[0]?.handle;
+
+      let statusCode = 200;
+      let jsonResult: any = null;
+      const req: any = { params: { albumId: 'alb-pago', photoId: 'p1' }, headers: {}, query: {} };
+      const res: any = {
+        status: (code: number) => {
+          statusCode = code;
+          return res;
+        },
+        json: (data: any) => {
+          jsonResult = data;
+        }
+      };
+
+      await handler(req, res);
+      expect(statusCode).toBe(403);
+      expect(jsonResult.error).toContain('no tiene habilitada la descarga gratuita');
+    });
+
+    it('debe responder 200 con el buffer HD y cabeceras de adjunto cuando el álbum es gratuito', async () => {
+      const albumRepo = new MemoryAlbumRepository();
+      await albumRepo.createAlbum({
+        id: 'alb-gratis',
+        title: 'Álbum Cortesía Fin de Año',
+        category: 'sociales',
+        unitPrice: 1200,
+        fullAlbumPrice: 8000,
+        coverUrl: 'https://example.com/cover.jpg',
+        photosCount: 1,
+        isFreeDownload: true
+      });
+
+      const realBuffer = Buffer.from('CONTENIDO_FOTO_HD_GRATIS_REAL');
+      await storageService.saveOriginal('alb-gratis', 'foto-libre', '.jpg', realBuffer);
+
+      const router = createDownloadsRouter(deliveryService, orderService, storageService, albumRepo);
+      const handler = (router as any).stack.find((s: any) => s.route?.path === '/free/:albumId/photo/:photoId')?.route?.stack[0]?.handle;
+
+      let sentBuffer: any = null;
+      let headers: Record<string, string> = {};
+      const req: any = { params: { albumId: 'alb-gratis', photoId: 'foto-libre' }, headers: {}, query: {} };
+      const res: any = {
+        setHeader: (name: string, val: string) => {
+          headers[name] = val;
+        },
+        status: () => res,
+        send: (data: any) => {
+          sentBuffer = data;
+        }
+      };
+
+      await handler(req, res);
+      expect(headers['Content-Type']).toBe('image/jpeg');
+      expect(headers['Content-Disposition']).toContain('attachment; filename="LA_TERCERA_alb-gratis_foto-libre.jpg"');
+      expect(Buffer.isBuffer(sentBuffer)).toBe(true);
+      expect(sentBuffer.equals(realBuffer)).toBe(true);
+    });
   });
 });

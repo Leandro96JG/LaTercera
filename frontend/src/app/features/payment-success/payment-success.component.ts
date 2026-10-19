@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, OnInit, OnDestroy, input, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import confetti from 'canvas-confetti';
 import { DeliveryService } from '../../core/services/delivery.service';
 import { OrderDeliveryInfo, PhotoDownloadItem, DeliveryStatusResponse } from '../../core/models/delivery.model';
 
@@ -29,6 +30,7 @@ export class PaymentSuccessComponent implements OnInit, OnDestroy {
   public readonly downloadingPhotoId = signal<string | null>(null);
   public readonly remainingSeconds = signal<number>(0);
   public readonly pollingAttempt = signal<number>(0);
+  public readonly currentOrderId = signal<string | null>(null);
 
   public readonly formattedRemainingTime = computed(() => {
     return this.deliveryService.formatRemainingTime(this.remainingSeconds());
@@ -96,6 +98,27 @@ export class PaymentSuccessComponent implements OnInit, OnDestroy {
     return id;
   }
 
+  public triggerConfetti(): void {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    try {
+      // Guardar contra entornos sin soporte completo de Canvas 2D (ej. jsdom)
+      const testCanvas = document.createElement('canvas');
+      if (!testCanvas.getContext || !testCanvas.getContext('2d')) {
+        return;
+      }
+      if (typeof confetti === 'function') {
+        confetti({
+          particleCount: 90,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#FDB813', '#131316', '#10B981', '#FFFFFF']
+        });
+      }
+    } catch {
+      // Fallback silencioso en entornos de prueba o navegadores sin canvas
+    }
+  }
+
   public loadDeliveryInfo(token: string): void {
     this.state.set('loading');
     this.errorMessage.set(null);
@@ -103,10 +126,14 @@ export class PaymentSuccessComponent implements OnInit, OnDestroy {
     this.deliveryService.getDeliveryInfo(token).subscribe({
       next: (info) => {
         if (this.isDestroyed) return;
+        const isExp = info.isExpired;
         this.orderInfo.set(info);
         this.remainingSeconds.set(info.expiresInSeconds);
-        this.isExpired.set(info.isExpired);
-        this.state.set(info.isExpired ? 'expired' : 'ready');
+        this.isExpired.set(isExp);
+        this.state.set(isExp ? 'expired' : 'ready');
+        if (!isExp) {
+          this.triggerConfetti();
+        }
       },
       error: (err: { status?: number; error?: { isExpired?: boolean; error?: string } }) => {
         if (this.isDestroyed) return;
@@ -122,6 +149,7 @@ export class PaymentSuccessComponent implements OnInit, OnDestroy {
   }
 
   public loadByOrderId(orderId: string): void {
+    this.currentOrderId.set(orderId);
     this.deliveryService.getOrderStatus(orderId).subscribe({
       next: (res: DeliveryStatusResponse) => {
         if (this.isDestroyed) return;
@@ -137,7 +165,8 @@ export class PaymentSuccessComponent implements OnInit, OnDestroy {
               this.loadByOrderId(orderId);
             }, 2500);
           } else {
-            this.state.set('ready');
+            this.state.set('error');
+            this.errorMessage.set('El pago sigue procesándose en Mercado Pago. Haz clic en Reintentar en unos segundos.');
           }
         } else if (res.status === 'FRAUD_ALERT_PRICE_MISMATCH') {
           this.state.set('error');
@@ -191,5 +220,15 @@ export class PaymentSuccessComponent implements OnInit, OnDestroy {
 
   public onGoHome(): void {
     this.goHome.emit();
+  }
+
+  public retryPolling(): void {
+    const orderId = this.currentOrderId();
+    if (orderId) {
+      this.pollingAttempt.set(0);
+      this.state.set('polling');
+      this.errorMessage.set(null);
+      this.loadByOrderId(orderId);
+    }
   }
 }

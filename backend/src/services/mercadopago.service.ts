@@ -1,5 +1,6 @@
 import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
 import { OrderService, Order } from './order.service';
+import { getPrimaryFrontendUrl } from '../config/env';
 
 export interface PreferenceResult {
   preferenceId: string;
@@ -28,7 +29,7 @@ export class MercadoPagoService {
    * Enlaza la orden con external_reference y activa binary_mode
    */
   public async createCheckoutPreference(orderId: string, baseUrl: string): Promise<PreferenceResult> {
-    const order = this.orderService.getOrder(orderId);
+    const order = await this.orderService.getOrderAsync(orderId);
     if (!order) {
       throw new Error(`Orden no encontrada: ${orderId}`);
     }
@@ -38,7 +39,7 @@ export class MercadoPagoService {
       : `LA TERCERA • Pack ${order.photoCount} Foto(s)`;
 
     const appUrl = baseUrl || process.env.APP_URL || 'http://localhost:4000';
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:4200';
+    const frontendUrl = getPrimaryFrontendUrl();
 
     const preferenceData = {
       body: {
@@ -114,7 +115,7 @@ export class MercadoPagoService {
       const currencyId = payment.currency_id || 'ARS';
       const transactionAmount = payment.transaction_amount || 0;
 
-      return this.orderService.processWebhookPayment({
+      return await this.orderService.processWebhookPaymentAsync({
         eventId,
         orderId,
         paymentId,

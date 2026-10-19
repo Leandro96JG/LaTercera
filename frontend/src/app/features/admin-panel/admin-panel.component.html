@@ -41,9 +41,9 @@
       <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-amber-400/10 rounded-full blur-2xl pointer-events-none"></div>
       <span class="text-zinc-400 text-xs font-semibold">Resumen General</span>
       <div class="my-4">
-        <span class="font-display font-black text-3xl sm:text-4xl text-white">{{ stats().photosSold }}</span>
-        <span class="text-xs text-zinc-400 block mt-1">fotos individuales vendidas</span>
-        <p class="text-xs text-amber-400 mt-1 font-medium">+{{ stats().albumsSold }} álbumes completos</p>
+        <span class="font-display font-black text-3xl sm:text-4xl text-white">{{ photosSold() }}</span>
+        <span class="text-xs text-zinc-400 block mt-1">fotos individuales entregadas</span>
+        <p class="text-xs text-amber-400 mt-1 font-medium">+{{ albumsSold() }} packs completos</p>
       </div>
       <span class="text-[10px] text-zinc-500">Temporada oficial La Rioja</span>
     </div>
@@ -51,14 +51,14 @@
     <!-- Métricas 2: Ingresos Mercado Pago -->
     <div class="bg-white rounded-[28px] p-6 border border-black/[0.05] shadow-bento flex flex-col justify-between">
       <div class="flex justify-between items-center text-xs text-zinc-400">
-        <span class="font-semibold text-zinc-700">Ingresos del Mes</span>
-        <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 font-bold text-[10px]">+24%</span>
+        <span class="font-semibold text-zinc-700">Ingresos Totales (ARS)</span>
+        <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 font-bold text-[10px]">Neto</span>
       </div>
       <div class="my-4">
-        <span class="font-display font-black text-3xl text-zinc-900">${{ stats().revenueARS.toLocaleString('es-AR') }}</span>
-        <span class="text-xs text-zinc-400 block mt-0.5">ARS en Mercado Pago</span>
+        <span class="font-display font-black text-3xl text-zinc-900">${{ totalPaidRevenue().toLocaleString('es-AR') }}</span>
+        <span class="text-xs text-zinc-400 block mt-0.5">ARS cobrados en Mercado Pago</span>
       </div>
-      <span class="text-[10px] text-zinc-400">Cobros acreditados en tu cuenta</span>
+      <span class="text-[10px] text-zinc-400">{{ paidMpOrdersCount() }} ventas con cobro • {{ freeRedemptionOrdersCount() }} canjes 100%</span>
     </div>
 
     <!-- Métricas 3: Almacenamiento & Capacidad -->
@@ -99,7 +99,7 @@
   </div>
 
   <!-- Selector de Pestañas Bento: Scroll Horizontal Elástico y Zero-Wrap -->
-  <div class="w-full overflow-x-auto no-scrollbar scroll-smooth -mx-1 px-1 sm:mx-0 sm:px-0 pb-2 border-b border-black/[0.05] touch-pan-x">
+  <div class="w-full max-w-full overflow-x-auto no-scrollbar scroll-smooth pb-2 border-b border-black/[0.05] touch-pan-x">
     <div class="flex items-center gap-2 min-w-max">
       <button
         type="button"
@@ -124,6 +124,22 @@
         @if (orders().length > 0) {
           <span class="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-400 text-zinc-950">
             {{ orders().length }}
+          </span>
+        }
+      </button>
+
+      <button
+        type="button"
+        (click)="activeTab.set('promotions'); loadPromotions()"
+        [class]="activeTab() === 'promotions'
+          ? 'px-4 py-2.5 rounded-2xl bg-zinc-950 text-white font-bold text-xs shadow-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap shrink-0 active:scale-95'
+          : 'px-4 py-2.5 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.04] transition-all duration-200 flex items-center gap-2 whitespace-nowrap shrink-0 active:scale-95'"
+      >
+        <span class="text-sm">🏷️</span>
+        <span class="tracking-tight">Descuentos & Cupones</span>
+        @if (coupons().length > 0) {
+          <span class="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-400 text-zinc-950">
+            {{ coupons().length }}
           </span>
         }
       </button>
@@ -214,6 +230,113 @@
           <span>{{ fb.message }}</span>
         </div>
       }
+
+      <!-- Barra Bento de Búsqueda y Filtros de Álbumes -->
+      <div class="bg-white rounded-3xl p-4 border border-black/[0.06] shadow-sm mb-5 space-y-3.5">
+        <!-- Fila 1: Input de Búsqueda Rápida + Contadores -->
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div class="relative flex-1">
+            <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 text-sm pointer-events-none">🔍</span>
+            <input
+              type="text"
+              [value]="albumSearchQuery()"
+              (input)="albumSearchQuery.set($any($event.target).value)"
+              placeholder="Buscar álbum por nombre, club, fiesta o ID..."
+              class="w-full pl-10 pr-9 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-medium focus:outline-none focus:border-zinc-950 transition placeholder:text-zinc-400"
+            />
+            @if (albumSearchQuery()) {
+              <button
+                type="button"
+                (click)="albumSearchQuery.set('')"
+                class="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-zinc-200 hover:bg-zinc-300 text-zinc-600 text-[10px] font-bold flex items-center justify-center transition"
+                aria-label="Limpiar búsqueda"
+              >
+                ✕
+              </button>
+            }
+          </div>
+
+          <div class="flex items-center justify-between sm:justify-end gap-2 text-xs">
+            <span class="text-zinc-500 font-medium">
+              Álbumes en Catálogo (<strong class="text-zinc-900">{{ filteredAdminAlbums().length }}</strong> de <strong class="text-zinc-900">{{ albums().length }}</strong>)
+            </span>
+            @if (hasActiveAlbumFilters()) {
+              <button
+                type="button"
+                (click)="clearAlbumFilters()"
+                class="px-2.5 py-1 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-[11px] font-bold transition active:scale-95 flex items-center gap-1"
+                title="Restablecer todos los filtros"
+              >
+                <span>✕</span> <span>Limpiar</span>
+              </button>
+            }
+          </div>
+        </div>
+
+        <!-- Fila 2: Píldoras de Categoría + Selectores Compactos (Estado y Orden) -->
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-2 border-t border-zinc-100">
+          <!-- Píldoras de Categoría Dinámica -->
+          <div class="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              (click)="albumCategoryFilter.set('todos')"
+              [class]="albumCategoryFilter() === 'todos'
+                ? 'px-3 py-1.5 rounded-xl bg-zinc-950 text-white font-extrabold text-[11px] shadow-sm transition'
+                : 'px-3 py-1.5 rounded-xl bg-zinc-50 hover:bg-zinc-100 text-zinc-600 font-semibold text-[11px] border border-zinc-200/80 transition'"
+            >
+              Todos
+            </button>
+            @for (cat of categories(); track cat.id) {
+              <button
+                type="button"
+                (click)="albumCategoryFilter.set(cat.id)"
+                [class]="albumCategoryFilter() === cat.id
+                  ? 'px-3 py-1.5 rounded-xl bg-amber-400 text-zinc-950 font-extrabold text-[11px] shadow-sm transition'
+                  : 'px-3 py-1.5 rounded-xl bg-zinc-50 hover:bg-zinc-100 text-zinc-600 font-semibold text-[11px] border border-zinc-200/80 transition'"
+              >
+                {{ cat.icon }} {{ cat.name }}
+              </button>
+            }
+            <button
+              type="button"
+              (click)="openCategoryModal()"
+              class="px-2.5 py-1.5 rounded-xl bg-amber-100/70 hover:bg-amber-200/80 text-amber-900 font-bold text-[11px] transition flex items-center gap-1 active:scale-95 border border-amber-300"
+              title="Crear o editar disciplinas y categorías"
+            >
+              <span>🏷️</span>
+              <span>Gestionar Categorías</span>
+            </button>
+          </div>
+
+          <!-- Selectores Compactos de Estado y Orden -->
+          <div class="flex flex-wrap sm:flex-nowrap items-center gap-2">
+            <select
+              [value]="albumStatusFilter()"
+              (change)="albumStatusFilter.set($any($event.target).value)"
+              class="px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-700 text-xs font-semibold focus:outline-none focus:border-zinc-950 transition"
+              aria-label="Filtrar por estado"
+            >
+              <option value="todos">Todos los estados</option>
+              <option value="publicados">🟢 Publicados</option>
+              <option value="ocultos">⚪ Ocultos</option>
+              <option value="privados">🔒 Privados con PIN</option>
+              <option value="cortesia">🎁 Cortesía Gratis</option>
+            </select>
+
+            <select
+              [value]="albumSortBy()"
+              (change)="albumSortBy.set($any($event.target).value)"
+              class="px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-700 text-xs font-semibold focus:outline-none focus:border-zinc-950 transition"
+              aria-label="Ordenar álbumes"
+            >
+              <option value="recientes">Más recientes</option>
+              <option value="antiguos">Más antiguos</option>
+              <option value="mas_fotos">Más fotos</option>
+              <option value="menos_fotos">Menos fotos</option>
+            </select>
+          </div>
+        </div>
+      </div>
 
       <!-- Grid Bento de Tarjetas de Álbumes -->
       @if (albums().length === 0 && isLoadingAlbums()) {
@@ -312,7 +435,7 @@
                 </div>
 
                 <!-- Botón Guardar Precios con Feedback Directo -->
-                <div class="flex items-center justify-between pt-1">
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-1">
                   <div>
                     @if (updateFeedback()?.albumId === album.id) {
                       <span
@@ -329,7 +452,7 @@
                     type="button"
                     (click)="saveAlbumPrices(album.id)"
                     [disabled]="updatingAlbumId() === album.id"
-                    class="px-3.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-[11px] shadow-sm transition active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
+                    class="w-full sm:w-auto py-2.5 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-[11px] shadow-sm transition active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1.5"
                   >
                     @if (updatingAlbumId() === album.id) {
                       <span class="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
@@ -341,107 +464,129 @@
                 </div>
               </div>
 
-              <!-- Acciones Rápidas del Álbum -->
-              <div class="flex items-center justify-between pt-1 text-xs border-t border-black/[0.04]">
-                <div class="flex flex-wrap items-center gap-1.5 pt-2 border-t border-black/[0.04] justify-between">
-                  <!-- Acciones Principales -->
-                  <div class="flex flex-wrap items-center gap-1.5">
-                    <button
-                      type="button"
-                      (click)="openPhotosModal(album)"
-                      class="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-extrabold text-[11px] shadow-sm transition flex items-center gap-1 active:scale-95"
-                      title="Gestionar fotos, portadas y muestras HD de este álbum"
-                    >
-                      <span>🖼️ Ver / Editar Fotos ({{ album.photosCount }})</span>
-                    </button>
+              <!-- Acciones Rápidas del Álbum (Organizadas para Mobile & Desktop) -->
+              <div class="pt-3 border-t border-black/[0.06] space-y-2.5">
+                <!-- Fila 1: Acciones Principales (Grid táctil en mobile con py-2.5) -->
+                <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    (click)="openPhotosModal(album)"
+                    class="col-span-2 sm:col-span-1 px-3 py-2.5 sm:py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-extrabold text-xs shadow-sm transition flex items-center justify-center gap-1.5 active:scale-95"
+                    title="Gestionar fotos, portadas y muestras HD de este álbum"
+                  >
+                    <span>🖼️</span>
+                    <span>Fotos ({{ album.photosCount }})</span>
+                  </button>
 
-                    <button
-                      type="button"
-                      (click)="copyWhatsAppShareText(album)"
-                      class="px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold transition flex items-center gap-1 active:scale-95"
-                      title="Copiar texto de difusión para grupos de WhatsApp con enlace directo al álbum"
-                    >
-                      <span>📲</span>
-                      <span>{{ copiedWhatsAppAlbumId() === album.id ? '✓ ¡Copiado!' : 'Copiar Link WhatsApp' }}</span>
-                    </button>
+                  <button
+                    type="button"
+                    (click)="copyWhatsAppShareText(album)"
+                    class="col-span-1 px-3 py-2.5 sm:py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition flex items-center justify-center gap-1.5 active:scale-95"
+                    title="Copiar texto de difusión para grupos de WhatsApp con enlace directo al álbum"
+                  >
+                    <span>📲</span>
+                    <span class="truncate">{{ copiedWhatsAppAlbumId() === album.id ? '¡Copiado!' : 'WhatsApp' }}</span>
+                  </button>
 
-                    <button
-                      type="button"
-                      (click)="navigateToUploadWithAlbum(album.id)"
-                      class="px-2.5 py-1.5 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-700 font-bold text-[11px] transition flex items-center gap-1 active:scale-95"
-                    >
-                      <span>📤 Fotos</span>
-                    </button>
+                  <button
+                    type="button"
+                    (click)="openQrModal(album)"
+                    class="col-span-1 px-3 py-2.5 sm:py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 text-xs font-bold transition flex items-center justify-center gap-1.5 active:scale-95"
+                    title="Generar y descargar código QR del evento"
+                  >
+                    <span>🔳</span>
+                    <span>QR Evento</span>
+                  </button>
+                </div>
 
-                    <button
-                      type="button"
-                      (click)="navigateToDriveWithAlbum(album.id)"
-                      class="px-2.5 py-1.5 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-700 font-bold text-[11px] transition flex items-center gap-1 active:scale-95"
-                    >
-                      <span>☁️ Drive</span>
-                    </button>
+                <!-- Fila 2: Botonera Secundaria Simétrica (Grilla de 3 columnas sin botones huérfanos) -->
+                <div class="grid grid-cols-3 gap-2 pt-2 border-t border-zinc-100">
+                  <!-- 1. Subir -->
+                  <button
+                    type="button"
+                    (click)="navigateToUploadWithAlbum(album.id)"
+                    class="px-2.5 py-2 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-700 font-bold text-[11px] transition flex items-center justify-center gap-1 truncate active:scale-95 shadow-2xs"
+                    title="Subir fotos locales a este álbum"
+                  >
+                    <span>📤</span>
+                    <span class="truncate">Subir</span>
+                  </button>
 
-                    <!-- Toggle Cortesía / Gratuito HD -->
-                    <button
-                      type="button"
-                      (click)="toggleCourtesyDownload(album)"
-                      [disabled]="isTogglingCourtesyId() === album.id"
-                      [class]="album.isFreeDownload
-                        ? 'px-2.5 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 text-[11px] font-bold transition flex items-center gap-1 active:scale-95'
-                        : 'px-2.5 py-1.5 rounded-xl bg-white hover:bg-zinc-100 text-zinc-600 border border-zinc-200 text-[11px] font-medium transition flex items-center gap-1 active:scale-95'"
-                      title="Habilitar descarga gratuita de cortesía en máxima calidad para este evento"
-                    >
-                      @if (isTogglingCourtesyId() === album.id) {
-                        <span class="w-2.5 h-2.5 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
-                      } @else {
-                        <span>{{ album.isFreeDownload ? '🎁 Gratis HD' : '🎁 Cortesía' }}</span>
-                      }
-                    </button>
+                  <!-- 2. Drive -->
+                  <button
+                    type="button"
+                    (click)="navigateToDriveWithAlbum(album.id)"
+                    class="px-2.5 py-2 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-700 font-bold text-[11px] transition flex items-center justify-center gap-1 truncate active:scale-95 shadow-2xs"
+                    title="Importar desde Google Drive a este álbum"
+                  >
+                    <span>☁️</span>
+                    <span class="truncate">Drive</span>
+                  </button>
 
-                    <!-- Toggle Privacidad PIN -->
-                    <button
-                      type="button"
-                      (click)="startEditPrivacy(album)"
-                      [class]="album.isPrivate
-                        ? 'px-2.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-amber-400 border border-zinc-800 text-[11px] font-bold transition flex items-center gap-1 active:scale-95'
-                        : 'px-2.5 py-1.5 rounded-xl bg-white hover:bg-zinc-100 text-zinc-600 border border-zinc-200 text-[11px] font-medium transition flex items-center gap-1 active:scale-95'"
-                      title="Configurar código PIN para este álbum"
-                    >
-                      <span>{{ album.isPrivate ? '🔒 PIN' : '🔓 Público' }}</span>
-                    </button>
-                  </div>
+                  <!-- 3. Cortesía -->
+                  <button
+                    type="button"
+                    (click)="toggleCourtesyDownload(album)"
+                    [disabled]="isTogglingCourtesyId() === album.id"
+                    [class]="album.isFreeDownload
+                      ? 'px-2.5 py-2 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 text-[11px] font-bold transition flex items-center justify-center gap-1 truncate active:scale-95 shadow-2xs'
+                      : 'px-2.5 py-2 rounded-xl bg-white hover:bg-zinc-100 text-zinc-600 border border-zinc-200 text-[11px] font-bold transition flex items-center justify-center gap-1 truncate active:scale-95 shadow-2xs'"
+                    [title]="album.isFreeDownload ? 'Descarga gratuita activada (clic para desactivar)' : 'Activar descarga gratuita de cortesía'"
+                  >
+                    @if (isTogglingCourtesyId() === album.id) {
+                      <span class="w-2.5 h-2.5 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
+                    } @else {
+                      <span>🎁</span>
+                      <span class="truncate">{{ album.isFreeDownload ? 'Gratis ON' : 'Cortesía' }}</span>
+                    }
+                  </button>
 
-                  <!-- Visibilidad y Papelera -->
-                  <div class="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      (click)="togglePublishStatus(album)"
-                      [disabled]="isTogglingPublishId() === album.id"
-                      [class]="album.isPublished !== false
-                        ? 'px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold transition flex items-center gap-1 active:scale-95 disabled:opacity-50'
-                        : 'px-2.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border border-zinc-200 text-[11px] font-bold transition flex items-center gap-1 active:scale-95 disabled:opacity-50'"
-                    >
-                      @if (isTogglingPublishId() === album.id) {
-                        <span class="w-2.5 h-2.5 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
-                      } @else {
-                        <span>{{ album.isPublished !== false ? '🟢 Visible' : '⚪ Oculto' }}</span>
-                      }
-                    </button>
+                  <!-- 4. Privacidad / PIN -->
+                  <button
+                    type="button"
+                    (click)="startEditPrivacy(album)"
+                    [class]="album.isPrivate
+                      ? 'px-2.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-amber-400 border border-zinc-800 text-[11px] font-bold transition flex items-center justify-center gap-1 truncate active:scale-95 shadow-2xs'
+                      : 'px-2.5 py-2 rounded-xl bg-white hover:bg-zinc-100 text-zinc-600 border border-zinc-200 text-[11px] font-bold transition flex items-center justify-center gap-1 truncate active:scale-95 shadow-2xs'"
+                    [title]="album.isPrivate ? 'Álbum privado con PIN (clic para editar)' : 'Configurar privacidad PIN para este álbum'"
+                  >
+                    <span>🔒</span>
+                    <span class="truncate">{{ album.isPrivate ? 'PIN Activo' : 'Público' }}</span>
+                  </button>
 
-                    <button
-                      type="button"
-                      (click)="moveToTrash(album)"
-                      [disabled]="isMovingToTrashId() === album.id"
-                      class="px-2 py-1.5 rounded-xl bg-white hover:bg-rose-50 text-rose-600 hover:text-rose-700 border border-zinc-200 hover:border-rose-200 text-[11px] font-bold transition flex items-center gap-1 active:scale-95"
-                      title="Mover a papelera de reciclaje (30 días de retención)"
-                    >
-                      @if (isMovingToTrashId() === album.id) {
-                        <span class="w-2.5 h-2.5 border-2 border-rose-600 border-t-transparent rounded-full animate-spin"></span>
-                      } @else {
-                        <span>🗑️</span>
-                      }
-                    </button>
-                  </div>
+                  <!-- 5. Publicar / Ocultar -->
+                  <button
+                    type="button"
+                    (click)="togglePublishStatus(album)"
+                    [disabled]="isTogglingPublishId() === album.id"
+                    [class]="album.isPublished !== false
+                      ? 'px-2.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold transition flex items-center justify-center gap-1 truncate active:scale-95 disabled:opacity-50 shadow-2xs'
+                      : 'px-2.5 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border border-zinc-200 text-[11px] font-bold transition flex items-center justify-center gap-1 truncate active:scale-95 disabled:opacity-50 shadow-2xs'"
+                    [title]="album.isPublished !== false ? 'Ocultar del catálogo público' : 'Publicar en el catálogo'"
+                  >
+                    @if (isTogglingPublishId() === album.id) {
+                      <span class="w-2.5 h-2.5 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
+                    } @else {
+                      <span>{{ album.isPublished !== false ? '🟢' : '⚪' }}</span>
+                      <span class="truncate">{{ album.isPublished !== false ? 'Publicar' : 'Ocultar' }}</span>
+                    }
+                  </button>
+
+                  <!-- 6. Papelera -->
+                  <button
+                    type="button"
+                    (click)="moveToTrash(album)"
+                    [disabled]="isMovingToTrashId() === album.id"
+                    class="px-2.5 py-2 rounded-xl bg-white hover:bg-rose-50 text-rose-600 hover:text-rose-700 border border-zinc-200 hover:border-rose-200 text-[11px] font-bold transition flex items-center justify-center gap-1 truncate active:scale-95 shadow-2xs disabled:opacity-50"
+                    title="Mover a papelera de reciclaje (30 días de retención)"
+                  >
+                    @if (isMovingToTrashId() === album.id) {
+                      <span class="w-2.5 h-2.5 border-2 border-rose-600 border-t-transparent rounded-full animate-spin"></span>
+                    } @else {
+                      <span>🗑️</span>
+                      <span class="truncate">Papelera</span>
+                    }
+                  </button>
                 </div>
 
                 <!-- Panel Flotante Inline de Edición de Privacidad PIN -->
@@ -498,16 +643,33 @@
                 }
               </div>
             </div>
+          } @empty {
+            @if (albums().length > 0) {
+              <div class="col-span-1 md:col-span-2 py-16 px-4 text-center bg-white rounded-3xl border border-dashed border-zinc-200 p-8 space-y-3 animate-fadeIn">
+                <div class="text-4xl">🔍</div>
+                <h4 class="font-bold text-zinc-900 text-sm">No se encontraron álbumes</h4>
+                <p class="text-xs text-zinc-500 max-w-sm mx-auto">
+                  No hay ningún evento que coincida con los filtros y términos de búsqueda aplicados.
+                </p>
+                <button
+                  type="button"
+                  (click)="clearAlbumFilters()"
+                  class="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs transition active:scale-95 shadow-sm inline-flex items-center gap-1.5"
+                >
+                  <span>Limpiar filtros de búsqueda</span>
+                </button>
+              </div>
+            }
           }
         </div>
 
         <!-- Barra de Paginación Bento de Álbumes en Admin -->
-        @if (albums().length > 0) {
+        @if (filteredAdminAlbums().length > 0) {
           <div class="mt-6 pt-5 border-t border-black/[0.05] flex flex-col sm:flex-row items-center justify-between gap-4">
             <span class="text-xs text-zinc-500 font-medium order-2 sm:order-1">
               Mostrando <strong class="text-zinc-900 font-bold">{{ showingFrom() }}</strong> a
               <strong class="text-zinc-900 font-bold">{{ showingTo() }}</strong> de
-              <strong class="text-zinc-900 font-bold">{{ albums().length }}</strong> eventos
+              <strong class="text-zinc-900 font-bold">{{ filteredAdminAlbums().length }}</strong> álbumes
             </span>
 
             @if (totalPages() > 1) {
@@ -585,89 +747,166 @@
       </div>
 
       <!-- Resumen Bento de Métricas de Ventas -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <!-- Resumen Bento de Métricas de Ventas Sincronizadas -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="bg-white rounded-[24px] p-5 border border-black/[0.05] shadow-bento flex flex-col justify-between">
-          <span class="text-zinc-500 text-xs font-semibold">Total de Transacciones</span>
+          <span class="text-zinc-500 text-xs font-semibold">Total Recaudado (ARS)</span>
           <div class="my-2">
-            <span class="font-display font-black text-2xl sm:text-3xl text-zinc-900">{{ orders().length }}</span>
-            <span class="text-xs text-zinc-400 block">registradas en el sistema</span>
+            <span class="font-display font-black text-2xl sm:text-3xl text-zinc-900">${{ totalPaidRevenue().toLocaleString('es-AR') }}</span>
+            <span class="text-xs text-zinc-400 block mt-0.5">cobrados netos en Mercado Pago</span>
           </div>
+          <span class="text-[10px] text-emerald-600 font-bold">100% verificado sin bypass</span>
         </div>
 
         <div class="bg-white rounded-[24px] p-5 border border-black/[0.05] shadow-bento flex flex-col justify-between">
           <span class="text-zinc-500 text-xs font-semibold">Órdenes Acreditadas</span>
           <div class="my-2">
-            <span class="font-display font-black text-2xl sm:text-3xl text-emerald-600">{{ paidOrdersCount() }}</span>
-            <span class="text-xs text-zinc-400 block">con pago completado</span>
+            <div class="flex items-baseline gap-2">
+              <span class="font-display font-black text-2xl sm:text-3xl text-emerald-600">{{ paidMpOrdersCount() }}</span>
+              <span class="text-xs font-bold text-zinc-500">ventas cobradas</span>
+            </div>
+            @if (freeRedemptionOrdersCount() > 0) {
+              <div class="mt-1.5 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-violet-50 border border-violet-200/60 text-[11px] font-bold text-violet-700 shadow-sm">
+                <span>🎁</span>
+                <span>{{ freeRedemptionOrdersCount() }} sorteos canjeados ($0)</span>
+              </div>
+            } @else {
+              <span class="text-xs text-zinc-400 block mt-0.5">0 sorteos canjeados ($0)</span>
+            }
           </div>
+          <span class="text-[10px] text-zinc-400">Total transacciones: {{ paidOrdersCount() }} pagadas de {{ orders().length }}</span>
         </div>
 
         <div class="bg-white rounded-[24px] p-5 border border-black/[0.05] shadow-bento flex flex-col justify-between">
-          <span class="text-zinc-500 text-xs font-semibold">Total Recaudado (ARS)</span>
+          <span class="text-zinc-500 text-xs font-semibold">Fotos Sueltas Vendidas</span>
           <div class="my-2">
-            <span class="font-display font-black text-2xl sm:text-3xl text-zinc-900">${{ totalPaidRevenue().toLocaleString('es-AR') }}</span>
-            <span class="text-xs text-zinc-400 block">pesos argentinos cobrados</span>
+            <span class="font-display font-black text-2xl sm:text-3xl text-zinc-900">{{ photosSold() }}</span>
+            <span class="text-xs text-zinc-400 block mt-0.5">archivos entregados en 4K</span>
+          </div>
+          <span class="text-[10px] text-zinc-400">Descargas individuales</span>
+        </div>
+
+        <div class="bg-white rounded-[24px] p-5 border border-black/[0.05] shadow-bento flex flex-col justify-between">
+          <span class="text-zinc-500 text-xs font-semibold">Packs Completos Vendidos</span>
+          <div class="my-2">
+            <span class="font-display font-black text-2xl sm:text-3xl text-amber-500">{{ albumsSold() }}</span>
+            <span class="text-xs text-zinc-400 block mt-0.5">álbumes empaquetados en ZIP</span>
+          </div>
+          <span class="text-[10px] text-zinc-400">Entregas de eventos completos</span>
+        </div>
+      </div>
+
+      <!-- Barra de Filtros y Búsqueda de Órdenes -->
+      <div class="bg-white rounded-[28px] p-4 sm:p-5 border border-black/[0.05] shadow-bento space-y-3.5">
+        <!-- Fila 1: Buscador Reactivo + Selector de Álbum -->
+        <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          <div class="relative flex-1">
+            <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">🔍</span>
+            <input
+              type="text"
+              [value]="orderSearchQuery()"
+              (input)="orderSearchQuery.set($any($event.target).value)"
+              placeholder="Buscar por ID, email, nombre, álbum o teléfono..."
+              class="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200/80 text-xs text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-white transition"
+            />
+          </div>
+
+          <!-- Selector de Álbum -->
+          <div class="w-full md:w-64">
+            <select
+              [value]="ordersAlbumFilter()"
+              (change)="ordersAlbumFilter.set($any($event.target).value)"
+              class="w-full px-3.5 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-700 text-xs font-semibold focus:outline-none focus:border-zinc-950 transition"
+              aria-label="Filtrar ventas por álbum"
+            >
+              <option value="ALL">🌐 Todos los eventos / álbumes</option>
+              @for (alb of albums(); track alb.id) {
+                <option [value]="alb.id">{{ alb.title }}</option>
+              }
+            </select>
+          </div>
+        </div>
+
+        <!-- Fila 2: Filtros por Estado y Tipo de Entrega -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-zinc-100">
+          <!-- Filtros por Estado de Pago -->
+          <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
+            <button
+              type="button"
+              (click)="orderStatusFilter.set('ALL')"
+              [class]="orderStatusFilter() === 'ALL'
+                ? 'px-3 py-1.5 rounded-xl bg-zinc-950 text-white font-bold text-xs whitespace-nowrap'
+                : 'px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-600 font-medium text-xs whitespace-nowrap transition'"
+            >
+              Todas ({{ orders().length }})
+            </button>
+
+            <button
+              type="button"
+              (click)="orderStatusFilter.set('PAID')"
+              [class]="orderStatusFilter() === 'PAID'
+                ? 'px-3 py-1.5 rounded-xl bg-emerald-600 text-white font-bold text-xs whitespace-nowrap'
+                : 'px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-medium text-xs whitespace-nowrap transition'"
+            >
+              ✅ Pagadas ({{ paidOrdersCount() }})
+            </button>
+
+            <button
+              type="button"
+              (click)="orderStatusFilter.set('PENDING')"
+              [class]="orderStatusFilter() === 'PENDING'
+                ? 'px-3 py-1.5 rounded-xl bg-amber-500 text-white font-bold text-xs whitespace-nowrap'
+                : 'px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 font-medium text-xs whitespace-nowrap transition'"
+            >
+              ⏳ Pendientes
+            </button>
+          </div>
+
+          <!-- Filtros por Tipo de Entrega -->
+          <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
+            <button
+              type="button"
+              (click)="ordersDeliveryTypeFilter.set('ALL')"
+              [class]="ordersDeliveryTypeFilter() === 'ALL'
+                ? 'px-2.5 py-1.5 rounded-xl bg-zinc-900 text-white font-bold text-[11px] whitespace-nowrap'
+                : 'px-2.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-600 font-medium text-[11px] whitespace-nowrap transition'"
+            >
+              Cualquier Entrega
+            </button>
+
+            <button
+              type="button"
+              (click)="ordersDeliveryTypeFilter.set('FULL_ALBUM')"
+              [class]="ordersDeliveryTypeFilter() === 'FULL_ALBUM'
+                ? 'px-2.5 py-1.5 rounded-xl bg-amber-400 text-zinc-950 font-bold text-[11px] whitespace-nowrap'
+                : 'px-2.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-600 font-medium text-[11px] whitespace-nowrap transition'"
+            >
+              📦 Álbum Completo
+            </button>
+
+            <button
+              type="button"
+              (click)="ordersDeliveryTypeFilter.set('SINGLE_PHOTOS')"
+              [class]="ordersDeliveryTypeFilter() === 'SINGLE_PHOTOS'
+                ? 'px-2.5 py-1.5 rounded-xl bg-amber-400 text-zinc-950 font-bold text-[11px] whitespace-nowrap'
+                : 'px-2.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-600 font-medium text-[11px] whitespace-nowrap transition'"
+            >
+              🖼️ Fotos Sueltas
+            </button>
+
+            <button
+              type="button"
+              (click)="ordersDeliveryTypeFilter.set('FREE_REDEMPTION')"
+              [class]="ordersDeliveryTypeFilter() === 'FREE_REDEMPTION'
+                ? 'px-2.5 py-1.5 rounded-xl bg-purple-600 text-white font-bold text-[11px] whitespace-nowrap'
+                : 'px-2.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-800 font-medium text-[11px] whitespace-nowrap transition'"
+            >
+              🎁 Canje Sorteo 100%
+            </button>
           </div>
         </div>
       </div>
 
-      <!-- Barra de Filtros y Búsqueda -->
-      <div class="bg-white rounded-[28px] p-4 sm:p-5 border border-black/[0.05] shadow-bento flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-        <!-- Buscador Reactivo -->
-        <div class="relative flex-1">
-          <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">🔍</span>
-          <input
-            type="text"
-            [value]="orderSearchQuery()"
-            (input)="orderSearchQuery.set($any($event.target).value)"
-            placeholder="Buscar por ID, email, nombre, álbum o teléfono..."
-            class="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200/80 text-xs text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-white transition"
-          />
-        </div>
-
-        <!-- Filtros por Estado -->
-        <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 md:pb-0">
-          <button
-            type="button"
-            (click)="orderStatusFilter.set('ALL')"
-            [class]="orderStatusFilter() === 'ALL'
-              ? 'px-3 py-1.5 rounded-xl bg-zinc-950 text-white font-bold text-xs whitespace-nowrap'
-              : 'px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-600 font-medium text-xs whitespace-nowrap transition'"
-          >
-            Todas ({{ orders().length }})
-          </button>
-
-          <button
-            type="button"
-            (click)="orderStatusFilter.set('PAID')"
-            [class]="orderStatusFilter() === 'PAID'
-              ? 'px-3 py-1.5 rounded-xl bg-emerald-600 text-white font-bold text-xs whitespace-nowrap'
-              : 'px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-medium text-xs whitespace-nowrap transition'"
-          >
-            ✅ Pagadas ({{ paidOrdersCount() }})
-          </button>
-
-          <button
-            type="button"
-            (click)="orderStatusFilter.set('PENDING')"
-            [class]="orderStatusFilter() === 'PENDING'
-              ? 'px-3 py-1.5 rounded-xl bg-amber-500 text-white font-bold text-xs whitespace-nowrap'
-              : 'px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 font-medium text-xs whitespace-nowrap transition'"
-          >
-            ⏳ Pendientes
-          </button>
-
-          <button
-            type="button"
-            (click)="orderStatusFilter.set('FRAUD_ALERT_PRICE_MISMATCH')"
-            [class]="orderStatusFilter() === 'FRAUD_ALERT_PRICE_MISMATCH'
-              ? 'px-3 py-1.5 rounded-xl bg-rose-600 text-white font-bold text-xs whitespace-nowrap'
-              : 'px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 font-medium text-xs whitespace-nowrap transition'"
-          >
-            ⚠️ Alertas
-          </button>
-        </div>
-      </div>
 
       <!-- Feedback de Renovación de Enlace -->
       @if (renewFeedback(); as fb) {
@@ -719,7 +958,7 @@
         </div>
       } @else {
         <div class="space-y-4">
-          @for (order of filteredOrders(); track order.id) {
+          @for (order of paginatedAdminOrders(); track order.id) {
             <div class="bg-white rounded-[28px] border border-black/[0.06] shadow-bento p-5 sm:p-6 space-y-4 hover:border-black/[0.12] transition">
               <!-- Fila Superior: ID, Fecha y Badge de Estado -->
               <div class="flex flex-wrap items-center justify-between gap-3 border-b border-black/[0.04] pb-3">
@@ -789,8 +1028,8 @@
                 <!-- Columna 2: Álbum y Contenido -->
                 <div class="bg-zinc-50/70 rounded-2xl p-3.5 border border-black/[0.03] space-y-1">
                   <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Evento / Álbum</span>
-                  <div class="font-bold text-zinc-900 text-sm truncate" [title]="order.albumTitle || order.albumId">
-                    📁 {{ order.albumTitle || order.albumId }}
+                  <div class="font-bold text-zinc-900 text-sm truncate" [title]="order.albumTitle || order.albumId || 'Álbum archivado / eliminado'">
+                    📁 {{ order.albumTitle || order.albumId || 'Álbum archivado / eliminado' }}
                   </div>
                   <div class="pt-1">
                     @if (order.isFullAlbum) {
@@ -885,8 +1124,553 @@
               </div>
             </div>
           }
+
+          <!-- Paginación Bento de Órdenes -->
+          @if (ordersTotalPages() > 1) {
+            <div class="bg-white rounded-[24px] border border-black/[0.06] shadow-bento p-4 flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
+              <div class="text-xs text-zinc-500 font-medium">
+                Mostrando <strong class="text-zinc-900 font-bold">{{ ordersShowingFrom() }}</strong> a <strong class="text-zinc-900 font-bold">{{ ordersShowingTo() }}</strong> de <strong class="text-zinc-900 font-bold">{{ filteredOrders().length }}</strong> órdenes
+              </div>
+
+              <div class="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  (click)="prevOrdersPage()"
+                  [disabled]="ordersCurrentPage() === 1"
+                  class="p-2 rounded-xl border border-black/[0.08] bg-zinc-50 hover:bg-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed text-zinc-700 transition"
+                  aria-label="Página anterior de órdenes"
+                >
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                  </svg>
+                </button>
+
+                @for (p of ordersPaginationPages(); track p) {
+                  <button
+                    type="button"
+                    (click)="goToOrdersPage(p)"
+                    [class]="p === ordersCurrentPage()
+                      ? 'w-8 h-8 rounded-xl bg-zinc-900 text-white font-bold text-xs shadow-sm transition'
+                      : 'w-8 h-8 rounded-xl border border-black/[0.08] bg-white hover:bg-zinc-100 text-zinc-700 font-bold text-xs transition'"
+                    [attr.aria-label]="'Ir a página ' + p"
+                  >
+                    {{ p }}
+                  </button>
+                }
+
+                <button
+                  type="button"
+                  (click)="nextOrdersPage()"
+                  [disabled]="ordersCurrentPage() === ordersTotalPages()"
+                  class="p-2 rounded-xl border border-black/[0.08] bg-zinc-50 hover:bg-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed text-zinc-700 transition"
+                  aria-label="Página siguiente de órdenes"
+                >
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          }
         </div>
       }
+    </div>
+  }
+
+  <!-- PESTAÑA DESCUENTOS & CUPONES PROMOCIONALES -->
+  @else if (activeTab() === 'promotions') {
+    <div class="space-y-6 animate-fadeIn">
+      <!-- Cabecera de la sección Promociones -->
+      <div class="bg-white rounded-[32px] p-6 sm:p-8 border border-black/[0.05] shadow-bento flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <span class="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-[10px] uppercase tracking-wider">
+              🏷️ Promociones & Cupones
+            </span>
+            <span class="text-xs text-zinc-400 font-mono">• Zero-Trust Backend</span>
+          </div>
+          <h3 class="font-display font-extrabold text-xl sm:text-2xl text-zinc-900 tracking-tight">
+            Descuentos por Cantidad & Cupones
+          </h3>
+          <p class="text-xs text-zinc-500 mt-0.5">
+            Configura los porcentajes de descuento por compra masiva de fotos y crea códigos promocionales únicos para tus clientes.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          (click)="loadPromotions()"
+          [disabled]="isLoadingPromotions()"
+          class="px-5 py-3 rounded-2xl bg-zinc-950 hover:bg-zinc-800 text-white font-display font-extrabold text-xs shadow-md transition active:scale-95 disabled:opacity-50 flex items-center gap-2 self-start sm:self-auto"
+        >
+          @if (isLoadingPromotions()) {
+            <span class="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+            <span>Cargando...</span>
+          } @else {
+            <span>🔄 Recargar Configuración</span>
+          }
+        </button>
+      </div>
+
+      <!-- Feedback Banner si existe -->
+      @if (promotionsFeedback(); as fb) {
+        <div
+          class="p-4 rounded-2xl border text-xs font-semibold flex items-center gap-3 transition animate-fadeIn"
+          [class.bg-emerald-50]="fb.success"
+          [class.border-emerald-200]="fb.success"
+          [class.text-emerald-800]="fb.success"
+          [class.bg-rose-50]="!fb.success"
+          [class.border-rose-200]="!fb.success"
+          [class.text-rose-800]="!fb.success"
+        >
+          <span class="text-base">{{ fb.success ? '✅' : '⚠️' }}</span>
+          <span>{{ fb.message }}</span>
+        </div>
+      }
+
+      <!-- Grid Bento Principal: Descuentos por Cantidad y Cupones -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Columna Izquierda: Configuración de Descuentos por Cantidad (col-span-5) -->
+        <div class="lg:col-span-5 bg-white rounded-[32px] p-6 sm:p-7 border border-black/[0.05] shadow-bento flex flex-col justify-between">
+          <div>
+            <div class="flex items-center gap-2 mb-2">
+              <span class="text-base">📦</span>
+              <h4 class="font-display font-bold text-base text-zinc-900">
+                Packs y Descuentos por Cantidad
+              </h4>
+            </div>
+            <p class="text-xs text-zinc-500 mb-6">
+              Incentiva a los clientes a comprar más fotos sueltas aplicando descuentos porcentuales automáticos según el tamaño del carrito.
+            </p>
+
+            <form [formGroup]="pricingConfigForm" (ngSubmit)="savePricingConfig()" class="space-y-5">
+              <!-- Switch: Activar Descuentos por Cantidad -->
+              <div class="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 flex items-center justify-between gap-4">
+                <div>
+                  <label for="enableTierDiscounts" class="text-xs font-bold text-zinc-900 block cursor-pointer">
+                    Habilitar descuentos por volumen
+                  </label>
+                  <span class="text-[11px] text-zinc-500 block mt-0.5">
+                    Aplica rebajas al alcanzar 3 o 5 fotos seleccionadas.
+                  </span>
+                </div>
+                <input
+                  id="enableTierDiscounts"
+                  type="checkbox"
+                  formControlName="enableTierDiscounts"
+                  class="w-5 h-5 rounded text-amber-500 focus:ring-amber-400 accent-zinc-950 cursor-pointer"
+                >
+              </div>
+
+              <!-- Input: Descuento 3+ Fotos -->
+              <div class="bg-zinc-50 p-4 rounded-2xl border border-zinc-200">
+                <label for="tier3DiscountPercent" class="block text-xs font-bold text-zinc-800 mb-1">
+                  Descuento por 3 o más fotos
+                </label>
+                <div class="flex items-center gap-2">
+                  <input
+                    id="tier3DiscountPercent"
+                    type="number"
+                    min="0"
+                    max="100"
+                    formControlName="tier3DiscountPercent"
+                    class="w-24 bg-white border border-zinc-200 rounded-xl px-3 py-2 text-sm font-bold text-zinc-900 focus:outline-none focus:border-zinc-950 transition"
+                  >
+                  <span class="text-xs font-bold text-zinc-500">% OFF</span>
+                </div>
+                <span class="text-[10px] text-zinc-400 block mt-1">
+                  Valor recomendado estándar: 20%
+                </span>
+              </div>
+
+              <!-- Input: Descuento 5+ Fotos -->
+              <div class="bg-zinc-50 p-4 rounded-2xl border border-zinc-200">
+                <label for="tier5DiscountPercent" class="block text-xs font-bold text-zinc-800 mb-1">
+                  Descuento por 5 o más fotos
+                </label>
+                <div class="flex items-center gap-2">
+                  <input
+                    id="tier5DiscountPercent"
+                    type="number"
+                    min="0"
+                    max="100"
+                    formControlName="tier5DiscountPercent"
+                    class="w-24 bg-white border border-zinc-200 rounded-xl px-3 py-2 text-sm font-bold text-zinc-900 focus:outline-none focus:border-zinc-950 transition"
+                  >
+                  <span class="text-xs font-bold text-zinc-500">% OFF</span>
+                </div>
+                <span class="text-[10px] text-zinc-400 block mt-1">
+                  Valor recomendado estándar: 30%
+                </span>
+              </div>
+
+              <!-- Switch: Tope Automático al Precio del Álbum Completo -->
+              <div class="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 flex items-center justify-between gap-4">
+                <div>
+                  <label for="capAtFullAlbumPrice" class="text-xs font-bold text-zinc-900 block cursor-pointer">
+                    Tope de Álbum Completo
+                  </label>
+                  <span class="text-[11px] text-zinc-500 block mt-0.5">
+                    Garantiza que comprar fotos individuales nunca cueste más que el pack completo del álbum.
+                  </span>
+                </div>
+                <input
+                  id="capAtFullAlbumPrice"
+                  type="checkbox"
+                  formControlName="capAtFullAlbumPrice"
+                  class="w-5 h-5 rounded text-amber-500 focus:ring-amber-400 accent-zinc-950 cursor-pointer"
+                >
+              </div>
+
+              <button
+                type="submit"
+                [disabled]="pricingConfigForm.invalid || isSavingPricingConfig()"
+                class="w-full py-3.5 px-4 rounded-2xl bg-zinc-950 hover:bg-zinc-800 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md transition active:scale-95"
+              >
+                @if (isSavingPricingConfig()) {
+                  <span class="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                  <span>Guardando Reglas...</span>
+                } @else {
+                  <span>💾 Guardar Reglas de Descuento</span>
+                }
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Columna Derecha: Catálogo y Creación de Cupones Promocionales (col-span-7) -->
+        <div class="lg:col-span-7 bg-white rounded-[32px] p-6 sm:p-7 border border-black/[0.05] shadow-bento flex flex-col justify-between">
+          <div>
+            <div class="flex items-center gap-2 mb-2">
+              <span class="text-base">🎟️</span>
+              <h4 class="font-display font-bold text-base text-zinc-900">
+                Cupones Promocionales
+              </h4>
+            </div>
+            <p class="text-xs text-zinc-500 mb-6">
+              Crea cupones con código secreto (ej. <code>FIESTA20</code>) para eventos especiales o promociones en Instagram y WhatsApp.
+            </p>
+
+            <!-- Formulario de Nuevo Cupón -->
+            <form [formGroup]="createCouponForm" (ngSubmit)="createNewCoupon()" class="bg-zinc-50 p-4 rounded-2xl border border-zinc-200 mb-6">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                <span class="text-xs font-bold text-zinc-800">
+                  ➕ Crear Nuevo Cupón
+                </span>
+                <button
+                  type="button"
+                  (click)="presetGiveawayCoupon()"
+                  class="self-start sm:self-auto px-2.5 py-1 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 text-[11px] font-bold transition flex items-center gap-1 active:scale-95 shadow-2xs"
+                  title="Autocompletar cupón para sorteo: 100% de descuento, 1 uso y 1 foto"
+                >
+                  <span>🎁 Autocompletar Sorteo 100% (1 uso)</span>
+                </button>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
+                <div>
+                  <label for="couponCodeInput" class="block text-[11px] font-semibold text-zinc-600 mb-1">
+                    Código *
+                  </label>
+                  <input
+                    id="couponCodeInput"
+                    type="text"
+                    formControlName="code"
+                    placeholder="SORTEO100"
+                    class="w-full bg-white border border-zinc-200 rounded-xl px-3 py-2 text-xs uppercase font-bold text-zinc-900 focus:outline-none focus:border-zinc-950 transition"
+                  >
+                </div>
+
+                <div>
+                  <label for="discountPercentInput" class="block text-[11px] font-semibold text-zinc-600 mb-1">
+                    % Descuento *
+                  </label>
+                  <input
+                    id="discountPercentInput"
+                    type="number"
+                    min="1"
+                    max="100"
+                    formControlName="discountPercent"
+                    placeholder="100"
+                    class="w-full bg-white border border-zinc-200 rounded-xl px-3 py-2 text-xs font-bold text-zinc-900 focus:outline-none focus:border-zinc-950 transition"
+                  >
+                </div>
+
+                <div>
+                  <label for="maxUsesInput" class="block text-[11px] font-semibold text-zinc-600 mb-1">
+                    Usos Máx. (Opcional)
+                  </label>
+                  <input
+                    id="maxUsesInput"
+                    type="number"
+                    min="1"
+                    formControlName="maxUses"
+                    placeholder="Ilimitado"
+                    class="w-full bg-white border border-zinc-200 rounded-xl px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:border-zinc-950 transition"
+                  >
+                </div>
+
+                <div>
+                  <label for="couponAlbumIdInput" class="block text-[11px] font-semibold text-zinc-600 mb-1">
+                    Álbum Válido
+                  </label>
+                  <select
+                    id="couponAlbumIdInput"
+                    formControlName="albumId"
+                    class="w-full bg-white border border-zinc-200 rounded-xl px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:border-zinc-950 transition"
+                  >
+                    <option [ngValue]="null">🌐 Todos los álbumes</option>
+                    @for (album of albums(); track album.id) {
+                      <option [value]="album.id">{{ album.title }}</option>
+                    }
+                  </select>
+                </div>
+
+                <div>
+                  <label for="couponMaxPhotosInput" class="block text-[11px] font-semibold text-zinc-600 mb-1">
+                    Máx. Fotos (Sorteos)
+                  </label>
+                  <input
+                    id="couponMaxPhotosInput"
+                    type="number"
+                    min="1"
+                    formControlName="maxPhotos"
+                    placeholder="Sin límite"
+                    class="w-full bg-white border border-zinc-200 rounded-xl px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:border-zinc-950 transition"
+                  >
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                [disabled]="createCouponForm.invalid || isCreatingCoupon()"
+                class="w-full py-2.5 px-4 rounded-xl bg-amber-400 hover:bg-amber-500 disabled:opacity-50 text-zinc-950 font-bold text-xs flex items-center justify-center gap-2 transition active:scale-95"
+              >
+                @if (isCreatingCoupon()) {
+                  <span class="inline-block w-3.5 h-3.5 border-2 border-zinc-950 border-t-transparent rounded-full animate-spin"></span>
+                  <span>Creando Cupón...</span>
+                } @else {
+                  <span>+ Agregar Cupón al Catálogo</span>
+                }
+              </button>
+            </form>
+
+            <!-- Lista de Cupones Existentes -->
+            <div>
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                <span class="text-xs font-bold text-zinc-700 uppercase tracking-wider">
+                  Cupones Registrados ({{ filteredCoupons().length }}/{{ coupons().length }})
+                </span>
+
+                <!-- Filtros y Búsqueda Rápida de Cupones -->
+                <div class="flex flex-wrap items-center gap-2">
+                  <div class="relative">
+                    <input
+                      type="text"
+                      [value]="couponSearchQuery()"
+                      (input)="couponSearchQuery.set($any($event.target).value)"
+                      placeholder="Buscar cupón..."
+                      class="pl-7 pr-3 py-1 rounded-xl bg-white border border-zinc-200 text-xs text-zinc-800 placeholder-zinc-400 focus:outline-none focus:border-zinc-950 transition w-32 sm:w-36 font-medium"
+                    >
+                    <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 text-[11px]">🔍</span>
+                  </div>
+
+                  <div class="flex items-center gap-0.5 bg-zinc-100 p-0.5 rounded-xl border border-zinc-200 text-[11px] font-bold">
+                    <button
+                      type="button"
+                      (click)="couponStatusFilter.set('ALL')"
+                      [class]="couponStatusFilter() === 'ALL'
+                        ? 'px-2 py-0.5 rounded-lg bg-white text-zinc-900 shadow-2xs'
+                        : 'px-2 py-0.5 rounded-lg text-zinc-600 hover:text-zinc-900'"
+                    >
+                      Todos
+                    </button>
+                    <button
+                      type="button"
+                      (click)="couponStatusFilter.set('ACTIVE')"
+                      [class]="couponStatusFilter() === 'ACTIVE'
+                        ? 'px-2 py-0.5 rounded-lg bg-white text-emerald-700 shadow-2xs'
+                        : 'px-2 py-0.5 rounded-lg text-zinc-600 hover:text-zinc-900'"
+                    >
+                      Activos
+                    </button>
+                    <button
+                      type="button"
+                      (click)="couponStatusFilter.set('GIVEAWAY')"
+                      [class]="couponStatusFilter() === 'GIVEAWAY'
+                        ? 'px-2 py-0.5 rounded-lg bg-white text-amber-700 shadow-2xs'
+                        : 'px-2 py-0.5 rounded-lg text-zinc-600 hover:text-zinc-900'"
+                    >
+                      🎁 Sorteos
+                    </button>
+                    <button
+                      type="button"
+                      (click)="couponStatusFilter.set('EXHAUSTED')"
+                      [class]="couponStatusFilter() === 'EXHAUSTED'
+                        ? 'px-2 py-0.5 rounded-lg bg-white text-zinc-800 shadow-2xs'
+                        : 'px-2 py-0.5 rounded-lg text-zinc-600 hover:text-zinc-900'"
+                    >
+                      Agotados
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              @if (filteredCoupons().length === 0) {
+                <div class="py-8 text-center bg-zinc-50 rounded-2xl border border-dashed border-zinc-200 text-xs text-zinc-400">
+                  @if (coupons().length === 0) {
+                    No hay cupones creados aún. Crea el primero arriba.
+                  } @else {
+                    No se encontraron cupones con el filtro actual.
+                  }
+                </div>
+              } @else {
+                <div class="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+                  @for (coupon of paginatedCoupons(); track coupon.code) {
+                    <div class="p-3.5 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition hover:bg-zinc-100/70">
+                      <div class="flex items-center gap-3">
+                        <button
+                          type="button"
+                          (click)="copyCouponCode(coupon.code)"
+                          class="group relative font-mono font-black text-sm px-2.5 py-1 rounded-lg bg-zinc-900 text-amber-300 tracking-wider hover:bg-zinc-800 transition active:scale-95 flex items-center gap-1.5"
+                          title="Clic para copiar código"
+                        >
+                          <span>{{ coupon.code }}</span>
+                          <span class="text-[10px] text-zinc-400 group-hover:text-amber-300 transition">📋</span>
+                        </button>
+
+                        <div class="flex flex-col">
+                          <div class="flex flex-wrap items-center gap-1.5">
+                            <span class="text-xs font-extrabold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                              -{{ coupon.discountPercent }}%
+                            </span>
+                            @if (coupon.maxPhotos) {
+                              <span class="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
+                                Máx. {{ coupon.maxPhotos }} foto{{ coupon.maxPhotos > 1 ? 's' : '' }}
+                              </span>
+                            }
+                            @if (coupon.albumId) {
+                              <span class="text-[10px] font-bold text-purple-800 bg-purple-100 px-2 py-0.5 rounded-full">
+                                Álbum asignado
+                              </span>
+                            }
+                            @if (!coupon.isActive) {
+                              <span class="text-[10px] font-bold text-zinc-500 bg-zinc-200 px-2 py-0.5 rounded-full">
+                                Inactivo
+                              </span>
+                            }
+                          </div>
+                          <span class="text-[10px] text-zinc-400 mt-0.5">
+                            Usado {{ coupon.usedCount }} {{ coupon.maxUses ? 'de ' + coupon.maxUses : 'veces (sin límite)' }}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div class="flex items-center gap-1.5 self-end sm:self-center">
+                        <!-- Compartir por WhatsApp -->
+                        <button
+                          type="button"
+                          (click)="shareCouponWhatsApp(coupon)"
+                          class="px-2 py-1.5 rounded-xl text-[11px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition flex items-center gap-1 active:scale-95"
+                          title="Compartir cupón por WhatsApp"
+                        >
+                          <span>💬</span>
+                          <span class="hidden sm:inline">WhatsApp</span>
+                        </button>
+
+                        <!-- Botón Alternar Estado Activo / Inactivo -->
+                        <button
+                          type="button"
+                          (click)="toggleCouponActive(coupon)"
+                          [disabled]="isTogglingCouponCode() === coupon.code"
+                          class="px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition flex items-center gap-1"
+                          [class.bg-emerald-50]="coupon.isActive"
+                          [class.border-emerald-200]="coupon.isActive"
+                          [class.text-emerald-700]="coupon.isActive"
+                          [class.hover:bg-emerald-100]="coupon.isActive"
+                          [class.bg-zinc-100]="!coupon.isActive"
+                          [class.border-zinc-300]="!coupon.isActive"
+                          [class.text-zinc-600]="!coupon.isActive"
+                          [class.hover:bg-zinc-200]="!coupon.isActive"
+                        >
+                          @if (isTogglingCouponCode() === coupon.code) {
+                            <span class="inline-block w-2.5 h-2.5 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
+                          }
+                          <span>{{ coupon.isActive ? 'Activo' : 'Pausado' }}</span>
+                        </button>
+
+                        <!-- Botón Eliminar Cupón -->
+                        <button
+                          type="button"
+                          (click)="deleteCoupon(coupon)"
+                          [disabled]="isDeletingCouponCode() === coupon.code"
+                          title="Eliminar cupón permanentemente"
+                          class="w-8 h-8 rounded-xl bg-zinc-100 hover:bg-rose-50 hover:text-rose-600 text-zinc-400 transition flex items-center justify-center text-xs"
+                        >
+                          @if (isDeletingCouponCode() === coupon.code) {
+                            <span class="inline-block w-2.5 h-2.5 border-2 border-rose-500 border-t-transparent rounded-full animate-spin"></span>
+                          } @else {
+                            <span>🗑️</span>
+                          }
+                        </button>
+                      </div>
+                    </div>
+                  }
+                </div>
+
+                <!-- Paginación de Cupones -->
+                @if (couponsTotalPages() > 1) {
+                  <div class="flex items-center justify-between pt-3 mt-3 border-t border-zinc-100 text-xs">
+                    <span class="text-zinc-500 font-medium">
+                      Pág. <strong class="text-zinc-900">{{ couponsCurrentPage() }}</strong> de <strong class="text-zinc-900">{{ couponsTotalPages() }}</strong>
+                    </span>
+
+                    <div class="flex items-center gap-1">
+                      <button
+                        type="button"
+                        (click)="prevCouponsPage()"
+                        [disabled]="couponsCurrentPage() === 1"
+                        class="p-1.5 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed text-zinc-700 transition"
+                        aria-label="Página anterior de cupones"
+                      >
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                        </svg>
+                      </button>
+
+                      @for (p of couponsPaginationPages(); track p) {
+                        <button
+                          type="button"
+                          (click)="goToCouponsPage(p)"
+                          [class]="p === couponsCurrentPage()
+                            ? 'w-7 h-7 rounded-lg bg-zinc-900 text-white font-bold text-xs shadow-xs transition'
+                            : 'w-7 h-7 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-100 text-zinc-700 font-bold text-xs transition'"
+                          [attr.aria-label]="'Ir a página ' + p"
+                        >
+                          {{ p }}
+                        </button>
+                      }
+
+                      <button
+                        type="button"
+                        (click)="nextCouponsPage()"
+                        [disabled]="couponsCurrentPage() === couponsTotalPages()"
+                        class="p-1.5 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed text-zinc-700 transition"
+                        aria-label="Página siguiente de cupones"
+                      >
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                }
+              }
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   }
 
@@ -1267,7 +2051,11 @@
           <div class="space-y-2 pointer-events-none">
             <span class="text-3xl block">🖼️</span>
             <span class="font-display font-bold text-sm text-zinc-900 block">
-              Arrastra tus fotografías aquí o haz clic para explorar
+              @if (selectedFiles().length > 0) {
+                ➕ Arrastra o haz clic aquí para AGREGAR más fotos al lote actual
+              } @else {
+                Arrastra tus fotografías aquí o haz clic para explorar
+              }
             </span>
             <span class="text-[11px] text-zinc-400 block">
               Formatos aceptados: JPG, PNG, WebP (Lotes de hasta 100 fotos de 50MB)
@@ -1388,6 +2176,29 @@
           </div>
         }
 
+        <!-- Barra de Progreso de Subida Real HTTP -->
+        @if (isBulkUploading()) {
+          <div class="p-4 rounded-2xl bg-zinc-950 text-white border border-zinc-800 space-y-2.5 animate-fadeIn shadow-lg">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-bold flex items-center gap-2 text-zinc-200">
+                <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping"></span>
+                Subiendo y procesando fotografías en el servidor...
+              </span>
+              <span class="font-mono font-extrabold text-amber-400 text-sm">{{ uploadProgress() }}%</span>
+            </div>
+            <div class="w-full h-3 rounded-full bg-zinc-800 overflow-hidden p-0.5 border border-zinc-700">
+              <div
+                class="h-full rounded-full bg-gradient-to-r from-amber-500 via-amber-400 to-emerald-400 transition-all duration-300 ease-out shadow-sm"
+                [style.width.%]="uploadProgress()"
+              ></div>
+            </div>
+            <p class="text-[11px] text-zinc-400 flex items-center justify-between">
+              <span>Por favor no cierres esta ventana mientras se transfieren y protegen las fotos.</span>
+              <span class="font-mono text-zinc-300 font-semibold">{{ selectedFiles().length }} fotos en proceso</span>
+            </p>
+          </div>
+        }
+
         <!-- Botón de Envío -->
         <div class="flex items-center justify-end gap-3 pt-2">
           <button
@@ -1397,7 +2208,7 @@
           >
             @if (isBulkUploading()) {
               <span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-              <span>Procesando fotos en segundo plano...</span>
+              <span>Subiendo fotos ({{ uploadProgress() }}%)...</span>
             } @else {
               <span>Subir y Procesar Lote ({{ selectedFiles().length }})</span>
               <span>⚡</span>
@@ -1602,22 +2413,30 @@
             />
           </div>
 
-          <!-- Categoría y Badge -->
+          <!-- Categoría y Badge Dinámicos (Frente 2) -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
-                Disciplina / Categoría *
-              </label>
+              <div class="flex items-center justify-between mb-1">
+                <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider">
+                  Disciplina / Categoría *
+                </label>
+                <button
+                  type="button"
+                  (click)="openCategoryModal()"
+                  class="text-[11px] font-bold text-amber-600 hover:text-amber-700 hover:underline flex items-center gap-0.5"
+                  title="Abrir Gestor Dinámico de Categorías"
+                >
+                  <span>🏷️ Gestionar</span>
+                </button>
+              </div>
               <select
                 formControlName="category"
                 (change)="onCategoryChange($event)"
                 class="w-full px-4 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-semibold focus:outline-none focus:border-zinc-950 transition"
               >
-                <option value="futbol">⚽ Fútbol</option>
-                <option value="hockey">🏑 Hockey</option>
-                <option value="basquet">🏀 Básquet</option>
-                <option value="sociales">🎉 Cumpleaños & Social</option>
-                <option value="otros">📸 Evento Especial / Otro</option>
+                @for (cat of categories(); track cat.id) {
+                  <option [value]="cat.id">{{ cat.badgeLabel || (cat.icon + ' ' + cat.name) }}</option>
+                }
               </select>
             </div>
 
@@ -1939,9 +2758,9 @@
             <button
               type="button"
               (click)="loadAlbumPhotos(currentAlbum.id)"
-              class="px-4 py-2 rounded-xl bg-zinc-900 text-white text-xs font-bold hover:bg-zinc-800 transition"
+              class="px-4 py-2 rounded-xl bg-zinc-900 text-white text-xs font-bold hover:bg-zinc-800 transition flex items-center gap-1.5 mx-auto active:scale-95 shadow-sm"
             >
-              Reintentar
+              <span>🔄 Reintentar carga</span>
             </button>
           </div>
         } @else if (albumPhotos().length === 0) {
@@ -1955,6 +2774,13 @@
             </p>
           </div>
         } @else {
+          @if (isSampleDemoAlbum(currentAlbum)) {
+            <div class="mb-4 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center gap-2 animate-fadeIn">
+              <span class="text-base">💡</span>
+              <span><strong>Fotos de muestra:</strong> Este álbum contiene fotografías de demostración. Sube las fotos oficiales en la pestaña "📤 Subida Masiva" para reemplazarlas.</span>
+            </div>
+          }
+
           <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5 sm:gap-4">
             @for (photo of albumPhotos(); track photo.id) {
               <div
@@ -1968,6 +2794,7 @@
                     [src]="photo.previewUrl"
                     [alt]="photo.filename"
                     loading="lazy"
+                    (error)="onPhotoThumbError($event, photo)"
                     class="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                   />
 
@@ -1999,15 +2826,15 @@
                     {{ photo.filename }}
                   </p>
 
-                  <div class="flex items-center gap-1">
+                  <div class="grid grid-cols-2 gap-1">
                     <!-- Botón 1: Definir como Portada -->
                     <button
                       type="button"
                       (click)="setPhotoAsCover(photo)"
                       [disabled]="currentAlbum.coverUrl === photo.previewUrl || updatingPhotoId() === photo.id"
                       [class]="currentAlbum.coverUrl === photo.previewUrl
-                        ? 'flex-1 py-1 px-1.5 rounded-lg bg-amber-50 text-amber-800 font-bold text-[9px] border border-amber-200 text-center cursor-default'
-                        : 'flex-1 py-1 px-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-semibold text-[9px] transition active:scale-95 disabled:opacity-50 text-center'"
+                        ? 'py-1 px-1 rounded-lg bg-amber-50 text-amber-800 font-bold text-[9px] border border-amber-200 text-center cursor-default truncate'
+                        : 'py-1 px-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-semibold text-[9px] transition active:scale-95 disabled:opacity-50 text-center truncate'"
                       title="Definir esta foto como portada de la carpeta 3D"
                       aria-label="Definir foto como portada"
                     >
@@ -2020,24 +2847,30 @@
                       (click)="toggleSampleHd(photo)"
                       [disabled]="updatingPhotoId() === photo.id"
                       [class]="photo.isSampleHd
-                        ? 'py-1 px-1.5 rounded-lg bg-sky-100 hover:bg-sky-200 text-sky-800 font-bold text-[9px] border border-sky-300 transition active:scale-95'
-                        : 'py-1 px-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-semibold text-[9px] transition active:scale-95'"
+                        ? 'py-1 px-1 rounded-lg bg-sky-100 hover:bg-sky-200 text-sky-800 font-bold text-[9px] border border-sky-300 transition active:scale-95 text-center truncate'
+                        : 'py-1 px-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-semibold text-[9px] transition active:scale-95 text-center truncate'"
                       [title]="photo.isSampleHd ? 'Quitar muestra HD' : 'Marcar como muestra de alta definición'"
                       [attr.aria-label]="photo.isSampleHd ? 'Quitar muestra HD' : 'Marcar como muestra HD'"
                     >
                       {{ photo.isSampleHd ? '⭐ HD' : '☆ HD' }}
                     </button>
 
-                    <!-- Botón 3: Borrar Foto -->
+                    <!-- Botón 3: Borrar Foto con Confirmación Inline (Ancho completo inferior) -->
                     <button
                       type="button"
                       (click)="deleteAlbumPhoto(photo)"
                       [disabled]="deletingPhotoId() === photo.id"
-                      class="py-1 px-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-[9px] border border-rose-200 transition active:scale-95 disabled:opacity-50"
-                      title="Eliminar esta foto del álbum"
-                      aria-label="Eliminar foto del álbum"
+                      [class]="confirmingDeletePhotoId() === photo.id
+                        ? 'col-span-2 py-1 px-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-[9px] border border-rose-700 shadow-sm transition active:scale-95 animate-pulse text-center flex items-center justify-center gap-1 w-full'
+                        : 'col-span-2 py-1 px-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-[9px] border border-rose-200 transition active:scale-95 disabled:opacity-50 text-center flex items-center justify-center gap-1 w-full'"
+                      [title]="confirmingDeletePhotoId() === photo.id ? 'Haz clic de nuevo para confirmar eliminación' : 'Eliminar esta foto del álbum'"
+                      [attr.aria-label]="confirmingDeletePhotoId() === photo.id ? 'Confirmar eliminación de foto' : 'Eliminar foto del álbum'"
                     >
-                      🗑️
+                      @if (confirmingDeletePhotoId() === photo.id) {
+                        <span>¿Confirmar? 🗑️</span>
+                      } @else {
+                        <span>🗑️ Eliminar</span>
+                      }
                     </button>
                   </div>
                 </div>
@@ -2116,11 +2949,374 @@
 }
 
 <!-- ======================================================================== -->
+<!-- MODAL BENTO: GENERADOR DE CÓDIGO QR PARA EVENTOS                          -->
+<!-- ======================================================================== -->
+@if (isQrModalOpen() && qrAlbum(); as album) {
+  <div
+    class="fixed inset-0 z-[110] bg-black/75 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="qrModalTitle"
+  >
+    <div
+      class="bg-zinc-950 text-white rounded-3xl p-6 sm:p-7 max-w-md w-full border border-zinc-800 shadow-2xl relative animate-scaleUp overflow-hidden"
+    >
+      <!-- Franja dorada superior -->
+      <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600"></div>
+
+      <!-- Cabecera del Modal -->
+      <div class="flex items-start justify-between gap-4 mb-4 pt-1">
+        <div>
+          <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-amber-400">
+            {{ album.badge || 'EVENTO' }}
+          </span>
+          <h3 id="qrModalTitle" class="text-lg font-bold text-white tracking-tight mt-0.5">
+            🔳 Código QR del Evento
+          </h3>
+          <p class="text-xs text-zinc-400 mt-0.5">
+            {{ album.title }}
+          </p>
+        </div>
+        <button
+          type="button"
+          (click)="closeQrModal()"
+          class="text-zinc-400 hover:text-white p-1 rounded-xl bg-zinc-900 hover:bg-zinc-800 transition"
+          aria-label="Cerrar modal QR"
+        >
+          ✕
+        </button>
+      </div>
+
+      <!-- Vista previa del Código QR en marco blanco -->
+      <div class="flex flex-col items-center justify-center my-4 p-4 rounded-2xl bg-zinc-900 border border-zinc-800/80">
+        @if (isGeneratingQr()) {
+          <div class="w-64 h-64 flex flex-col items-center justify-center gap-3">
+            <span class="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></span>
+            <span class="text-xs text-zinc-400">Generando código QR...</span>
+          </div>
+        } @else if (qrDataUrl()) {
+          <div class="p-3 bg-white rounded-2xl shadow-xl">
+            <img
+              [src]="qrDataUrl()"
+              [alt]="'Código QR para ' + album.title"
+              class="w-56 h-56 sm:w-64 sm:h-64 object-contain rounded-lg"
+            />
+          </div>
+        }
+
+        <!-- Información de PIN o Estado -->
+        @if (album.isPrivate && album.accessCode) {
+          <div class="mt-4 px-3.5 py-1.5 rounded-xl bg-amber-400/15 border border-amber-400/30 text-amber-300 text-xs font-mono font-bold flex items-center gap-2">
+            <span>🔒 PIN de acceso:</span>
+            <span class="tracking-widest">{{ album.accessCode }}</span>
+          </div>
+        }
+
+        <p class="text-[11px] text-zinc-400 text-center mt-3 max-w-xs">
+          Escaneando este código, el público accede directamente a las fotos de este evento.
+        </p>
+      </div>
+
+      <!-- Botones de Acción -->
+      <div class="space-y-2 mt-5">
+        <button
+          type="button"
+          (click)="downloadQrCard(album)"
+          class="w-full py-3 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 font-extrabold text-xs transition flex items-center justify-center gap-2 shadow-md active:scale-95"
+        >
+          <span>⬇️ Descargar Tarjeta QR (PNG)</span>
+          <span class="text-[10px] opacity-75 font-normal">• Lista para imprimir o historias</span>
+        </button>
+
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            (click)="copyQrAlbumLink()"
+            class="flex-1 py-2.5 px-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-700/60 text-xs font-bold transition flex items-center justify-center gap-1.5 active:scale-95"
+          >
+            <span>🔗</span>
+            <span>{{ qrCopied() ? '✓ ¡Enlace Copiado!' : 'Copiar Link Directo' }}</span>
+          </button>
+
+          <button
+            type="button"
+            (click)="closeQrModal()"
+            class="py-2.5 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs font-semibold transition"
+          >
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ======================================================================== -->
+<!-- MODAL GESTOR DINÁMICO DE CATEGORÍAS E INSIGNIAS (FRENTE 2)               -->
+<!-- ======================================================================== -->
+@if (isCategoryModalOpen()) {
+  <div
+    class="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6 bg-zinc-950/70 backdrop-blur-sm animate-fadeIn"
+    (click)="closeCategoryModal()"
+  >
+    <div
+      class="bg-white rounded-[28px] border border-black/[0.08] shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-float-cart-in"
+      (click)="$event.stopPropagation()"
+    >
+      <!-- Cabecera Sticky del Modal -->
+      <div class="p-5 sm:p-6 border-b border-black/[0.06] flex items-center justify-between bg-white shrink-0">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-[10px] uppercase tracking-wider">
+              🏷️ Disciplinas & Eventos
+            </span>
+            <span class="text-xs text-zinc-400 font-mono">• Sincronización en Vivo</span>
+          </div>
+          <h3 class="font-display font-extrabold text-xl sm:text-2xl text-zinc-900 mt-1">
+            Gestor de Categorías e Insignias
+          </h3>
+          <p class="text-xs text-zinc-500">
+            Administra las categorías de tus álbumes con selector táctil de iconos. Se reflejan en el catálogo público en tiempo real.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          (click)="closeCategoryModal()"
+          class="w-8 h-8 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-500 text-xs font-bold transition flex items-center justify-center active:scale-90"
+          aria-label="Cerrar modal de categorías"
+        >
+          ✕
+        </button>
+      </div>
+
+      <!-- Contenido Desplazable del Modal -->
+      <div class="p-5 sm:p-6 overflow-y-auto space-y-6 flex-1">
+        <!-- Alerta de Feedback -->
+        @if (categoryFeedback(); as fb) {
+          <div
+            class="p-3.5 rounded-2xl text-xs font-semibold flex items-center gap-2.5"
+            [class]="fb.success
+              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+              : 'bg-rose-50 text-rose-800 border border-rose-200'"
+          >
+            <span class="text-base">{{ fb.success ? '✅' : '⚠️' }}</span>
+            <span>{{ fb.message }}</span>
+          </div>
+        }
+
+        <!-- Formulario Crear / Editar Categoría -->
+        <div class="bg-zinc-50 rounded-2xl p-4 sm:p-5 border border-zinc-200 space-y-4">
+          <div class="flex items-center justify-between">
+            <h4 class="text-xs font-bold text-zinc-900 uppercase tracking-wider flex items-center gap-1.5">
+              <span>{{ editingCategory() ? '✏️ Editando Categoría' : '➕ Crear Nueva Categoría' }}</span>
+              @if (editingCategory()) {
+                <span class="text-amber-600 font-mono text-[11px]">({{ editingCategory()?.id }})</span>
+              }
+            </h4>
+
+            @if (editingCategory()) {
+              <button
+                type="button"
+                (click)="cancelEditCategory()"
+                class="text-[11px] font-bold text-zinc-500 hover:text-zinc-800 underline"
+              >
+                Cancelar Edición
+              </button>
+            }
+          </div>
+
+          <form [formGroup]="categoryForm" (ngSubmit)="saveCategory()" class="space-y-4">
+            <!-- Selector Táctil de Iconos (Icon Picker Curado) -->
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <label class="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider">
+                  Icono Seleccionado:
+                  <span class="text-base ml-1">{{ categoryForm.get('icon')?.value }}</span>
+                </label>
+                <span class="text-[10px] text-zinc-400">1 Toque para seleccionar</span>
+              </div>
+
+              <div class="grid grid-cols-6 sm:grid-cols-12 gap-1.5 p-2 bg-white rounded-xl border border-zinc-200 max-h-28 overflow-y-auto">
+                @for (icon of CURATED_ICONS; track icon) {
+                  <button
+                    type="button"
+                    (click)="selectIcon(icon)"
+                    [class]="categoryForm.get('icon')?.value === icon
+                      ? 'w-9 h-9 rounded-xl bg-amber-400 text-base shadow-sm scale-105 font-bold flex items-center justify-center transition active:scale-95'
+                      : 'w-9 h-9 rounded-xl bg-zinc-50 hover:bg-zinc-100 text-base border border-zinc-100 flex items-center justify-center transition active:scale-95'"
+                    [attr.aria-label]="'Seleccionar icono ' + icon"
+                  >
+                    {{ icon }}
+                  </button>
+                }
+              </div>
+            </div>
+
+            <!-- Campos de Entrada -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label for="categoryNameInput" class="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                  Nombre Visible *
+                </label>
+                <input
+                  id="categoryNameInput"
+                  type="text"
+                  formControlName="name"
+                  (input)="onCategoryNameInput($event)"
+                  placeholder="Ej: Motos & Enduro"
+                  class="w-full px-3.5 py-2 rounded-xl bg-white border border-zinc-200 text-zinc-900 text-xs font-semibold focus:outline-none focus:border-zinc-950 transition"
+                />
+              </div>
+
+              <div>
+                <label for="categoryBadgeInput" class="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                  Insignia / Badge en Catálogo
+                </label>
+                <input
+                  id="categoryBadgeInput"
+                  type="text"
+                  formControlName="badgeLabel"
+                  placeholder="Ej: 🏍️ Motos & Enduro"
+                  class="w-full px-3.5 py-2 rounded-xl bg-white border border-zinc-200 text-zinc-900 text-xs font-semibold focus:outline-none focus:border-zinc-950 transition"
+                />
+              </div>
+            </div>
+
+            @if (!editingCategory()) {
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label for="categoryIdInput" class="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                    Slug ID (Opcional)
+                  </label>
+                  <input
+                    id="categoryIdInput"
+                    type="text"
+                    formControlName="id"
+                    placeholder="motos (auto-generado si se deja vacío)"
+                    class="w-full px-3.5 py-2 rounded-xl bg-white border border-zinc-200 text-zinc-700 text-xs font-mono focus:outline-none focus:border-zinc-950 transition"
+                  />
+                </div>
+
+                <div class="flex items-center gap-3 pt-6">
+                  <label class="flex items-center gap-2 cursor-pointer text-xs font-bold text-zinc-700">
+                    <input
+                      type="checkbox"
+                      formControlName="isActive"
+                      class="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 accent-zinc-950"
+                    />
+                    <span>Categoría Activa</span>
+                  </label>
+                </div>
+              </div>
+            }
+
+            <div class="flex justify-end gap-2 pt-1">
+              <button
+                type="submit"
+                [disabled]="categoryForm.invalid || isSavingCategory()"
+                class="px-5 py-2.5 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white font-bold text-xs flex items-center gap-2 transition active:scale-95 disabled:opacity-50"
+              >
+                @if (isSavingCategory()) {
+                  <span class="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                  <span>Guardando...</span>
+                } @else {
+                  <span>{{ editingCategory() ? '💾 Actualizar Categoría' : '➕ Guardar Categoría' }}</span>
+                }
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Lista de Categorías Existentes -->
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 class="text-xs font-bold text-zinc-700 uppercase tracking-wider">
+              Categorías Configuradas ({{ categories().length }})
+            </h4>
+            <span class="text-[10px] text-zinc-400">Total en catálogo público</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            @for (cat of categories(); track cat.id) {
+              <div class="p-3 rounded-2xl bg-white border border-zinc-200/90 shadow-2xs flex items-center justify-between gap-3 hover:border-zinc-300 transition">
+                <div class="flex items-center gap-2.5 min-w-0">
+                  <span class="w-9 h-9 rounded-xl bg-amber-100 border border-amber-200/70 flex items-center justify-center text-lg shrink-0">
+                    {{ cat.icon }}
+                  </span>
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-1.5">
+                      <span class="text-xs font-bold text-zinc-900 truncate">
+                        {{ cat.name }}
+                      </span>
+                      @if (!cat.isActive) {
+                        <span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-zinc-100 text-zinc-500">
+                          Pausada
+                        </span>
+                      }
+                    </div>
+                    <span class="text-[10px] text-zinc-400 font-mono truncate block">
+                      id: {{ cat.id }}
+                    </span>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    (click)="startEditCategory(cat)"
+                    class="p-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs transition active:scale-95"
+                    title="Editar categoría"
+                  >
+                    ✏️
+                  </button>
+
+                  <button
+                    type="button"
+                    (click)="deleteCategory(cat)"
+                    [disabled]="cat.id === 'otros' || isDeletingCategoryId() === cat.id"
+                    [class.bg-rose-600]="confirmingDeleteCategoryId() === cat.id"
+                    [class.text-white]="confirmingDeleteCategoryId() === cat.id"
+                    [class.hover:bg-rose-700]="confirmingDeleteCategoryId() === cat.id"
+                    [class.animate-pulse]="confirmingDeleteCategoryId() === cat.id"
+                    class="p-1.5 rounded-lg bg-zinc-100 hover:bg-rose-100 text-zinc-400 hover:text-rose-600 disabled:opacity-30 disabled:hover:bg-zinc-100 disabled:hover:text-zinc-400 text-xs transition active:scale-95"
+                    [title]="cat.id === 'otros' ? 'Categoría requerida por el sistema' : (confirmingDeleteCategoryId() === cat.id ? 'Haz clic de nuevo para confirmar eliminación' : 'Eliminar categoría')"
+                  >
+                    @if (isDeletingCategoryId() === cat.id) {
+                      <span class="inline-block w-3 h-3 border-2 border-rose-500 border-t-transparent rounded-full animate-spin"></span>
+                    } @else if (confirmingDeleteCategoryId() === cat.id) {
+                      <span class="font-bold text-[11px] px-1 text-white flex items-center gap-1">¿Confirmar? 🗑️</span>
+                    } @else {
+                      <span>🗑️</span>
+                    }
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- Pie del Modal -->
+      <div class="p-4 sm:p-5 border-t border-black/[0.06] bg-zinc-50 flex justify-end shrink-0">
+        <button
+          type="button"
+          (click)="closeCategoryModal()"
+          class="px-5 py-2 rounded-xl bg-zinc-200 hover:bg-zinc-300 text-zinc-800 font-bold text-xs transition"
+        >
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ======================================================================== -->
 <!-- SISTEMA DE TOAST BENTO FLOTANTE                                          -->
 <!-- ======================================================================== -->
 @if (toast(); as t) {
   <div
-    class="fixed bottom-6 right-6 z-[120] max-w-md p-4 rounded-2xl shadow-2xl border flex items-center justify-between gap-3 animate-fadeIn text-xs font-semibold backdrop-blur-md"
+    class="fixed bottom-4 inset-x-4 sm:inset-x-auto sm:bottom-6 sm:right-6 z-[120] max-w-md p-4 rounded-2xl shadow-2xl border flex items-center justify-between gap-3 animate-fadeIn text-xs font-semibold backdrop-blur-md"
     [class]="t.type === 'success'
       ? 'bg-zinc-950/90 text-emerald-400 border-emerald-500/30'
       : t.type === 'error'

@@ -201,6 +201,16 @@ describe('Admin Orders & Real Stats Suite', () => {
       expect(stats.photosSold).toBeGreaterThanOrEqual(3);
       // Álbumes activos en catálogo inicial (album-1 y album-2)
       expect(stats.activeAlbumsCount).toBeGreaterThanOrEqual(2);
+      // Almacenamiento calculado dinámicamente
+      expect(typeof stats.storageUsedGB).toBe('number');
+      expect(stats.storageUsedGB).toBeGreaterThanOrEqual(0);
+      expect(stats.storageLimitGB).toBe(10);
+    });
+
+    it('debe calcular correctamente getTotalStorageBytes() sumando fotos o estimando álbumes activos', async () => {
+      const bytes = await albumRepository.getTotalStorageBytes();
+      expect(typeof bytes).toBe('number');
+      expect(bytes).toBeGreaterThan(0);
     });
   });
 

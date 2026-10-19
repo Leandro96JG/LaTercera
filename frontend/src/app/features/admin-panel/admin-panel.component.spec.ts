@@ -1,14 +1,17 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { of, throwError } from 'rxjs';
+import { of, throwError, Subject } from 'rxjs';
 import { AdminPanelComponent } from './admin-panel.component';
 import { AdminService } from '../../core/services/admin.service';
 import { AdminAuthStore } from '../../core/state/admin-auth.store';
+import { AlbumCategory } from '../../core/models/album.model';
+import { CategoryDTO } from '../../core/models/category.model';
 
 describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () => {
   let component: AdminPanelComponent;
+  let fixture: ComponentFixture<AdminPanelComponent>;
   let mockAdminService: {
     getStats: ReturnType<typeof vi.fn>;
     importFromDrive: ReturnType<typeof vi.fn>;
@@ -28,6 +31,11 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
     getAlbumPhotos: ReturnType<typeof vi.fn>;
     updateAlbumPhoto: ReturnType<typeof vi.fn>;
     deleteAlbumPhoto: ReturnType<typeof vi.fn>;
+    getPromotions: ReturnType<typeof vi.fn>;
+    updatePricingConfig: ReturnType<typeof vi.fn>;
+    createCoupon: ReturnType<typeof vi.fn>;
+    updateCoupon: ReturnType<typeof vi.fn>;
+    deleteCoupon: ReturnType<typeof vi.fn>;
   };
 
   const initialMockAlbum = {
@@ -148,6 +156,58 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
         success: true,
         photoId: 'photo-1',
         message: 'Foto eliminada correctamente'
+      })),
+      getPromotions: vi.fn().mockReturnValue(of({
+        success: true,
+        config: {
+          enableTierDiscounts: true,
+          tier3DiscountPercent: 20,
+          tier5DiscountPercent: 30,
+          capAtFullAlbumPrice: true
+        },
+        coupons: [
+          {
+            code: 'YUYO10',
+            discountPercent: 10,
+            isActive: true,
+            usedCount: 0
+          }
+        ]
+      })),
+      updatePricingConfig: vi.fn().mockReturnValue(of({
+        success: true,
+        config: {
+          enableTierDiscounts: true,
+          tier3DiscountPercent: 25,
+          tier5DiscountPercent: 35,
+          capAtFullAlbumPrice: true
+        },
+        message: 'Configuración actualizada'
+      })),
+      createCoupon: vi.fn().mockReturnValue(of({
+        success: true,
+        coupon: {
+          code: 'FIESTA20',
+          discountPercent: 20,
+          isActive: true,
+          usedCount: 0
+        },
+        message: 'Cupón creado'
+      })),
+      updateCoupon: vi.fn().mockReturnValue(of({
+        success: true,
+        coupon: {
+          code: 'YUYO10',
+          discountPercent: 10,
+          isActive: false,
+          usedCount: 0
+        },
+        message: 'Cupón actualizado'
+      })),
+      deleteCoupon: vi.fn().mockReturnValue(of({
+        success: true,
+        code: 'YUYO10',
+        message: 'Cupón eliminado'
       }))
     };
 
@@ -160,7 +220,7 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
       ]
     }).compileComponents();
 
-    const fixture = TestBed.createComponent(AdminPanelComponent);
+    fixture = TestBed.createComponent(AdminPanelComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
@@ -477,6 +537,205 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
     expect(component.currentPage()).toBe(2);
   });
 
+  it('debe cargar 10 álbumes, verificar pageSize 6, mostrar exactamente 6 en página 1 y 4 en página 2, y renderizar 6 tarjetas en el DOM', () => {
+    const mockList = Array.from({ length: 10 }, (_, i) => ({
+      ...initialMockAlbum,
+      id: `album-pag-${i + 1}`,
+      title: `Álbum de Prueba #${i + 1}`,
+      category: 'futbol' as AlbumCategory,
+      isPublished: true,
+      deletedAt: null
+    }));
+
+    component.albums.set(mockList);
+    component.clearAlbumFilters();
+    fixture.detectChanges();
+
+    expect(component.pageSize()).toBe(6);
+    expect(component.filteredAdminAlbums().length).toBe(10);
+    expect(component.totalPages()).toBe(2);
+    expect(component.currentPage()).toBe(1);
+    expect(component.paginatedAlbums().length).toBe(6);
+
+    // Verificar en el DOM que se renderizan exactamente 6 tarjetas de álbum en la página 1
+    const compiled = fixture.nativeElement as HTMLElement;
+    const cardsPage1 = compiled.querySelectorAll('.grid.grid-cols-1.md\\:grid-cols-2 > div');
+    expect(cardsPage1.length).toBe(6);
+
+    // Ir a la página 2
+    component.goToPage(2);
+    fixture.detectChanges();
+
+    expect(component.currentPage()).toBe(2);
+    expect(component.paginatedAlbums().length).toBe(4);
+    const cardsPage2 = compiled.querySelectorAll('.grid.grid-cols-1.md\\:grid-cols-2 > div');
+    expect(cardsPage2.length).toBe(4);
+  });
+
+  describe('Buscador y Filtros Reactivos de Álbumes (filteredAdminAlbums)', () => {
+    beforeEach(() => {
+      component.albums.set([
+        {
+          id: 'album-fut-1',
+          category: 'futbol',
+          title: 'Defensores de la Boca vs Rioja Juniors',
+          subtitle: 'Torneo Clausura',
+          date: '2026-10-15',
+          eventDate: '2026-10-15',
+          location: 'Estadio Mercado Luna',
+          photosCount: 50,
+          unitPrice: 1200,
+          fullAlbumPrice: 9500,
+          coverUrl: '',
+          badge: '⚽ Fútbol',
+          isPublished: true,
+          isPrivate: false,
+          isFreeDownload: false
+        },
+        {
+          id: 'album-hoc-2',
+          category: 'hockey',
+          title: 'Semifinal Hockey Dairó',
+          subtitle: 'Polideportivo Evita',
+          date: '2026-10-10',
+          eventDate: '2026-10-10',
+          location: 'Cancha 1',
+          photosCount: 30,
+          unitPrice: 1200,
+          fullAlbumPrice: 9500,
+          coverUrl: '',
+          badge: '🏑 Hockey',
+          isPublished: false,
+          isPrivate: false,
+          isFreeDownload: false
+        },
+        {
+          id: 'album-bas-3',
+          category: 'basquet',
+          title: 'Final Básquetbol Riojano',
+          subtitle: 'Club San Martín',
+          date: '2026-10-05',
+          eventDate: '2026-10-05',
+          location: 'Cancha Central',
+          photosCount: 80,
+          unitPrice: 1500,
+          fullAlbumPrice: 12000,
+          coverUrl: '',
+          badge: '🏀 Básquet',
+          isPublished: true,
+          isPrivate: true,
+          accessCode: 'BASQUET26',
+          isFreeDownload: false
+        },
+        {
+          id: 'album-soc-4',
+          category: 'sociales',
+          title: 'Fiesta de 15 Camila',
+          subtitle: 'Salón Las Retamas',
+          date: '2026-10-01',
+          eventDate: '2026-10-01',
+          location: 'Salón Principal',
+          photosCount: 15,
+          unitPrice: 1000,
+          fullAlbumPrice: 7000,
+          coverUrl: '',
+          badge: '🎉 Cumpleaños',
+          isPublished: true,
+          isPrivate: false,
+          isFreeDownload: true
+        }
+      ]);
+      component.clearAlbumFilters();
+    });
+
+    it('debe filtrar álbumes en tiempo real por búsqueda de texto (título, subtítulo, ID, fecha)', () => {
+      // Búsqueda por título
+      component.albumSearchQuery.set('Defensores');
+      expect(component.filteredAdminAlbums().length).toBe(1);
+      expect(component.filteredAdminAlbums()[0].id).toBe('album-fut-1');
+
+      // Búsqueda por subtítulo
+      component.albumSearchQuery.set('Las Retamas');
+      expect(component.filteredAdminAlbums().length).toBe(1);
+      expect(component.filteredAdminAlbums()[0].id).toBe('album-soc-4');
+
+      // Búsqueda por ID
+      component.albumSearchQuery.set('album-bas-3');
+      expect(component.filteredAdminAlbums().length).toBe(1);
+      expect(component.filteredAdminAlbums()[0].id).toBe('album-bas-3');
+
+      // Búsqueda por fecha
+      component.albumSearchQuery.set('2026-10-10');
+      expect(component.filteredAdminAlbums().length).toBe(1);
+      expect(component.filteredAdminAlbums()[0].id).toBe('album-hoc-2');
+    });
+
+    it('debe filtrar combinando categoría y estado (privados, cortesía, ocultos, publicados)', () => {
+      // Filtrar por categoría hockey
+      component.albumCategoryFilter.set('hockey');
+      expect(component.filteredAdminAlbums().length).toBe(1);
+      expect(component.filteredAdminAlbums()[0].category).toBe('hockey');
+
+      // Combinar categoría hockey con estado publicados -> 0 (porque está oculto)
+      component.albumStatusFilter.set('publicados');
+      expect(component.filteredAdminAlbums().length).toBe(0);
+
+      // Cambiar estado a ocultos -> 1
+      component.albumStatusFilter.set('ocultos');
+      expect(component.filteredAdminAlbums().length).toBe(1);
+
+      // Limpiar y filtrar por privados
+      component.albumCategoryFilter.set('todos');
+      component.albumStatusFilter.set('privados');
+      expect(component.filteredAdminAlbums().length).toBe(1);
+      expect(component.filteredAdminAlbums()[0].id).toBe('album-bas-3');
+
+      // Filtrar por cortesía gratis
+      component.albumStatusFilter.set('cortesia');
+      expect(component.filteredAdminAlbums().length).toBe(1);
+      expect(component.filteredAdminAlbums()[0].id).toBe('album-soc-4');
+    });
+
+    it('debe ordenar álbumes por más fotos, menos fotos, más recientes y más antiguos', () => {
+      // Más fotos (80, 50, 30, 15)
+      component.albumSortBy.set('mas_fotos');
+      expect(component.filteredAdminAlbums()[0].id).toBe('album-bas-3');
+      expect(component.filteredAdminAlbums()[3].id).toBe('album-soc-4');
+
+      // Menos fotos (15, 30, 50, 80)
+      component.albumSortBy.set('menos_fotos');
+      expect(component.filteredAdminAlbums()[0].id).toBe('album-soc-4');
+      expect(component.filteredAdminAlbums()[3].id).toBe('album-bas-3');
+
+      // Más recientes (2026-10-15 -> 2026-10-01)
+      component.albumSortBy.set('recientes');
+      expect(component.filteredAdminAlbums()[0].id).toBe('album-fut-1');
+
+      // Más antiguos (2026-10-01 -> 2026-10-15)
+      component.albumSortBy.set('antiguos');
+      expect(component.filteredAdminAlbums()[0].id).toBe('album-soc-4');
+    });
+
+    it('debe restablecer todos los filtros con clearAlbumFilters()', () => {
+      component.albumSearchQuery.set('fiesta');
+      component.albumCategoryFilter.set('sociales');
+      component.albumStatusFilter.set('cortesia');
+      component.albumSortBy.set('mas_fotos');
+
+      expect(component.hasActiveAlbumFilters()).toBe(true);
+      expect(component.filteredAdminAlbums().length).toBe(1);
+
+      component.clearAlbumFilters();
+
+      expect(component.albumSearchQuery()).toBe('');
+      expect(component.albumCategoryFilter()).toBe('todos');
+      expect(component.albumStatusFilter()).toBe('todos');
+      expect(component.albumSortBy()).toBe('recientes');
+      expect(component.hasActiveAlbumFilters()).toBe(false);
+      expect(component.filteredAdminAlbums().length).toBe(4);
+    });
+  });
+
   it('debe detectar archivos que superan el límite de 50 MB de Supabase Storage y bloquear la subida', () => {
     // Archivo de 52 MB simulado
     const oversizedFile = new File(['x'.repeat(100)], 'foto_upscaled_4x.png', { type: 'image/png' });
@@ -678,21 +937,122 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
       expect(component.photosModalFeedback()?.success).toBe(true);
     });
 
-    it('debe eliminar una foto del álbum, actualizar la lista y decrementar el contador', () => {
-      vi.stubGlobal('confirm', vi.fn().mockReturnValue(true));
-
+    it('debe requerir confirmación inline de dos clics para eliminar una foto del álbum sin usar confirm nativo', () => {
       component.openPhotosModal(initialMockAlbum);
       const photoToDelete = component.albumPhotos()[0];
 
+      // Primer clic: activa el estado de confirmación y no llama al servicio
+      component.deleteAlbumPhoto(photoToDelete);
+
+      expect(component.confirmingDeletePhotoId()).toBe('photo-1');
+      expect(mockAdminService.deleteAlbumPhoto).not.toHaveBeenCalled();
+
+      // Segundo clic dentro de los 3s: confirma y llama al servicio
       component.deleteAlbumPhoto(photoToDelete);
 
       expect(mockAdminService.deleteAlbumPhoto).toHaveBeenCalledWith('album-1', 'photo-1');
+      expect(component.confirmingDeletePhotoId()).toBeNull();
       expect(component.albumPhotos().some(p => p.id === 'photo-1')).toBe(false);
       expect(component.selectedAlbumForPhotos()?.photosCount).toBe(47);
       expect(component.albums().find(a => a.id === 'album-1')?.photosCount).toBe(47);
       expect(component.photosModalFeedback()?.success).toBe(true);
+    });
 
-      vi.unstubAllGlobals();
+    it('debe manejar errores HTTP en loadAlbumPhotos mostrando toast y guardando el mensaje en photosModalError sin romper el modal', () => {
+      mockAdminService.getAlbumPhotos.mockReturnValueOnce(
+        throwError(() => ({ error: { error: 'Fallo de conexión con la base de datos' } }))
+      );
+
+      component.openPhotosModal(initialMockAlbum);
+
+      expect(component.isPhotosModalOpen()).toBe(true);
+      expect(component.isLoadingAlbumPhotos()).toBe(false);
+      expect(component.photosModalError()).toBe('Fallo de conexión con la base de datos');
+      expect(component.toast()?.type).toBe('error');
+      expect(component.toast()?.message).toContain('Fallo de conexión con la base de datos');
+      expect(component.albumPhotos().length).toBe(0);
+    });
+
+    it('debe reintentar la carga de fotos al invocar loadAlbumPhotos tras un fallo previo', () => {
+      // 1. Primer intento falla
+      mockAdminService.getAlbumPhotos.mockReturnValueOnce(
+        throwError(() => ({ message: 'Error de red transitorio' }))
+      );
+      component.openPhotosModal(initialMockAlbum);
+      expect(component.photosModalError()).toBe('Error de red transitorio');
+
+      // 2. Reintento exitoso
+      mockAdminService.getAlbumPhotos.mockReturnValueOnce(
+        of({
+          success: true,
+          albumId: 'album-1',
+          total: 1,
+          photos: [
+            {
+              id: 'photo-retry-1',
+              albumId: 'album-1',
+              filename: 'retry.jpg',
+              originalPath: '',
+              previewUrl: 'http://localhost:4000/retry.webp',
+              isSampleHd: false
+            }
+          ]
+        })
+      );
+
+      component.loadAlbumPhotos('album-1');
+
+      expect(component.isLoadingAlbumPhotos()).toBe(false);
+      expect(component.photosModalError()).toBeNull();
+      expect(component.albumPhotos().length).toBe(1);
+      expect(component.albumPhotos()[0].id).toBe('photo-retry-1');
+    });
+
+    it('debe reemplazar la imagen rota con un fallback seguro en onPhotoThumbError', () => {
+      const mockImg = { src: 'http://broken-link.com/photo.jpg' } as HTMLImageElement;
+      const mockEvent = { target: mockImg } as unknown as Event;
+      const photo = {
+        id: 'photo-broken',
+        albumId: 'album-1',
+        filename: 'broken.jpg',
+        originalPath: '',
+        previewUrl: 'http://broken-link.com/photo.jpg',
+        isSampleHd: false
+      };
+
+      component.onPhotoThumbError(mockEvent, photo);
+
+      expect(mockImg.src).toContain('https://images.unsplash.com');
+    });
+
+    it('debe detectar correctamente si un álbum contiene fotos de muestra demo con isSampleDemoAlbum', () => {
+      expect(component.isSampleDemoAlbum(null)).toBe(false);
+
+      // Con fotos regulares de producción
+      component.albumPhotos.set([
+        {
+          id: 'photo-prod-1',
+          albumId: 'album-1',
+          filename: 'partido_001.jpg',
+          originalPath: 'originals/album-1/partido_001.jpg',
+          previewUrl: 'https://cdn.example.com/partido_001.webp',
+          isSampleHd: false
+        }
+      ]);
+      expect(component.isSampleDemoAlbum(initialMockAlbum)).toBe(false);
+
+      // Con fotos sintéticas de muestra/demo
+      component.albumPhotos.set([
+        {
+          id: 'album-1-photo-1',
+          albumId: 'album-1',
+          filename: 'demo_muestra_01.jpg',
+          originalPath: '',
+          previewUrl: 'http://localhost:4000/demo1.webp',
+          isSampleHd: true
+        }
+      ]);
+      expect(component.isSampleDemoAlbum(initialMockAlbum)).toBe(true);
     });
   });
 
@@ -815,6 +1175,385 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
 
       component.dismissToast();
       expect(component.toast()).toBeNull();
+    });
+
+    it('debe acumular fotos al llamar handleSelectedFileList dos veces seguidas sin borrar la primera ni perder hdIndices ni previewUrls', () => {
+      const createObjectURLMock = vi.fn((file: File) => `blob:http://localhost:4200/${file.name}`);
+      const revokeObjectURLMock = vi.fn();
+      vi.stubGlobal('URL', {
+        createObjectURL: createObjectURLMock,
+        revokeObjectURL: revokeObjectURLMock
+      });
+
+      const f1 = new File(['foto 1'], 'foto1.jpg', { type: 'image/jpeg', lastModified: 1000 });
+      const f2 = new File(['foto 2'], 'foto2.jpg', { type: 'image/jpeg', lastModified: 2000 });
+      const f3 = new File(['foto 3'], 'foto3.jpg', { type: 'image/jpeg', lastModified: 3000 });
+
+      // Primera selección: 1 archivo
+      (component as any).handleSelectedFileList([f1]);
+
+      expect(component.selectedFiles().length).toBe(1);
+      expect(component.selectedFiles()[0].name).toBe('foto1.jpg');
+      expect(component.filePreviewUrls().length).toBe(1);
+      expect(component.filePreviewUrls()[0]).toBe('blob:http://localhost:4200/foto1.jpg');
+      expect(component.hdIndices()).toEqual([0]);
+
+      // Usuario personaliza hdIndices a algo específico
+      component.hdIndices.set([0]);
+
+      // Segunda selección: 2 archivos adicionales
+      (component as any).handleSelectedFileList([f2, f3]);
+
+      // Debe acumular los 3 archivos sin borrar foto1 ni revocar sus URLs
+      expect(component.selectedFiles().length).toBe(3);
+      expect(component.selectedFiles()[0].name).toBe('foto1.jpg');
+      expect(component.selectedFiles()[1].name).toBe('foto2.jpg');
+      expect(component.selectedFiles()[2].name).toBe('foto3.jpg');
+      expect(component.filePreviewUrls().length).toBe(3);
+      expect(component.filePreviewUrls()[0]).toBe('blob:http://localhost:4200/foto1.jpg');
+      expect(component.filePreviewUrls()[1]).toBe('blob:http://localhost:4200/foto2.jpg');
+      expect(component.filePreviewUrls()[2]).toBe('blob:http://localhost:4200/foto3.jpg');
+      expect(component.hdIndices()).toEqual([0]); // Conserva los índices elegidos intactos
+
+      vi.unstubAllGlobals();
+    });
+
+    it('debe deduplicar archivos repetidos por clave única y mostrar toast informativo', () => {
+      const createObjectURLMock = vi.fn((file: File) => `blob:http://localhost:4200/${file.name}`);
+      vi.stubGlobal('URL', {
+        createObjectURL: createObjectURLMock,
+        revokeObjectURL: vi.fn()
+      });
+
+      const f1 = new File(['content1'], 'partido_1.jpg', { type: 'image/jpeg', lastModified: 1000 });
+      const f1Duplicate = new File(['content1'], 'partido_1.jpg', { type: 'image/jpeg', lastModified: 1000 });
+      const f2 = new File(['content2'], 'partido_2.jpg', { type: 'image/jpeg', lastModified: 2000 });
+
+      (component as any).handleSelectedFileList([f1]);
+      expect(component.selectedFiles().length).toBe(1);
+
+      // Intentar agregar f1 nuevamente junto a f2
+      (component as any).handleSelectedFileList([f1Duplicate, f2]);
+
+      expect(component.selectedFiles().length).toBe(2);
+      expect(component.toast()?.type).toBe('info');
+      expect(component.toast()?.message).toContain('Se omitieron 1 foto(s)');
+
+      vi.unstubAllGlobals();
+    });
+
+    it('debe limpiar input.value en onFileSelect para permitir re-seleccionar archivos', () => {
+      const f1 = new File(['foto'], 'foto_reselect.jpg', { type: 'image/jpeg' });
+      const mockInput = {
+        files: [f1],
+        value: 'C:\\fakepath\\foto_reselect.jpg'
+      };
+
+      component.onFileSelect({ target: mockInput } as unknown as Event);
+
+      expect(mockInput.value).toBe('');
+      expect(component.selectedFiles().some(f => f.name === 'foto_reselect.jpg')).toBe(true);
+    });
+
+    it('debe conservar el PIN en claro en el objeto local al guardar privacidad para incluirlo en WhatsApp', () => {
+      const writeTextMock = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, {
+        clipboard: {
+          writeText: writeTextMock
+        }
+      });
+
+      // El backend devuelve accessCode enmascarado como '********'
+      mockAdminService.updateAlbumPrivacy.mockReturnValue(of({
+        success: true,
+        album: {
+          ...initialMockAlbum,
+          isPrivate: true,
+          accessCode: '********'
+        }
+      }));
+
+      component.startEditPrivacy(initialMockAlbum);
+      component.privacyAccessCodeInput.set('TORNEO2026');
+
+      component.savePrivacy(initialMockAlbum, true);
+
+      // Verificar que en local el álbum conserva el PIN en texto claro y no '********'
+      const updatedAlbum = component.albums().find(a => a.id === initialMockAlbum.id);
+      expect(updatedAlbum?.isPrivate).toBe(true);
+      expect(updatedAlbum?.accessCode).toBe('TORNEO2026');
+
+      // Al copiar texto de WhatsApp inmediatamente después, debe incluir el PIN
+      component.copyWhatsAppShareText(updatedAlbum!);
+
+      expect(writeTextMock).toHaveBeenCalledWith(
+        expect.stringContaining('🔒 PIN de acceso: TORNEO2026')
+      );
+    });
+
+    it('debe actualizar uploadProgress durante la subida masiva y completar al 100%', () => {
+      const f1 = new File(['foto'], 'test_upload.jpg', { type: 'image/jpeg' });
+      (component as any).handleSelectedFileList([f1]);
+
+      let capturedProgressCb: ((percent: number) => void) | undefined;
+      const uploadSubject = new Subject<any>();
+      mockAdminService.bulkUpload.mockImplementation((_alb, _files, _wm, _hd, onProgress) => {
+        capturedProgressCb = onProgress;
+        return uploadSubject.asObservable();
+      });
+
+      expect(component.uploadProgress()).toBe(0);
+
+      component.submitBulkUpload();
+
+      expect(component.isBulkUploading()).toBe(true);
+      expect(mockAdminService.bulkUpload).toHaveBeenCalled();
+
+      // Emitir progreso intermedio
+      capturedProgressCb?.(65);
+      expect(component.uploadProgress()).toBe(65);
+
+      // Emitir respuesta final exitosa
+      uploadSubject.next({
+        success: true,
+        albumId: 'album-1',
+        summary: { totalReceived: 1, successful: 1, failed: 0, durationMs: 500 }
+      });
+      uploadSubject.complete();
+
+      expect(component.uploadProgress()).toBe(100);
+      expect(component.selectedFiles().length).toBe(0);
+      expect(component.isBulkUploading()).toBe(false);
+    });
+  });
+
+  describe('Generador de Código QR para Álbumes (Eventos Deportivos & Sociales)', () => {
+    it('debe abrir el modal QR y generar el dataUrl del código QR con QRCode.toDataURL', async () => {
+      expect(component.isQrModalOpen()).toBe(false);
+      expect(component.qrDataUrl()).toBe('');
+
+      await component.openQrModal(initialMockAlbum);
+
+      expect(component.isQrModalOpen()).toBe(true);
+      expect(component.qrAlbum()?.id).toBe('album-1');
+      expect(component.qrDataUrl()).toContain('data:image/');
+
+      component.closeQrModal();
+      expect(component.isQrModalOpen()).toBe(false);
+      expect(component.qrAlbum()).toBeNull();
+      expect(component.qrDataUrl()).toBe('');
+    });
+
+    it('debe copiar el enlace directo al álbum desde el modal QR al portapapeles', async () => {
+      const writeTextMock = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, {
+        clipboard: {
+          writeText: writeTextMock
+        }
+      });
+
+      await component.openQrModal(initialMockAlbum);
+      await component.copyQrAlbumLink();
+
+      expect(writeTextMock).toHaveBeenCalledWith(
+        expect.stringContaining('?album=album-1')
+      );
+      expect(component.qrCopied()).toBe(true);
+      expect(component.toast()?.type).toBe('success');
+    });
+
+    it('debe generar y descargar la tarjeta QR con downloadQrCard', async () => {
+      await component.openQrModal(initialMockAlbum);
+
+      // Espiar creación de enlace para descarga
+      const clickMock = vi.fn();
+      const createElementSpy = vi.spyOn(document, 'createElement');
+
+      // Ejecutar descarga
+      await component.downloadQrCard(initialMockAlbum);
+
+      expect(component.toast()?.type).toBe('success');
+      createElementSpy.mockRestore();
+    });
+  });
+
+  describe('Gestión Dinámica de Promociones & Cupones (Bento Dashboard)', () => {
+    it('debe inicializar y cargar la configuración de descuentos por cantidad y cupones al arrancar', () => {
+      expect(mockAdminService.getPromotions).toHaveBeenCalled();
+      expect(component.pricingConfig().enableTierDiscounts).toBe(true);
+      expect(component.pricingConfig().tier3DiscountPercent).toBe(20);
+      expect(component.pricingConfig().tier5DiscountPercent).toBe(30);
+      expect(component.coupons().length).toBe(1);
+      expect(component.coupons()[0].code).toBe('YUYO10');
+      expect(component.pricingConfigForm.value.tier3DiscountPercent).toBe(20);
+    });
+
+    it('debe permitir cambiar a la pestaña de promociones', () => {
+      component.activeTab.set('promotions');
+      expect(component.activeTab()).toBe('promotions');
+    });
+
+    it('debe guardar la configuración de descuentos por cantidad con savePricingConfig', () => {
+      component.pricingConfigForm.patchValue({
+        enableTierDiscounts: true,
+        tier3DiscountPercent: 25,
+        tier5DiscountPercent: 35,
+        capAtFullAlbumPrice: true
+      });
+
+      component.savePricingConfig();
+
+      expect(mockAdminService.updatePricingConfig).toHaveBeenCalledWith({
+        enableTierDiscounts: true,
+        tier3DiscountPercent: 25,
+        tier5DiscountPercent: 35,
+        capAtFullAlbumPrice: true
+      });
+      expect(component.pricingConfig().tier3DiscountPercent).toBe(25);
+      expect(component.promotionsFeedback()?.success).toBe(true);
+    });
+
+    it('debe crear un nuevo cupón y añadirlo a la lista con createNewCoupon', () => {
+      component.createCouponForm.patchValue({
+        code: 'fiesta20',
+        discountPercent: 20,
+        maxUses: null
+      });
+
+      component.createNewCoupon();
+
+      expect(mockAdminService.createCoupon).toHaveBeenCalledWith({
+        code: 'FIESTA20',
+        discountPercent: 20,
+        maxUses: null
+      });
+      expect(component.coupons().some(c => c.code === 'FIESTA20')).toBe(true);
+      expect(component.createCouponForm.value.code).toBe('');
+      expect(component.promotionsFeedback()?.success).toBe(true);
+    });
+
+    it('debe alternar el estado activo/pausado de un cupón con toggleCouponActive', () => {
+      const coupon = component.coupons()[0];
+      expect(coupon.isActive).toBe(true);
+
+      component.toggleCouponActive(coupon);
+
+      expect(mockAdminService.updateCoupon).toHaveBeenCalledWith('YUYO10', { isActive: false });
+      expect(component.coupons()[0].isActive).toBe(false);
+    });
+
+    it('debe eliminar un cupón de la lista con deleteCoupon', () => {
+      const coupon = component.coupons()[0];
+
+      component.deleteCoupon(coupon);
+
+      expect(mockAdminService.deleteCoupon).toHaveBeenCalledWith('YUYO10');
+      expect(component.coupons().some(c => c.code === 'YUYO10')).toBe(false);
+      expect(component.promotionsFeedback()?.success).toBe(true);
+    });
+
+    it('debe autocompletar el formulario con presetGiveawayCoupon para sorteo de 100% de descuento, 1 uso y 1 foto', () => {
+      component.createCouponForm.patchValue({ code: '' });
+      component.presetGiveawayCoupon();
+
+      expect(component.createCouponForm.value.code).toBe('SORTEO100');
+      expect(component.createCouponForm.value.discountPercent).toBe(100);
+      expect(component.createCouponForm.value.maxUses).toBe(1);
+      expect(component.createCouponForm.value.maxPhotos).toBe(1);
+
+      // Si ya tenía un código escrito, debe preservarlo
+      component.createCouponForm.patchValue({ code: 'INSTASORTEO' });
+      component.presetGiveawayCoupon();
+      expect(component.createCouponForm.value.code).toBe('INSTASORTEO');
+      expect(component.createCouponForm.value.discountPercent).toBe(100);
+    });
+
+    it('debe crear un cupón con alcance de álbum específico y límite de maxPhotos para sorteos', () => {
+      component.createCouponForm.patchValue({
+        code: 'sorteo-final',
+        discountPercent: 100,
+        maxUses: 1,
+        albumId: 'album-1',
+        maxPhotos: 1
+      });
+
+      component.createNewCoupon();
+
+      expect(mockAdminService.createCoupon).toHaveBeenCalledWith({
+        code: 'SORTEO-FINAL',
+        discountPercent: 100,
+        maxUses: 1,
+        albumId: 'album-1',
+        maxPhotos: 1
+      });
+      expect(component.createCouponForm.value.albumId).toBeNull();
+      expect(component.createCouponForm.value.maxPhotos).toBeNull();
+    });
+  });
+
+  describe('Gestor Dinámico de Categorías e Insignias (Frente 2)', () => {
+    it('debe impedir eliminar la categoría "otros" requerida por el sistema', () => {
+      const otrosCat: CategoryDTO = {
+        id: 'otros',
+        name: 'Otros Eventos',
+        icon: '📸',
+        badgeLabel: '📸 Otros',
+        order: 99,
+        isActive: true
+      };
+
+      component.deleteCategory(otrosCat);
+
+      expect(component.categoryFeedback()?.success).toBe(false);
+      expect(component.categoryFeedback()?.message).toContain('No es posible eliminar');
+      expect(component.confirmingDeleteCategoryId()).toBeNull();
+    });
+
+    it('debe requerir confirmación inline de dos clics para eliminar una categoría sin usar confirm nativo', () => {
+      const catToDelete: CategoryDTO = {
+        id: 'padel',
+        name: 'Pádel',
+        icon: '🎾',
+        badgeLabel: '🎾 Pádel',
+        order: 10,
+        isActive: true
+      };
+      component.categories.set([...component.categories(), catToDelete]);
+      const deleteSpy = vi.spyOn(component.categoryService, 'deleteCategory').mockReturnValue(
+        of({ success: true, message: 'Categoría eliminada' })
+      );
+
+      // Primer clic: activa el estado de confirmación y no llama al servicio
+      component.deleteCategory(catToDelete);
+
+      expect(component.confirmingDeleteCategoryId()).toBe('padel');
+      expect(deleteSpy).not.toHaveBeenCalled();
+
+      // Segundo clic dentro de los 3s: confirma y llama al servicio
+      component.deleteCategory(catToDelete);
+
+      expect(deleteSpy).toHaveBeenCalledWith('padel');
+      expect(component.confirmingDeleteCategoryId()).toBeNull();
+      expect(component.categories().some(c => c.id === 'padel')).toBe(false);
+      expect(component.categoryFeedback()?.success).toBe(true);
+    });
+
+    it('debe auto-resetear la confirmación de eliminación de categoría tras 3 segundos', () => {
+      vi.useFakeTimers();
+      const catToDelete: CategoryDTO = {
+        id: 'padel',
+        name: 'Pádel',
+        icon: '🎾',
+        badgeLabel: '🎾 Pádel',
+        order: 10,
+        isActive: true
+      };
+      component.deleteCategory(catToDelete);
+      expect(component.confirmingDeleteCategoryId()).toBe('padel');
+
+      vi.advanceTimersByTime(3000);
+      expect(component.confirmingDeleteCategoryId()).toBeNull();
+      vi.useRealTimers();
     });
   });
 });

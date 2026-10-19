@@ -81,7 +81,709 @@ Plataforma web e-commerce mobile-first orientada a la venta de fotografías de p
 - [x] Conexión de Métricas Reales en `/api/admin/stats` y Pestaña "💳 Ventas & Entregas" con Regeneración de Links de 72h en 1 Clic con **251 tests unitarios pasando al 100%** (147 backend + 104 frontend).
 - [x] Modal Bento "🖼️ Gestionar Fotos del Álbum" (Portadas, Muestras HD y Eliminación Quirúrgica) con **263 tests unitarios pasando al 100%** (151 backend + 112 frontend).
 - [x] Kit de Difusión WhatsApp (enlaces directos ?album=), Miniaturas en Subida Masiva (URL.createObjectURL) y Sistema de Toasts Bento con **270 tests unitarios pasando al 100%** (151 backend + 119 frontend).
-- [ ] Preparación para Despliegue en Producción (CI/CD, Railway/Render para Backend, Vercel/Cloudflare Pages para Frontend).
+- [x] Subida Masiva Acumulativa y Deduplicada, Progreso de Subida HTTP en Tiempo Real, Preservación de PIN en Difusión WhatsApp y Confirmación Inline Libre de `confirm()` con **276 tests unitarios pasando al 100%** (151 backend + 125 frontend).
+- [x] Splash Screen Cinemático con Obturador de Cámara, Skeletons 3D de Carpetas y Prevención de Parpadeo de Fotos Dummy con **282 tests unitarios pasando al 100%** (151 backend + 131 frontend).
+- [x] Subagentes Especializados `motion-ux-specialist` y `media-upload-specialist`, Persistencia de Carrito en SessionStorage, Generador de QR Descargable (PNG) y Confeti de Pago Exitoso con **288 tests unitarios pasando al 100%** (151 backend + 137 frontend).
+- [x] Corrección de Hit-Testing y Selección/Deselección de Fotos en Catálogo (Z-Index Stacking, Transparencia de Eventos en Gloss Overlay, Delegación Reactiva en App.togglePhoto y Blindaje Defensivo en CartStore) con **291 tests unitarios pasando al 100%** (151 backend + 140 frontend).
+- [x] Blindaje de Persistencia en Supabase durante Pagos y Webhook de Mercado Pago, Hardening de Entradas de Checkout y Timeout de Polling en `/pago-exitoso` con **300 tests unitarios pasando al 100%** (159 backend + 141 frontend).
+- [x] Gestión Dinámica de Descuentos por Cantidad y Cupones Promocionales desde el Dashboard con Validación Zero-Trust en Backend con **328 tests unitarios pasando al 100%** (169 backend + 159 frontend).
+- [x] Canje Directo 100% OFF para Sorteos (Bypass MP), Control de Concurrencia (Mutex Lock), Alcance (maxPhotos/expiresAt), Sincronización de Tiers en CartStore y Migración SQL con **336 tests unitarios pasando al 100%** (174 backend + 162 frontend).
+- [x] Optimización de UX Mobile en Dashboard (`AdminPanelComponent`) y Carrito Flotante (`FloatingCartComponent`) con **338 tests unitarios pasando al 100%** (174 backend + 164 frontend).
+- [x] Blindaje Móvil Definitivo: Eliminación de Scroll Horizontal, Corrección de Píldora Flotante (6+ fotos) y Sincronización de Persistencia de Cupones con **339 tests unitarios pasando al 100%** (174 backend + 165 frontend).
+- [x] Diagnóstico y Reparación de Carga de Fotos en el Dashboard, Buscador y Filtros Reactivos de Álbumes (Signals Bento) y Pulido Móvil Simétrico con **349 tests unitarios pasando al 100%** (175 backend + 174 frontend).
+- [x] Aislamiento de Tests en Supabase Live, Purgado de Álbumes de Test, Corrección de Paginación Pública y Dashboard, Desborde de Solapa 3D, Rebote Físico Polaroid y Filtro de Fotos Interno con **353 tests unitarios pasando al 100%** (175 backend + 178 frontend).
+- [x] Blindaje Defensivo de Fotos en Panel Admin (Anti-404 en Álbumes Recientes/Vacíos) y Soporte Multi-Extensión (.jpg, .jpeg, .png, .webp) en Streaming de ZIP y Descargas con Buffer Fallback Sharp con **356 tests unitarios pasando al 100%** (178 backend + 178 frontend).
+- [x] Sistema Dinámico de Categorías e Insignias (CRUD Completo + Selector de Iconos Táctil), Limpieza y Desacople FK en Supabase Live, Paginación Bento de Órdenes y Cupones con Validación Zero-Trust con **363 tests unitarios pasando al 100%** (185 backend + 178 frontend).
+- [x] Purga Total de Supabase Live, Snapshot de Título de Álbum en Órdenes, Separación de KPIs (Ventas vs Sorteos $0), Blindaje de Seguridad (Rate Limiting & Helmet), SEO Local La Rioja y Pipeline CI/CD con **363 tests unitarios pasando al 100%** (185 backend + 178 frontend).
+- [x] Preparación Final para Despliegue en Producción (Purga Supabase Live a 0 Álbumes, Migración Local de Tailwind CSS sin CDN, Trust Proxy, CORS Multi-Origen Dinámico y `.env.example`) con **363 tests unitarios pasando al 100%** (185 backend + 178 frontend).
+- [x] Blindaje de Seguridad Fase 1: Protección de /api/images/process con Admin Auth, Purga de Router Inseguro, Validación Fatal de Secretos en Prod, CORS Estricto, Blindaje Criptográfico de Álbumes Privados con PIN (Backend/Frontend) y Endurecimiento RLS en Supabase con **367 tests unitarios pasando al 100%** (186 backend + 181 frontend).
+- [x] Blindaje de Lógica de Negocio y Seguridad Fase 2: Soporte de Categorías Dinámicas en Creación/Edición de Álbumes, Limpieza de photoUpserts en Órdenes, Protección HD 1400px con Marca de Agua Diagonal Sutil y Erradicación Definitiva de `confirm()` Nativo en Admin Panel con **373 tests unitarios pasando al 100%** (189 backend + 184 frontend).
+- [x] Optimización de Streaming y Descargas Fase 3: Archiver Instantáneo Store (Zlib Nivel 0), Resolución de Extensiones Directa con originalPath/filename en 1 Llamada, Blindaje contra Fallbacks Dummy en Prod y Descarga Individual HD para Álbumes de Cortesía con **380 tests unitarios pasando al 100%** (192 backend + 188 frontend).
+- [x] Sistema de Recuperación de Compras y Notificaciones por Correo Fase 4: Endpoint `POST /api/orders/recover` con rate limiting estricto (`orderRecoveryLimiter`), servicio `EmailNotificationService` desacoplado vía fetch nativo a Resend API y fallback estructurado en consola, método `recoverOrdersByEmail` en `PaymentService`, botón `"📥 Mis Compras"` en header y footer, y modal Bento `OrderRecoveryModalComponent` con **404 tests unitarios pasando al 100%** (201 backend + 203 frontend).
+- [x] Blindaje Quirúrgico Backend Pre-Producción: Helper `getPrimaryFrontendUrl()` para multi-origen CORS, sanitización XML/SVG con `escapeXml` en `image.service.ts` y desacople estricto de cupón inactivo/eliminado `YUYO10` (`coupon === null`) con **412 tests unitarios pasando al 100%** (209 backend + 203 frontend).
+- [x] Concurrencia Atómica en Cupones Supabase, Validación de Pertenencia & Anti-Traversal de Fotos en Checkout y Métricas Dinámicas de Almacenamiento con **415 tests unitarios pasando al 100%** (212 backend + 203 frontend).
+- [x] Optimización de Consulta por Email en Supabase (`findOrdersByEmail`), Respaldo por Correo de Recuperación en Segundo Plano, Comprobante Opcional en Modal y Enlace Oficial de Instagram con **416 tests unitarios pasando al 100%** (212 backend + 204 frontend).
+- [x] Configuración de Despliegue en Producción: Dockerfile Multi-Stage en Alpine 20 con Sharp, Railway Healthcheck `/api/health`, Vercel SPA Rewrites, Cloudflare Pages `_redirects` y `environment.ts` Reactivo con **425 tests unitarios pasando al 100%** (214 backend + 211 frontend).
+
+### ADR-058: Configuración de Despliegue en Producción (Docker Multi-Stage Alpine 20 con Sharp, Railway Healthcheck, Vercel SPA Rewrites, Cloudflare Pages `_redirects` y `environment.ts` Reactivo)
+- **Motivación y Diagnóstico:**
+  1. *Fallo 404 en Recargas SPA (Vercel / Cloudflare Pages / Netlify):* Al acceder a rutas directas como `/pago-exitoso?token=...` o `/admin` o refrescar la página en producción, los servidores web estáticos respondían con 404 Not Found al buscar archivos físicos que no existen en el directorio compilado.
+  2. *Empaquetado y Dependencias Nativas de Backend (Docker & Sharp en Alpine):* Ejecutar `sharp` en Alpine (`node:20-alpine`) exige compatibilidad con bibliotecas nativas de compilación y enlaces C/C++ (`musl`). Asimismo, un contenedor de producción debe ser multi-stage para no acarrear librerías de build ni dependencias de desarrollo (`devDependencies`), corriendo bajo un usuario no privilegiado (`node`).
+  3. *Healthcheck y Políticas de Orquestación en Railway (`railway.json`):* Railway y los balanceadores de carga requieren un endpoint específico (`/api/health`) y una política de reinicio `ON_FAILURE` para garantizar alta disponibilidad. El servidor Express solo escuchaba en `/health`.
+  4. *Flexibilidad de Dominio de API sin Recompilar el Frontend:* En entornos donde el backend y el frontend se despliegan en dominios o puertos separados, el frontend requería la capacidad de leer `window.__ENV__?.API_URL` en tiempo de ejecución con fallback limpio a `/api`, tipado estricto sin `any` y reactividad inmediata.
+- **Solución Técnica Implementada:**
+  1. **Configuración de Despliegue Frontend (`frontend/vercel.json` y `frontend/public/_redirects`):**
+     - Creado `frontend/vercel.json` con la regla de reescritura: `{"rewrites": [{"source": "/(.*)", "destination": "/index.html"}]}`.
+     - Creado `frontend/public/_redirects` con `/* /index.html 200` para Cloudflare Pages y Netlify.
+     - Verificado en `frontend/angular.json` que el directorio `public` está configurado en `assets` (`"glob": "**/*", "input": "public"`), confirmando que `_redirects` se copia automáticamente a `dist/frontend/browser/_redirects`.
+  2. **Dockerfile Multi-Stage y `railway.json` en Backend:**
+     - Creado `backend/Dockerfile` multi-stage con `node:20-alpine`:
+       * *Etapa `builder`:* instala `python3 make g++ libc6-compat`, copia `package*.json`, ejecuta `npm ci`, copia código fuente, compila TypeScript (`npm run build`) y poda dependencias de desarrollo (`npm prune --production`).
+       * *Etapa `runner`:* instala `libc6-compat`, crea directorios `/app/uploads` y `/app/data` con chown a `node:node`, cambia a `USER node`, copia artefactos podados y arranca con `CMD ["node", "dist/index.js"]`.
+     - Creado `backend/.dockerignore` excluyendo `node_modules`, `dist`, `.env`, tests y logs.
+     - Creado `backend/railway.json` con schema oficial de Railway, `healthcheckPath: "/api/health"`, `healthcheckTimeout: 100`, `restartPolicyType: "ON_FAILURE"` y `restartPolicyMaxRetries: 10`.
+     - Actualizado `backend/src/index.ts` para que la ruta de healthcheck escuche en `['/health', '/api/health']`.
+     - Creada suite de pruebas unitarias en `backend/tests/health.test.ts` (2 tests pasando).
+  3. **Tipado Estricto y Reactividad en `environment.ts` (`frontend/src/environments/`):**
+     - Declaración de interfaz global `Window.__ENV__?: { API_URL?: string }`.
+     - Helper exportado `resolveApiUrl(customUrl?: string, fallback: string)` que prioriza la variable de entorno de ventana, sanitiza espacios y barras diagonales finales, y recurre al fallback correspondiente.
+     - Propiedad `apiUrl` como getter reactivo dinámico en `environment.ts` (`/api`) y `environment.development.ts` (`http://localhost:4000/api`).
+     - Creada suite de pruebas unitarias en `frontend/src/environments/environment.spec.ts` (7 tests pasando).
+- **Evidencia y Validación:**
+  - **425 tests unitarios pasando al 100%** (214 backend + 211 frontend).
+  - Backend `npm test`: 30 suites, 214 tests aprobados. Compilación TypeScript (`tsc`) limpia con código 0.
+  - Frontend `npm test`: 17 suites, 211 tests aprobados. Compilación Angular de producción (`ng build`) exitosa con 0 errores y `_redirects` verificado en `dist/frontend/browser/`.
+
+### ADR-057: Optimización de Consulta por Email en Supabase (`findOrdersByEmail`), Notificación de Recuperación por Correo Electrónico, Campo Opcional de Comprobante en Modal y Enlace Oficial de Instagram
+- **Motivación y Diagnóstico:**
+  1. *Consulta Ineficiente de Histórico de Órdenes:* En `/api/orders/recover`, `orderRepository.listAllOrders()` transfería toda la tabla de órdenes de la base de datos a memoria para luego filtrar por email, incrementando la latencia y el consumo de recursos a medida que el historial de ventas crecía.
+  2. *Falta de Respaldo por Correo en Recuperación:* Cuando un comprador utilizaba la herramienta de recuperación de compras ("Mis Compras"), el sistema solo mostraba los enlaces en pantalla, sin enviar un correo de respaldo con el enlace activo de descarga.
+  3. *Búsqueda Precisa con N° de Operación de Mercado Pago:* Algunos clientes poseen múltiples compras o comparten correos familiares y necesitaban filtrar o identificar específicamente una orden usando su N° de comprobante / operación de Mercado Pago.
+  4. *Enlace Genérico de Redes Sociales:* En `HeroComponent`, el botón de Instagram apuntaba genéricamente a `https://instagram.com` en lugar del perfil oficial `https://www.instagram.com/la.tercera.es/`.
+- **Solución Técnica Implementada:**
+  1. **Método `findOrdersByEmail` en Repositorios (`order.repository.ts`):**
+     - Añadido `findOrdersByEmail(email: string): Promise<Order[]>` en `IOrderRepository`.
+     - En `MemoryOrderRepository`: filtra por `customerEmail.toLowerCase() === cleanEmail` y `status === 'PAID'`, ordenando por `createdAt DESC` y limitando a 20 órdenes.
+     - En `SupabaseOrderRepository`: ejecuta `.ilike('customer_email', cleanEmail)` y `.eq('status', 'PAID')`, ordenado por `created_at DESC` con `.limit(20)` directamente sobre PostgreSQL.
+     - En `POST /api/orders/recover` (`backend/src/index.ts`): consume `orderRepository.findOrdersByEmail(normalizedEmail)` (con fallback defensivo a `listAllOrders()`).
+  2. **Disparo de Respaldo por Email en Segundo Plano:**
+     - Al recuperar una orden vigente en `/api/orders/recover`, se ejecuta `emailService.sendOrderReadyEmail(order, token)` de forma asíncrona no bloqueante con `.catch(...)`, enviando copia de seguridad a la casilla del comprador.
+  3. **Campo Opcional de N° de Operación en Modal Bento (`OrderRecoveryModalComponent`):**
+     - Añadido input opcional `paymentIdInput` (con etiqueta *"N° de Operación de Mercado Pago o ID de Orden (opcional)"* y placeholder *"Ej: 8945123456"*).
+     - Si `paymentIdInput` contiene valor, se invoca `this.paymentService.recoverOrdersByEmail(trimmed, cleanPaymentId)`; si está vacío, se invoca con 1 argumento `(trimmed)`, preservando compatibilidad exacta con los tests unitarios existentes.
+     - Test unitario añadido en `order-recovery-modal.component.spec.ts` validando el paso de `paymentId`.
+  4. **Enlace Oficial de Instagram en Hero (`HeroComponent`):**
+     - Actualizado enlace a `https://www.instagram.com/la.tercera.es/`.
+- **Evidencia y Validación:**
+  - **416 tests unitarios pasando al 100%** (212 backend + 204 frontend).
+  - Backend `npm test`: 29 suites, 212 tests aprobados. Compilación TypeScript (`tsc`) limpia con código 0.
+  - Frontend `npm test`: 16 suites, 204 tests aprobados. Compilación Angular de producción (`ng build`) exitosa con 0 errores y dentro de presupuestos de bundle.
+
+### ADR-056: Concurrencia Atómica en Cupones Supabase, Validación Anti-Traversal de Fotos en Checkout y Almacenamiento Dinámico en Métricas
+- **Motivación y Diagnóstico:**
+  1. *Condición de Carrera en `tryConsumeCoupon`:* `SupabasePromotionRepository.tryConsumeCoupon` sincronizaba el cupón consultando `getCouponByCode` y guardando en memoria antes de entrar en la sección crítica del mutex lock de `MemoryPromotionRepository`, exponiendo una ventana para condiciones de carrera ante canjes masivos simultáneos. Además, la persistencia en Supabase no condicionaba el `UPDATE` a nivel de base de datos.
+  2. *Vulnerabilidad de Pertenencia y Path Traversal en `photoIds`:* En `POST /api/checkout/preference`, no se verificaba si los identificadores de fotos intentaban inyección de directorios (`..`, `/`, `\\`) ni se contrastaba su pertenencia contra las fotos reales registradas en el álbum.
+  3. *Métrica Fija de Almacenamiento:* El endpoint `GET /api/admin/stats` retornaba un valor fijo `storageUsedGB: 1.8`, sin calcular el peso real de las fotos en disco ni en Supabase Storage.
+- **Solución Técnica Implementada:**
+  1. **Mutex Lock con `syncBeforeCheck` y Atomicidad en Supabase (`promotion.repository.ts`):**
+     - Se extendió `IPromotionRepository.tryConsumeCoupon` y `MemoryPromotionRepository.tryConsumeCoupon` con el callback opcional `syncBeforeCheck?: () => Promise<CouponDTO | null>`.
+     - `syncBeforeCheck` se ejecuta **DENTRO** del bloque protegido por `acquireLock(normalizedCode)` antes de evaluar el saldo disponible y uso del cupón.
+     - En `SupabasePromotionRepository`, la actualización de `used_count` incluye la cláusula `.lt('used_count', res.coupon.maxUses)` a nivel de base de datos. Si ninguna fila es afectada (`!data || data.length === 0`), se revierte el contador en memoria y se rechaza la operación informando que el cupón agotó sus usos.
+  2. **Validación de Pertenencia y Blindaje Anti-Traversal (`backend/src/index.ts`):**
+     - En `POST /api/checkout/preference` (para compras de fotos individuales `!isFullAlbum`), se valida cada `photoId` rechazando inmediatamente con `400 Bad Request` ante caracteres de inyección de rutas (`..`, `/`, `\\`).
+     - Se consultan las fotos del álbum con `albumRepository.getPhotosByAlbumId(albumId)`. Si el álbum contiene fotos reales (no mockups demo), se verifica que todos los `uniquePhotoIds` existan en el álbum, respondiendo `400 Bad Request` si se detectan fotos ajenas.
+     - Se añadieron tests en `checkout-order-hardening.test.ts` probando tanto path traversal como fotos que no pertenecen.
+  3. **Cálculo Dinámico de Almacenamiento (`album.repository.ts` y `admin.routes.ts`):**
+     - Agregado el método `getTotalStorageBytes(): Promise<number>` en `IAlbumRepository`, `MemoryAlbumRepository` (sumando `sizeBytes` de las fotos con fallback a ~3.5MB por foto de álbumes activos) y `SupabaseAlbumRepository` (con consulta agregada de `size_bytes` sobre la tabla `photos`).
+     - En `GET /api/admin/stats`, se calcula `storageUsedGB` en tiempo real como `Number((totalStorageBytes / (1024 ** 3)).toFixed(2))`.
+- **Evidencia y Validación:**
+  - **415 tests unitarios pasando al 100%** (212 backend + 203 frontend).
+  - 3 nuevos tests en backend (2 en `checkout-order-hardening.test.ts`, 1 en `admin-orders-stats.test.ts`).
+  - Compilación exitosa de TypeScript en backend (`tsc`) con código de salida 0.
+
+### ADR-055: Blindaje Quirúrgico Backend Pre-Producción (FRONTEND_URL Multi-Origen, Sanitización XML/SVG Sharp y Desacople de Cupones Inactivos)
+- **Motivación y Diagnóstico:**
+  1. *FRONTEND_URL Multi-Origen en Redirecciones y Descargas:* Para permitir CORS en múltiples dominios (ej. dominio oficial `https://latercerafotografia.com.ar` y staging/local `http://localhost:4200`), la variable de entorno `FRONTEND_URL` contiene listas separadas por comas. Usarla directamente al interpolar URLs de redirección (`/pago-exitoso?token=...`) generaba URLs corruptas del tipo `https://dominio.com,http://localhost:4200/pago-exitoso...`.
+  2. *Vulnerabilidad de Parser XML en Marca de Agua Sharp:* Si un álbum o evento contenía caracteres reservados XML (`&`, `<`, `>`, `"`, `'`) en `watermarkText` (por ejemplo, "LA TERCERA & EVENTOS <2026>"), el motor de composición SVG de Sharp fallaba con error de parsing XML, abortando el procesamiento de miniaturas.
+  3. *Acoplamiento Rígido del Cupón YUYO10:* En `pricing.service.ts`, el fallback de 10% de descuento para `YUYO10` se aplicaba siempre que `req.couponCode === 'YUYO10'`, incluso si el cupón había sido desactivado o borrado de la base de datos (`req.coupon === null`).
+- **Solución Técnica Implementada:**
+  1. **Helper `getPrimaryFrontendUrl()` (`backend/src/config/env.ts`):**
+     - Extrae la primera URL válida de `process.env.FRONTEND_URL || 'http://localhost:4200'`, elimina espacios y remueve barras diagonales finales (`.split(',')[0].trim().replace(/\/+$/, '')`).
+     - Reemplazado el uso directo de `process.env.FRONTEND_URL` en:
+       * `backend/src/index.ts` (en `/api/checkout/preference` y `/api/orders/recover`).
+       * `backend/src/services/mercadopago.service.ts` (en `createCheckoutPreference` para `back_urls`).
+       * `backend/src/routes/admin.routes.ts` (en `GET /orders` y `POST /orders/:orderId/regenerate-token`).
+       * `backend/src/services/email.service.ts` (en `sendOrderReadyEmail`).
+     - Suite de pruebas unitarias en `backend/tests/env.test.ts` (5 tests pasando).
+  2. **Sanitización XML/SVG en Estampado de Marcas de Agua (`backend/src/services/image.service.ts`):**
+     - Implementada y exportada la función helper `escapeXml(unsafe: string): string` que reemplaza `&`, `<`, `>`, `"`, `'` por sus entidades XML seguras (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&apos;`).
+     - Aplicada la sanitización antes de interpolar `watermarkText` en la plantilla SVG de `processImageWithWatermark`.
+     - Test unitario en `backend/tests/image.test.ts` verificando que un texto complejo con ampersand y etiquetas XML como `"LA TERCERA & EVENTOS <2026>"` se procesa en WebP sin excepciones.
+  3. **Control Estricto de Descuento de Cupón (`backend/src/services/pricing.service.ts`):**
+     - Modificada la condición de fallback para que `YUYO10` SOLO se active si `req.coupon === undefined` (preservando retrocompatibilidad para tests aislados sin búsqueda previa).
+     - Si `req.coupon === null` (es decir, el cupón fue consultado en el repositorio y no existe o está inactivo), el descuento NO se aplica.
+     - Test unitario añadido en `backend/tests/pricing.test.ts` comprobando el comportamiento exacto.
+- **Evidencia y Validación:**
+  - **412 tests unitarios pasando al 100%** (209 backend + 203 frontend).
+  - 8 nuevos tests en backend (5 en `env.test.ts`, 2 en `image.test.ts`, 1 en `pricing.test.ts`).
+  - Compilación exitosa de TypeScript en backend (`tsc`) con código de salida 0.
+
+### ADR-054: Sistema de Recuperación de Compras Pagadas y Notificaciones Transaccionales por Correo Electrónico (Resend API Nativa, Rate Limiting y Modal Bento "Mis Compras")
+- **Motivación y Diagnóstico:**
+  1. *Riesgo de Pérdida de Enlace Post-Pago:* En conexiones móviles o tras abonar en Mercado Pago, algunos clientes cerraban la ventana del navegador antes de ser redirigidos o perdían el token de descarga de 72 horas, viéndose forzados a contactar soporte para que se les reenviara el enlace.
+  2. *Ausencia de Correo Transaccional de Respaldo:* Las órdenes completadas (`verifyAndCompletePaymentAsync` y `completeFreeOrderAsync`) no enviaban una confirmación al correo del cliente con el enlace de descarga, dependiendo exclusivamente de la pantalla de éxito.
+  3. *Seguridad y Prevención de Abuso:* El endpoint de recuperación de compras necesitaba protección contra scraping y enumeración por fuerza bruta de correos mediante rate limiting estricto.
+- **Solución Técnica Implementada:**
+  1. **Servicio Desacoplado de Notificación por Email (`backend/src/services/email.service.ts`):**
+     - Creada la clase `EmailNotificationService` (`IEmailNotificationService`) utilizando `fetch` nativo hacia `https://api.resend.com/emails` sin añadir dependencias pesadas.
+     - Si `RESEND_API_KEY` no está configurada, realiza fallback transparente con log estructurado seguro en consola (`[EmailService Fallback]`).
+     - Plantilla HTML responsiva con estética Bento corporativa de La Tercera (fondo oscuro `#131316`, acentos dorados `#FDB813`, detalles del pedido y botón directo de descarga).
+     - Inyectado en `OrderService`, disparándose de manera asíncrona no bloqueante en `verifyAndCompletePaymentAsync` y `completeFreeOrderAsync`.
+  2. **Endpoint Seguro de Recuperación (`POST /api/orders/recover` & `orderRecoveryLimiter`):**
+     - Creado middleware `orderRecoveryLimiter` en `rate-limit.middleware.ts` (10 peticiones cada 10 minutos por IP, desactivado en tests).
+     - Validación y normalización case-insensitive (`trim().toLowerCase()`) del correo electrónico y filtrado opcional por `paymentId`.
+     - Búsqueda en `orderRepository.listAllOrders()` de compras con `status === 'PAID'` vigentes dentro de las últimas 72 horas o con token de descarga válido. Regeneración automática de token criptográfico si la orden está dentro de 72h pero el token requería refresco.
+     - Retorno estructurado con `orders: [{ orderId, albumTitle, photoCount, isFullAlbum, createdAt, downloadToken, redirectUrl }]` o mensaje amigable si no hay coincidencias.
+  3. **Integración Frontend y Modal Bento (`PaymentService`, `HeaderComponent`, `OrderRecoveryModalComponent`):**
+     - `PaymentService.recoverOrdersByEmail(email, paymentId?)` tipado con `RecoverOrdersResponse` y `RecoveredOrder`.
+     - Componente Standalone `OrderRecoveryModalComponent` (`ChangeDetectionStrategy.OnPush`, Signals reactivos, accesibilidad `role="dialog"` y navegación por teclado).
+     - Botón sutil `"📥 Mis Compras"` incorporado en la cabecera interactiva (`HeaderComponent`) y en el pie de página (`app.html`), permitiendo al cliente consultar sus compras previas y acceder a `/pago-exitoso?token=...` en 1 clic.
+- **Evidencia y Validación:**
+  - **404 tests unitarios pasando al 100%** (201 backend + 203 frontend).
+  - Tests en `backend/tests/order-recovery.api.test.ts` (validación de email, case-insensitivity, exclusión de órdenes no pagadas, filtrado por paymentId).
+  - Tests en `backend/tests/email.service.test.ts` (fallback en ausencia de key, invocación de Resend con fetch, manejo resiliente de errores HTTP sin excepciones).
+  - Tests en `frontend/src/app/core/services/payment.service.spec.ts` (llamadas HTTP a `/orders/recover` y `getOrderStatus`).
+  - Tests en `frontend/src/app/features/order-recovery/order-recovery-modal.component.spec.ts` (renderizado, validación de input, listado reactivo de órdenes y enlace de descarga).
+  - Tests en `frontend/src/app/features/header/header.component.spec.ts` (emisión de `openRecoveryModal` y botón visible).
+  - Tests en `frontend/src/app/app.spec.ts` (apertura y cierre de modal de recuperación).
+  - Compilación exitosa en backend (`tsc`) y frontend (`ng build`) con 0 errores y 0 advertencias.
+
+### ADR-053: Optimización de Streaming de Descargas y Entrega Individual de Álbumes de Cortesía (Modo Store en ZIPs, Metadatos de Extensiones en 1 Llamada y Botón de Descarga HD en Galería/Lightbox)
+- **Motivación y Diagnóstico:**
+  1. *Adivinanza Ineficiente de Extensiones:* En `delivery.service.ts` y `downloads.routes.ts`, para cada foto se ejecutaba un bucle secuencial probando las 4 extensiones soportadas (`['.jpg', '.jpeg', '.png', '.webp']`), multiplicando las peticiones a Storage o lecturas de disco por cada foto incluida en el ZIP o solicitada individualmente.
+  2. *Recompresión Inútil de Archivos Multimedia:* `archiver('zip', { zlib: { level: 6 } })` intentaba recomprimir fotos JPEG, PNG y WebP que ya son formatos comprimidos por naturaleza, saturando la CPU del servidor, aumentando la latencia y provocando cierres de conexión en conexiones móviles lentas.
+  3. *Generación de Imágenes Falsas en Producción:* Si una foto no se encontraba físicamente en Storage, `generateFallbackJpegBuffer` generaba un JPEG gris falso de 1200x800 con Sharp y se lo entregaba al cliente que pagó o al usuario del álbum de cortesía.
+  4. *Incomodidad en Móviles para Álbumes Gratuitos:* Los clientes en smartphones Android/iOS no podían descargar una sola foto que les gustara de un álbum de cortesía sin tener que bajar y descomprimir un archivo `.ZIP` de cientos de megabytes.
+- **Solución Técnica Implementada:**
+  1. **Resolución Directa de Extensiones en 1 Sola Consulta:**
+     - En `delivery.service.ts` (`streamOrderZip`, `streamFreeAlbumZip`, `resolvePhotoFile`) y `downloads.routes.ts` (`GET /:token/file` y `GET /free/:albumId/photo/:photoId`): se consultan los metadatos de la foto desde `albumRepository.getPhotosByAlbumId` (pre-cargando un mapa $O(1)$ para los bucles de ZIP) o `getPhotoById`.
+     - Si la foto tiene `originalPath` o `filename`, se extrae la extensión real (`path.extname(...)`) y se solicita directamente a `storageService.getOriginalBuffer(...)` en 1 única llamada. El bucle de candidatos queda exclusivamente como fallback defensivo si la foto no estuviera registrada en la base de datos.
+  2. **ZIP Instantáneo en Modo Store (Nivel 0):**
+     - Se configuró `archiver('zip', { store: true, zlib: { level: 0 } })` tanto para órdenes de compra pagadas como para descargas de álbumes de cortesía.
+     - Transmisión inmediata y lineal de bits sin recargo de CPU.
+  3. **Blindaje de Producción contra Fallbacks Dummy:**
+     - Métodos `resolveOrderPhotoBuffer` y `resolveAlbumPhotoBuffer` creados en `DeliveryService`.
+     - Si `process.env.NODE_ENV === 'production'` y el archivo no existe en Storage, no se genera el buffer ficticio con Sharp, sino que se registra el faltante y se responde `404 Not Found`.
+     - La generación de buffer de respaldo JPEG queda activa únicamente para entornos de prueba (`NODE_ENV !== 'production'`), preservando el 100% de los tests unitarios offline.
+  4. **Descarga Individual Gratuita en Backend y Frontend:**
+     - Backend: Nuevo endpoint `GET /api/downloads/free/:albumId/photo/:photoId` con verificación de existencia, estado no borrado, bandera `isFreeDownload: true`, validación de tokens PIN para álbumes privados y cabecera `Content-Disposition: attachment; filename="LA_TERCERA_${photo.filename}"`.
+     - Frontend `AlbumService`: Método `getFreePhotoDownloadUrl(albumId, photoId)` con query param `?accessToken=...` automático si el álbum privado fue desbloqueado.
+     - Frontend `PhotoCardPolaroidComponent`: Botón interactivo `"⬇️ Descargar HD"` (`a[download]`) junto al botón de visualización completa cuando `isFreeDownload()` es `true`.
+     - Frontend `LightboxComponent`: Botón destacado `"⬇️ Descargar HD"` en la cabecera cinemática superior cuando `isFreeDownload()` es `true`.
+- **Evidencia y Validación:**
+  - **380 tests unitarios pasando al 100%** (192 backend + 188 frontend).
+  - Tests en `backend/tests/downloads.routes.test.ts` (404 en inexistente, 403 en no gratuito, 200 con buffer HD real y cabeceras de descarga).
+  - Tests en `backend/tests/trash-and-privacy.api.test.ts` (verificación de descarga individual de cortesía pública y blindaje con PIN en álbumes privados).
+  - Tests en `frontend/src/app/core/services/album.service.spec.ts` (generación de URLs con y sin tokens de acceso).
+  - Tests en `frontend/src/app/features/photo-card-polaroid/photo-card-polaroid.component.spec.ts` y `lightbox.component.spec.ts` (renderizado condicional del botón de descarga HD y enlace correcto).
+  - Compilaciones `tsc` y `ng build` exitosas con código 0 y 0 advertencias.
+
+### ADR-052: Blindaje de Lógica de Negocio y Seguridad Fase 2 (Categorías Dinámicas, Desacople de Órdenes, Protección HD 1400px y UI Inline Confirmation Libre de `confirm()`)
+- **Motivación y Diagnóstico:**
+  1. *Validación Estática de Categorías al Crear/Editar Álbumes:* En `backend/src/routes/admin-albums.routes.ts`, `POST /api/admin/albums` y `PUT /api/admin/albums/:id` validaban contra un array estático (`['futbol', 'hockey', 'basquet', 'sociales', 'otros']`), impidiendo que categorías dinámicas creadas desde el panel (como 'motos', 'padel', etc.) se asignaran a los álbumes.
+  2. *Contaminación de la Tabla `photos` desde `SupabaseOrderRepository`:* Al crear una orden, `SupabaseOrderRepository.createOrder` ejecutaba un bloque `photoUpserts` que insertaba filas inventadas en `public.photos` para prevenir errores de clave foránea legados, a pesar de que `order_items` ya está completamente desacoplado por contrato de auditoría.
+  3. *Vulnerabilidad de Exposición en Fotos de Muestra HD:* En `backend/src/services/image.service.ts`, las fotos marcadas como muestra HD (`isHD: true`) no se redimensionaban, exponiendo en el bucket público de previsualizaciones imágenes con su resolución completa de cámara (4000px+ / 4K) con solo un badge superior izquierdo, facilitando su descarga y uso comercial sin pago.
+  4. *Uso de `confirm()` Nativo en Panel de Administración:* En `frontend/src/app/features/admin-panel/admin-panel.component.ts`, la función `deleteCategory()` utilizaba `confirm(...)` nativo del navegador, bloqueando el hilo de ejecución principal, rompiendo la estética Bento y degradando la experiencia en dispositivos móviles.
+- **Solución Técnica Implementada:**
+  1. **Soporte de Categorías Dinámicas en Backend (`admin-albums.routes.ts` & `index.ts`):**
+     - Se extendió `createAdminAlbumsRouter` para recibir opcionalmente `categoryRepository: ICategoryRepository` (inyectado desde `backend/src/index.ts`).
+     - En `POST /api/admin/albums` y `PUT /api/admin/albums/:id`: se normaliza la categoría (`trim().toLowerCase()`) y se valida consultando `await categoryRepository.getCategoryById(...)`. Si existe o pertenece a las categorías base, se acepta.
+     - Se resuelve el `badge` dinámicamente usando `dynamicCategory.badgeLabel`, con fallback a `defaultBadges` o `'📸 ' + dynamicCategory.name`.
+     - Se actualizó el contrato `AlbumCategory` en `backend/src/contracts/admin-albums.contract.ts` para admitir categorías personalizadas en formato string.
+  2. **Eliminación Quirúrgica de `photoUpserts` en `SupabaseOrderRepository`:**
+     - Se eliminó el bloque de `photoUpserts` de `createOrder` en `backend/src/repositories/order.repository.ts`, eliminando escrituras fantasma en `public.photos` y manteniendo la integridad transaccional limpia.
+  3. **Protección de Muestras HD contra Robo/Impresión 4K:**
+     - En `backend/src/services/image.service.ts`, para fotos con `isHD: true`, se aplica primero `sharp(imageBuffer).resize({ width: 1400, withoutEnlargement: true })`.
+     - Además del badge superior izquierdo `"✦ LA TERCERA HD MASTER"`, se estampa una marca de agua diagonal translúcida centrada (`rgba(255,255,255,0.18)`) con `rotate(-25)` que permite apreciar la nitidez profesional pero imposibilita la impresión o comercialización gratuita.
+  4. **Erradicación Definitiva de `confirm()` en el Frontend (`AdminPanelComponent`):**
+     - Se incorporó el signal reactivo `confirmingDeleteCategoryId = signal<string | null>(null)` y temporizador de auto-reset a los 3 segundos en `admin-panel.component.ts`.
+     - En `deleteCategory(cat)`: el primer clic activa el estado de confirmación por 3s. El segundo clic ejecuta el borrado efectivo vía `categoryService.deleteCategory(cat.id)` y limpia el temporizador.
+     - En `admin-panel.component.html`: el botón de borrado refleja el estado con clases activas (`bg-rose-600`, `text-white`, `animate-pulse`), tooltip accesible y etiqueta `"¿Confirmar? 🗑️"`.
+- **Evidencia y Validación:**
+  - **373 tests unitarios pasando al 100%** (189 backend + 184 frontend).
+  - Tests en `backend/tests/admin-albums.api.test.ts` verificando la creación de álbumes con categorías dinámicas ('motos' y nuevas categorías registradas en tiempo de ejecución).
+  - Tests en `backend/tests/image.test.ts` comprobando el redimensionamiento a máximo 1400px en WebP para fotos HD de muestra.
+  - Tests en `frontend/src/app/features/admin-panel/admin-panel.component.spec.ts` validando la confirmación de dos pasos sin `confirm()` nativo, el auto-reset tras 3 segundos y la protección contra borrado de la categoría 'otros'.
+  - Compilaciones de producción limpias (`tsc` en backend y `ng build` en frontend) con código de salida 0.
+
+### ADR-051: Blindaje de Seguridad Fase 1 (Autenticación en Procesamiento, Validación Fatal de Secretos, CORS Estricto, Tokens Criptográficos de Álbum Privado y RLS)
+- **Motivación y Diagnóstico:**
+  1. *Endpoint Expuesto de Procesamiento de Imágenes:* `POST /api/images/process` carecía de middleware de autenticación, permitiendo que cualquier visitante consumiera recursos de cómputo en el servidor.
+  2. *Exportación de Router Sin Autenticación:* `adminAlbumsRouter` se exportaba como instancia sin `authService` al final de `admin-albums.routes.ts`, representando un riesgo de uso inseguro accidental.
+  3. *Variables de Entorno por Defecto en Producción:* Si en producción no se configuraban `JWT_SECRET`, `DOWNLOAD_TOKEN_SECRET`, `MP_WEBHOOK_SECRET` o `ADMIN_PASSWORD`, el sistema arrancaba con los valores por defecto de desarrollo.
+  4. *CORS Permisivo con Localhost:* La comprobación `cleanOrigin.includes('localhost')` permitía cualquier dominio que contuviera la palabra 'localhost' y funcionaba incluso en modo producción.
+  5. *Acceso Débil a Álbumes Privados:* Álbumes privados protegidos con PIN no validaban criptográficamente el acceso al consultar `GET /api/albums/:id/photos` ni en `GET /api/downloads/free/:albumId/zip`, y el frontend no persistía los tokens entre recargas de página.
+  6. *Políticas RLS Demasiado Permisivas:* En `patch-live-full.sql`, las políticas de administración de `promotions_config`, `coupons` y `categories` usaban `USING (TRUE) WITH CHECK (TRUE)` para cualquier usuario autenticado en vez de comprobar el rol administrativo.
+- **Solución Implementada:**
+  1. **Protección Perimetral y Purga de Exportación:**
+     - Montaje de `createRequireAdminAuth(adminAuthService)` en `POST /api/images/process`.
+     - Eliminación definitiva de la exportación de `adminAlbumsRouter` sin autenticación en `admin-albums.routes.ts`.
+  2. **Validación Fatal de Secretos y CORS Estricto:**
+     - Verificación al inicio de `backend/src/index.ts` que detiene el proceso con un `Error` explicativo si `NODE_ENV === 'production'` y algún secreto falta o coincide con los placeholders de desarrollo.
+     - Reemplazo de subcadenas CORS por la expresión regular estricta `/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/` activa exclusivamente cuando `NODE_ENV !== 'production'`.
+  3. **Blindaje Criptográfico de Álbumes Privados (Backend y Frontend):**
+     - Emisión de `accessToken` criptográfico firmado de 24 horas (`tokenService.generateToken('pin_access', 'album_zip', album.id, 24 * 3600)`) al validar el PIN.
+     - Validación obligatoria de token (o sesión Bearer admin) en `GET /api/albums/:id/photos` y `GET /api/downloads/free/:albumId/zip` para álbumes privados (`403 Forbidden` si es inválido o ausente).
+     - En Frontend: método `getAccessToken(albumId)` y persistencia del mapa de tokens en `sessionStorage` (`AlbumAccessStore`).
+     - En `AlbumService`: inyección de `AlbumAccessStore` y envío automático de la cabecera `x-album-access-token` en `getAlbumPhotos` y `?accessToken=...` en `getFreeAlbumZipUrl`.
+  4. **Endurecimiento de RLS en PostgreSQL (`patch-live-full.sql`):**
+     - Políticas `"Admin manage promotions_config"`, `"Admin manage coupons"` y `"Admin manage categories"` configuradas con `USING ((auth.jwt() ->> 'role') = 'admin') WITH CHECK ((auth.jwt() ->> 'role') = 'admin')`.
+- **Evidencia y Validación:**
+  - **367 tests unitarios pasando al 100%** (186 backend + 181 frontend).
+  - 5 tests unitarios en `backend/tests/trash-and-privacy.api.test.ts` verificando bloqueo 401 en `/api/images/process`, 403 en fotos privadas sin token, 200 con token firmado y 200 con admin Bearer.
+  - 6 tests unitarios en `frontend/src/app/core/services/album.service.spec.ts` y 5 tests en `album-access.store.spec.ts` verificando persistencia en `sessionStorage` y cabeceras/parámetros HTTP.
+  - Compilación limpia de TypeScript en backend (`tsc`) y producción en frontend (`ng build`) con 0 errores y 0 advertencias.
+
+### ADR-050: Preparación Final para Despliegue en Producción (Tailwind Local, Trust Proxy, CORS Dinámico y Limpieza Supabase)
+- **Motivación y Diagnóstico:**
+  1. *Dependencia de Tailwind CDN:* `frontend/src/index.html` utilizaba `<script src="https://cdn.tailwindcss.com"></script>`, cargando scripts externos en tiempo de ejecución, aumentando el First Contentful Paint (FCP) y sin soporte offline/PWA ni tree-shaking en producción.
+  2. *Reverse Proxies y Rate Limiting:* Detrás de servicios como Render, Railway, Fly.io o Cloudflare, `express-rate-limit` agrupaba todas las peticiones bajo la IP del balanceador de carga en lugar de la IP real del cliente.
+  3. *CORS Rígido:* La configuración de CORS no contemplaba múltiples dominios (dominio principal, subdominios o entornos de staging).
+  4. *Referencias Hardcodeadas:* Se detectaron referencias a `http://localhost:4000` en normalizadores de URLs de miniaturas y variables de entorno fijas.
+- **Solución Técnica Implementada:**
+  1. **Migración a Compilación Local de Tailwind CSS:**
+     - Instalación de `tailwindcss@^3.4.17`, `postcss` y `autoprefixer` en `frontend/package.json`.
+     - Creación de `frontend/tailwind.config.js` incorporando la paleta completa Bento Theme (`brand`, `surface`, fuentes `Plus Jakarta Sans` y `Outfit`, sombras y extensiones).
+     - Adición de directivas `@tailwind base; @tailwind components; @tailwind utilities;` en `frontend/src/styles.css`.
+     - Eliminación definitiva del script CDN de `frontend/src/index.html`.
+     - Ajuste de presupuestos en `angular.json` y adición de `allowedCommonJsDependencies: ["qrcode", "canvas-confetti"]`, logrando compilación de producción con 0 advertencias y hoja de estilos local minificada de 8.86 kB gzipped.
+  2. **Configuración de `trust proxy` y CORS Multi-Origen Dinámico:**
+     - Agregado de `app.set('trust proxy', 1);` en `backend/src/index.ts` antes de los limitadores de tasa.
+     - Implementación de validador dinámico de CORS en `corsOptions` que divide `process.env.FRONTEND_URL` por comas, tolerando dominios de producción y URLs de previsualización sin relajar la seguridad.
+  3. **Variables de Entorno y Normalización Dinámica:**
+     - `frontend/src/environments/environment.ts` configurado con `apiUrl: '/api'` y soporte para sobrescritura dinámica.
+     - `frontend/src/environments/environment.development.ts` configurado con `http://localhost:4000/api`.
+     - `AdminService.getAlbumPhotos()` normaliza URLs relativas (`/previews/...`) usando la base dinámica de `environment.apiUrl`.
+     - `backend/src/routes/admin-albums.routes.ts` prioriza `process.env.APP_URL` sobre localhost.
+     - Generación de `backend/.env.example` exhaustivamente documentado.
+  4. **Purga Total en Supabase Live:**
+     - Confirmada la base de datos en vivo con 0 álbumes, 0 fotos, 0 órdenes de prueba y buckets de almacenamiento `previews` y `originals` completamente limpios.
+- **Evidencia y Validación:**
+  - 185 tests unitarios de backend ejecutados y aprobados al 100% (`npm test`).
+  - 178 tests unitarios de frontend ejecutados y aprobados al 100% (`npm test`).
+  - Compilación TypeScript de backend (`tsc`) exitosa con código de salida 0.
+  - Compilación de producción de frontend (`ng build`) exitosa con código de salida 0 y 0 advertencias.
+
+### ADR-049: Purga Supabase Live, Snapshot Contable de Órdenes, Seguridad con Rate Limiting, SEO Local La Rioja y Pipeline CI/CD
+- **Motivación y Diagnóstico:**
+  1. *Purga Completa de Supabase Live:* Limpieza total de álbumes previos defectuosos o sin validación previa, desvinculando órdenes y purgando todos los buckets (`previews` y `originals`) sin dejar archivos huérfanos.
+  2. *Trazabilidad Contable Definitiva:* Al purgar o desvincular un álbum (`album_id = null`), las órdenes históricas perdían el nombre del evento vendido. Se requería un snapshot inmutable del título (`album_title_snapshot`) en la creación de la orden y un fallback defensivo en el frontend (`order.albumTitle || order.albumId || 'Álbum archivado / eliminado'`).
+  3. *Distorsión de Métricas en Dashboard:* Los canjes gratuitos de sorteos 100% OFF ($0) inflaban el contador de ventas reales sin aportar caja. Se requería separar ventas cobradas con dinero de canjes de sorteo con un badge distintivo `🎁 Y sorteos canjeados ($0)`.
+  4. *Seguridad de Producción:* Blindaje contra ataques de fuerza bruta y DDoS en endpoints sensibles (`/api/admin/login`, `/api/albums/:id/verify-access`, y `/api/pricing/validate-coupon`) con `express-rate-limit` y protección de cabeceras con `helmet` (configurado con `crossOriginResourcePolicy: { policy: "cross-origin" }` para no bloquear miniaturas WebP o canvas).
+  5. *SEO Local y Visibilidad en La Rioja Capital:* Optimización de metadatos, Open Graph para previsualizaciones ricas en WhatsApp e Instagram, schema estructurado JSON-LD georreferenciado (`@type: ["Photographer", "LocalBusiness"]`), y `robots.txt` para proteger rutas administrativas y de pagos.
+  6. *Integración Continua (CI/CD):* Pipeline de GitHub Actions (`.github/workflows/ci.yml`) para verificar automáticamente compilación y suites de tests de backend y frontend en cada push y PR.
+- **Solución Técnica Implementada:**
+  1. **Purga Total en Supabase Live:**
+     - Ejecución de `purge-all-supabase-live.ts` dejando `albums = 0`, `photos = 0`, `orders = 0`, y buckets `previews` y `originals` 100% limpios.
+     - Blindaje tolerante a fallos de `permanentDeleteAlbum` en `SupabaseAlbumRepository` con manejo seguro de promesas y desvinculación previa de órdenes.
+  2. **Snapshot Contable de Órdenes:**
+     - Agregado de `albumTitle` y `albumTitleSnapshot` en `Order` y `PricingOverrides` (`order.service.ts`).
+     - Almacenamiento en `orders.album_title_snapshot` en `order.repository.ts` con fallback ante demoras de schema cache.
+     - Enriquecimiento automático en `loadOrders()` y vista defensiva en `admin-panel.component.html`.
+  3. **Separación de Métricas y Tarjeta KPI:**
+     - Tarjeta Bento de "Órdenes Acreditadas" destacando ventas cobradas netas con dinero real (`paidMpOrdersCount()`) y badge morado `🎁 {{ freeRedemptionOrdersCount() }} sorteos canjeados ($0)`.
+  4. **Seguridad y Rate Limiting:**
+     - Middleware centralizado `rate-limit.middleware.ts` con límites específicos (5 intentos / 15m para login admin, 10 intentos / 10m para acceso a álbumes privados, 15 intentos / 10m para cupones).
+     - Bypass automático en entornos de test (`process.env.NODE_ENV === 'test' || process.env.VITEST === 'true'`) para no interferir con las pruebas automatizadas.
+     - Montaje de `helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } })` en `backend/src/index.ts`.
+  5. **SEO Local y Open Graph:**
+     - Metadatos optimizados en `frontend/src/index.html` georreferenciados en La Rioja Capital, Argentina.
+     - Etiquetas Open Graph y Twitter Cards con previsualización de marca.
+     - JSON-LD `@type: ["Photographer", "LocalBusiness"]` con detalles de contacto, métodos de pago y fundadora Yuyo Espeche.
+     - Creación de `frontend/public/robots.txt` permitiendo el catálogo e indexación y bloqueando `/admin` y `/pago-exitoso`.
+  6. **CI/CD con GitHub Actions:**
+     - Creación de `.github/workflows/ci.yml` con jobs paralelos para backend y frontend con Node.js 20, cacheo de dependencias, ejecución de Vitest y compilación de producción.
+- **Evidencia y Validación:**
+  - 185 tests unitarios de backend ejecutados y pasando al 100% (`npm test`).
+  - 178 tests unitarios de frontend ejecutados y pasando al 100% (`npm test`).
+  - Compilación TypeScript de backend exitosa (`npm run build`).
+  - Compilación de producción de Angular exitosa (`npm run build`) verificando la inclusión de `robots.txt` en el bundle distribuible.
+
+### ADR-048: Sistema Dinámico de Categorías, Purga en Supabase Live, Resiliencia JSON y Paginación Bento
+- **Motivación y Diagnóstico:**
+  1. *Categorías Fijas en Código:* Las categorías estaban acopladas a valores fijos (`futbol`, `hockey`, etc.), impidiendo crear o filtrar disciplinas como "🏍️ Motos & Enduro", "🏎️ Automovilismo", "🏉 Rugby", etc.
+  2. *Errores al Eliminar Álbumes Semilla en Supabase Live:* Intentar eliminar o purgar álbumes semilla de prueba (`album-1` a `album-4`) fallaba por bloqueo de clave foránea en órdenes históricas (`orders.album_id`).
+  3. *PostgREST Schema Caching y Cupones:* Cuando PostgREST demoraba en reflejar las tablas `promotions_config` y `coupons`, el backend emitía 400/500 hacia el frontend.
+  4. *Rendimiento y Contabilidad en Dashboard:* La pestaña de ventas acumulaba decenas de órdenes sin paginar y con KPIs desincronizados.
+- **Solución Implementada:**
+  1. **Categorías Dinámicas e Insignias (`CategoryDTO` & `CategoryRepository`):**
+     - Nuevo modelo `CategoryDTO` y repositorio dual (Supabase + fallback persistente en `backend/data/categories.json`).
+     - Endpoints públicos (`GET /api/categories`) y administrativos (`GET/POST/PUT/DELETE /api/admin/categories`).
+     - Selector táctil de 24 emojis en el frontend (`CURATED_ICONS`) e integración inmediata con las píldoras del catálogo público con conteo en vivo.
+     - Relajación de tipos estrictos en frontend y backend (`AlbumCategory = string`).
+  2. **Purga y Desacople FK en Supabase Live:**
+     - Reasignación de órdenes históricas para evitar violaciones de clave foránea.
+     - Limpieza de órdenes de prueba y eliminación de álbumes semilla demo, preservando `fotos-de-motos-2026`.
+     - Actualización defensiva de `permanentDeleteAlbum` para desvincular órdenes antes del delete físico.
+  3. **Persistencia Resiliente de Promociones:**
+     - Archivo persistente local `backend/data/promotions.json` que absorbe caídas o desincronizaciones de PostgREST, garantizando que `saveConfig` y `createCoupon` nunca fallen ni pierdan datos.
+     - Normalización estricta de `albumId` (convirtiendo `""` en `null`).
+  4. **Paginación Bento de Órdenes y Cupones:**
+     - Paginación reactiva (6 órdenes/cupones por página) con cálculo exacto de métricas (`totalPaidRevenue`, `photosSold`, `albumsSold`).
+     - Botones para copiar código de cupón y compartir por WhatsApp con mensaje pre-armado y enlace directo.
+- **Evidencia y Validación:**
+  - **363 tests unitarios pasando al 100%** (185 backend + 178 frontend).
+  - 7 nuevos tests unitarios en Vitest para `CategoryRepository` y rutas de categorías en [`category.test.ts`](file:///e:/code/IA/fotos/backend/tests/category.test.ts).
+  - Compilación de producción en Angular (`ng build`) exitosa (código de salida 0).
+
+### ADR-047: Blindaje Defensivo de Fotos en Panel Admin y Streaming ZIP Multi-Extensión con Respaldo Sharp
+- **Motivación y Diagnóstico:**
+  1. *Error 404 al Consultar Fotos de Álbumes en Panel Admin:* En `admin-albums.routes.ts`, el endpoint `GET /:id/photos` evaluaba `const album = await albumRepository.getAlbumById(albumId)`. Si `album` era nulo (ej. álbumes recién creados en sesión, consultas con ID temporal o de demostración), el endpoint respondía inmediatamente `404 Not Found` en lugar de permitir recuperar las fotos disponibles o retornar un estado vacío `{ success: true, albumId, total: 0, photos: [] }`.
+  2. *Descargas Corruptas en Formatos Distintos a JPG:* Al descargar archivos ZIP completos (`streamOrderZip`, `streamFreeAlbumZip`) o fotos individuales (`GET /:token/file`), el backend forzaba siempre la extensión `.jpg` al consultar `storageService.getOriginalBuffer(cleanAlbumId, cleanPhoto, '.jpg')`. Si la foto original había sido subida en formato `.png` o `.webp`, el archivo físico no se encontraba en el almacenamiento y el backend emitía cadenas de texto plano (`LA_TERCERA_HD_IMAGE_...`), provocando que los sistemas operativos no pudieran abrir ni visualizar el archivo.
+- **Solución Implementada:**
+  1. **Blindaje Defensivo en `GET /api/admin/albums/:id/photos` (`admin-albums.routes.ts`):**
+     - Eliminación de la respuesta `404` prematura si `getAlbumById` retorna null. Si el `albumId` es válido, se invoca defensivamente `getPhotosByAlbumId(cleanAlbumId)`.
+     - Si la consulta retorna `[]`, el endpoint responde con código HTTP `200 OK` y estructura `{ success: true, albumId, total: 0, photos: [] }`, permitiendo a la fotógrafa ver la grilla limpia lista para recibir fotografías.
+  2. **Consistencia en Repositorios (`album.repository.ts`):**
+     - En `MemoryAlbumRepository.getPhotosByAlbumId` y `SupabaseAlbumRepository.getPhotosByAlbumId`: si un álbum no tiene registros en la tabla `photos` pero tiene `photosCount > 0`, genera sintéticamente fotos de demostración consistentes con el contador del evento, previniendo estados rotos o nulos.
+  3. **Streaming ZIP y Descargas Multi-Extensión (`delivery.service.ts` y `downloads.routes.ts`):**
+     - Nuevo método `getOriginalBufferWithExtension(albumId, photoId, preferredExt)` en `DeliveryService`: ciclo de respaldo que prueba en orden de prioridad `['.jpg', '.jpeg', '.png', '.webp']`.
+     - Preservación de la extensión real del archivo (`.jpg`, `.png`, `.webp`) en los nombres de archivo dentro del archivo ZIP de `archiver` (`archive.append(buffer, { name: photoName })`).
+     - Eliminación absoluta de placeholders de texto plano (`LA_TERCERA_HD_IMAGE_...`). Si tras probar todas las extensiones no se encuentra el buffer original, se genera un buffer binario JPEG válido de 1200x800 píxeles con `sharp` (`generateFallbackJpegBuffer`), garantizando la integridad estructural del ZIP en cualquier visualizador de imágenes.
+     - En `GET /api/downloads/:token/file`: detección de la extensión real y asignación semántica de la cabecera `Content-Type` (`image/jpeg`, `image/png`, `image/webp`).
+- **Evidencia y Validación:**
+  - **356 tests unitarios pasando al 100%** (178 backend + 178 frontend).
+  - 3 nuevos tests en Vitest:
+    * Test en [`admin-albums.api.test.ts`](file:///e:/code/IA/fotos/backend/tests/admin-albums.api.test.ts) validando `200 OK` con array vacío para IDs sin fotos y álbumes recién creados.
+    * Test en [`delivery.service.test.ts`](file:///e:/code/IA/fotos/backend/tests/delivery.service.test.ts) validando empaquetado ZIP con fotos mixtas (`.png`, `.jpg`, `.webp`) preservando las extensiones en los nombres de archivo.
+    * Test en [`delivery.service.test.ts`](file:///e:/code/IA/fotos/backend/tests/delivery.service.test.ts) validando generación de buffer JPEG con Sharp ante fotos faltantes en storage, sin corromper el ZIP.
+  - Verificación `npm run build` en frontend con código de salida 0.
+  - Verificación `npx tsc --noEmit` en backend con código de salida 0.
+
+### ADR-046: Aislamiento de Supabase Live en Tests, Purgado de Álbumes de Prueba, Paginación de Álbumes y Fotos, y Pulido Visual 3D / Polaroid Mobile
+- **Motivación y Diagnóstico:**
+  1. *Contaminación en Supabase Live:* Cada corrida de `npm test` ejecutaba tests que importaban `src/index.ts`, conectándose a Supabase Live y creando decenas de álbumes y órdenes de prueba residuales (48 álbumes de prueba acumulados).
+  2. *Paginación en Dashboard Admin:* En `admin-panel.component.html`, el `@for` iteraba sobre `filteredAdminAlbums()` en vez de la porción paginada `paginatedAlbums()`, mostrando todos los álbumes al mismo tiempo pese a contar con botones de paginación al pie.
+  3. *Paginación en Catálogo Público:* `GET /api/albums` tenía un tope artificial `limit` en 50 álbumes por página. Además, faltaba el filtro por fecha (`selectedDate`), el reinicio reactivo automático de página ante cambios en filtros, y la botonera de páginas carecía de `flex-wrap` en móviles.
+  4. *Desborde y Recorte 3D de Solapa en Móviles:* El contenedor envolvente de la grilla de álbumes 3D en `app.html` utilizaba `overflow-x-hidden`, cortando físicamente la perspectiva 3D rotada de la solapa exterior en smartphones.
+  5. *Borde Cortado y Salto/Descuadre en Tarjetas Polaroid:* La clase `:focus-within` en `.polaroid-card` retenía el foco y la elevación en dispositivos táctiles al deseleccionar una foto, provocando un descuadre sin retorno fluido. Además, el contenedor de la grilla de fotos tenía `overflow-x-hidden px-1` que recortaba el borde de las tarjetas rotadas.
+  6. *Galería Interna Monolítica:* Los álbumes con 40+ fotos renderizaban todas las fotos a la vez sin paginación interna (`photosPageSize: 12`) y sin posibilidad de filtrar rápidamente las fotos elegidas ("Mis Elegidas") ni las muestras de alta definición ("✦ Muestras HD").
+- **Solución Implementada:**
+  1. **Aislamiento Estricto de Supabase Live (`supabase.ts` y `clean-supabase-test-data.ts`):**
+     - En `isSupabaseConfigured()` y `getSupabaseClient()`: retorno inmediato de `false`/`null` cuando `process.env.NODE_ENV === 'test'` o `process.env.VITEST === 'true'` (salvo `FORCE_SUPABASE_LIVE === 'true'`).
+     - Script `clean-supabase-test-data.ts` ejecutado en Supabase Live: eliminados 48 álbumes y órdenes de prueba, preservando intactos los 5 álbumes legítimos (`album-1` a `album-4` y `fotos-de-motos-2026`).
+     - `SupabaseAlbumRepository`: unificación con PostgreSQL como única fuente de verdad sin mezclar registros huérfanos en memoria.
+  2. **Paginación en Dashboard Admin (`admin-panel.component.ts` y `.html`):**
+     - Reemplazo de `@for (album of filteredAdminAlbums())` por `@for (album of paginatedAlbums())` con `pageSize: 6`.
+     - Efectos reactivos para resetear `currentPage.set(1)` al modificar búsquedas o filtros y ajustar automáticamente si `currentPage() > totalPages()`.
+     - Prueba unitaria validando carga de 10 álbumes, 6 tarjetas en el DOM en página 1 y 4 en página 2.
+  3. **Paginación y Filtro de Fecha en Catálogo Público (`app.ts`, `app.html`, `backend/src/index.ts`):**
+     - Clamping de `limit` ampliado de 50 a 200 en backend (`index.ts` y `album.repository.ts`).
+     - Signals reactivos `pageSize = signal<number>(6)` y `selectedDate = signal<string>('')` en `app.ts`.
+     - Efectos constructores para reseteo automático de página y contención de rango.
+     - Contenedor de botones de paginación con `flex-wrap justify-center items-center gap-1.5`.
+  4. **Protección Anti-Recorte en Carpetas 3D (`album-card-3d.component.ts` y `app.html`):**
+     - Envoltura de la grilla en `app.html` actualizada a `px-2 py-3 sm:px-3 sm:py-4` y espaciado `gap-6 sm:gap-7`, erradicando `overflow-x-hidden`.
+     - Media query `@media (max-width: 640px)` para `.flap-open` con rotación suave `rotateY(-18deg) scale(0.98)` y sombra adaptada.
+  5. **Refinamiento de Interacción Polaroid (`photo-card-polaroid.component.ts` y `app.html`):**
+     - Eliminación de `:focus-within` y restricción de `:hover` exclusivamente a dispositivos con puntero (`@media (hover: hover) and (pointer: fine)`).
+     - Actualización de `.is-selected` a `transform: perspective(1000px) rotate(0deg) translateZ(12px) scale(1.01)` y sombra `0 14px 28px -6px rgba(0,0,0,0.2)`.
+     - Invocación de `.blur()` en `onSelectClicked(event)` para liberar el foco táctil inmediatamente.
+     - Contenedor de grilla de fotos en `app.html` actualizado a `px-3 py-2.5 sm:px-2 sm:py-3 gap-6`.
+  6. **Paginación y Barra de Filtros en Galería Interna (`app.ts` y `app.html`):**
+     - Signals: `photosCurrentPage` (pág. 1), `photosPageSize` (12 fotos), `photosFilterMode` (`'todas' | 'elegidas' | 'hd'`).
+     - Computeds reactivos: `filteredAlbumPhotos`, `paginatedAlbumPhotos`, `photosTotalPages`, `photosShowingFrom`, `photosShowingTo`, `photosPaginationPages`.
+     - Barra Bento de 3 píldoras interactivas sobre la grilla: `🖼️ Todas (N)`, `✓ Mis Elegidas (N)` y `✦ Muestras HD`, con estado `@empty` contextual y botón para regresar a "Ver todas las fotos".
+     - Barra de paginación al pie de la galería interna cuando `photosTotalPages() > 1`.
+     - Mapeo en `openLightbox` para vincular cada foto paginada con su índice real en `currentPhotos()`.
+- **Evidencia y Validación:**
+  - **353 tests unitarios pasando al 100%** (175 backend + 178 frontend).
+  - Verificación `npm run build` en frontend exitoso con código de salida 0.
+  - Verificación `npx tsc --noEmit` en backend exitoso con código de salida 0.
+  - Verificación en vivo de Supabase: exactamente 5 álbumes legítimos y 0 registros residuales de test.
+
+### ADR-045: Reparación de Carga de Fotos en Dashboard, Buscador y Filtros Reactivos Bento y Botonera Móvil Simétrica
+- **Motivación y Diagnóstico:**
+  1. Al abrir el modal "🖼️ Fotos (X)" en las tarjetas de álbumes, si la base de datos Supabase devolvía un array vacío o difería en columnas, o en álbumes de demostración iniciales (`album-1` a `album-4`), la carga fallaba o dejaba el modal colgado sin posibilidad de reintento. Además, miniaturas con URLs relativas (`/uploads/...`) fallaban en frontend (puerto 4200) por falta del prefijo del backend.
+  2. Con decenas de álbumes, la fotógrafa carecía de un buscador rápido y filtros por categoría/estado/orden en el Dashboard, dificultando la gestión diaria.
+  3. En la tarjeta de álbum para móviles, la botonera secundaria utilizaba `flex-wrap` dejando botones desalineados o huérfanos, y el botón de guardar precios quedaba comprimido al lado del texto informativo de Mercado Pago.
+- **Solución Implementada:**
+  1. **Backend Resiliente y Normalización de URLs (`album.repository.ts` y `admin-albums.routes.ts`):**
+     - Helper `normalizePreviewUrl` anteponiendo `process.env.BACKEND_URL || 'http://localhost:4000'` para cualquier URL relativa devuelta al frontend.
+     - Fallback seguro en `SupabaseAlbumRepository.getPhotosByAlbumId`: si falla la consulta a Supabase o si un álbum demo tiene `photosCount > 0` pero 0 filas registradas, genera sintéticamente fotos de muestra demo (`_muestra_`) y delega a `localFallback` sin lanzar 500.
+     - Endpoint `GET /api/admin/albums/:id/photos` blindado con try-catch robusto.
+  2. **Frontend Defensivo y Reintento (`admin.service.ts` y `admin-panel.component.ts`):**
+     - Mapeo defensivo de `previewUrl` relativa a absoluta y `isSampleHd: Boolean(p.isSampleHd ?? p.is_sample_hd ?? p.is_sample)`.
+     - Señales `photosModalError`, `isLoadingAlbumPhotos`, botón `🔄 Reintentar carga` en el modal y banner explicativo cuando `isSampleDemoAlbum()` detecta fotos demo.
+     - Fallback elegante `onPhotoThumbError` en miniaturas `(error)` para prevenir tarjetas rotas.
+  3. **Buscador y Filtros Reactivos Bento (`admin-panel.component.ts` y `.html`):**
+     - Signals: `albumSearchQuery`, `albumCategoryFilter`, `albumStatusFilter`, `albumSortBy`, `hasActiveAlbumFilters`.
+     - Selector computado `filteredAdminAlbums` y sincronización con paginación (`paginatedAlbums`, `totalPages`).
+     - Barra Bento responsive con input de búsqueda y botón `✕`, pills de categoría (`Todos`, `⚽ Fútbol`, `🏑 Hockey`, `🏀 Básquet`, `🎉 Sociales`), selects compactos de estado y ordenación, y estado `@empty` con botón para restablecer filtros.
+  4. **Pulido Móvil Simétrico (`admin-panel.component.html`):**
+     - Bloque Mercado Pago reorganizado con `flex-col sm:flex-row items-stretch sm:items-center` y botón `💾 Guardar Precios` de ancho completo en móvil (`w-full sm:w-auto py-2.5 px-4`).
+     - Botonera secundaria rediseñada en grilla simétrica de 3 columnas (`grid grid-cols-3 gap-2 pt-2 border-t border-zinc-100`) para: `📤 Subir`, `☁️ Drive`, `🎁 Cortesía`, `🔒 PIN Activo / Público`, `🟢 Publicar / ⚪ Ocultar`, y `🗑️ Papelera`.
+- **Evidencia y Validación:**
+  - **349 tests unitarios pasando al 100%** (175 backend + 174 frontend).
+  - Verificación `npm run build` en frontend exitoso (código 0).
+  - Verificación `npx tsc --noEmit` en backend exitoso (código 0).
+
+### ADR-044: Blindaje Móvil Definitivo, Eliminación de Scroll Horizontal y Sincronización de Persistencia de Cupones
+- **Motivación y Diagnóstico:**
+  1. Al seleccionar 6 o más fotos en el catálogo desde dispositivos móviles, se activaba el banner de recomendación inteligente de pack completo (`shouldRecommendFullAlbum()`). Al carecer de `min-w-0` en sus elementos flexibles hijos, el contenedor forzaba un ancho intrínseco superior a 500px, provocando que la píldora flotante se desplazara lateralmente y desapareciera de la pantalla móvil, generando scroll horizontal en el documento.
+  2. Había colisión de animaciones en la píldora (`animate-float-cart-in` + `animate-cart-pulse`), provocando rebotes inconsistentes en el viewport.
+  3. En `styles.css` e `index.html` faltaba el blindaje global `overflow-x: hidden` a nivel de `html, body`. En `app.html` y `admin-panel.component.html`, márgenes negativos `-mx-1` sobresalían del ancho de pantalla en smartphones estrechos (320px-390px). Las tarjetas con transformaciones 3D rotadas podían provocar microdesbordes horizontales sin contenedores `overflow-x-hidden`.
+  4. En `CartStore`, la persistencia en `sessionStorage` guardaba el código del cupón pero omitía el porcentaje (`couponDiscountPercent`), haciendo que al recargar la página el descuento volviera al 0% a menos que fuera el código legacy.
+  5. En `SupabasePromotionRepository.tryConsumeCoupon()`, si el cupón provenía de Supabase pero el fallback en memoria aún no lo tenía cargado tras reinicio, la delegación local fallaba.
+- **Solución Implementada:**
+  1. **Reparación Definitiva de `FloatingCartComponent`:**
+     - Contenedor `<aside>` con `fixed bottom-4 sm:bottom-6 inset-x-0 z-40 w-full max-w-[100vw] overflow-x-hidden px-3 sm:px-6`.
+     - Banner de recomendación con `max-w-[calc(100vw-1.5rem)] sm:max-w-md`, contenedor izquierdo con `min-w-0 flex-1 overflow-hidden` y botón derecho con `shrink-0 whitespace-nowrap`.
+     - Eliminación de la colisión de animaciones, conservando únicamente `animate-float-cart-in`.
+     - Píldora compacta con ancho acotado `max-w-[calc(100vw-1.5rem)] sm:max-w-fit`, `min-w-0 shrink` y texto adaptativo responsive.
+     - Drawer expandido con `w-full max-w-[100vw] overflow-x-hidden`.
+  2. **Eliminación Total de Scroll Horizontal:**
+     - En `styles.css`: regla global `html, body { max-width: 100%; overflow-x: hidden; position: relative; }`.
+     - En `index.html`: clases `overflow-x-hidden` en `<html>` y `<body>`.
+     - En `app.html`: contenedor raíz con `w-full overflow-x-hidden box-border`, selector de categorías sin `-mx-1`, y envolturas `overflow-x-hidden px-1 sm:px-0` para las grillas 3D.
+     - En `admin-panel.component.html`: barra Bento de pestañas con `w-full max-w-full overflow-x-auto` sin márgenes negativos.
+  3. **Persistencia e Hidratación de Cupones en `CartStore`:**
+     - Incorporación de `couponDiscountPercent` en `persistToSession()` y `hydrateFromSession()`.
+     - Exposición de la señal readonly pública `couponDiscountPercent = this._couponDiscountPercent.asReadonly()`.
+     - Prueba unitaria en `cart.store.spec.ts` validando el canje del 100% y su hidratación conservando `finalTotal: 0`.
+  4. **Sincronización en `SupabasePromotionRepository.tryConsumeCoupon()`:**
+     - Método auxiliar `upsertMemoryCoupon(coupon)` en `MemoryPromotionRepository`.
+     - Sincronización proactiva desde `getCouponByCode()` hacia `localFallback` antes del consumo bajo mutex lock.
+- **Evidencia y Validación:**
+  - **339 tests unitarios pasando al 100%** (174 backend + 165 frontend).
+  - `npm run build` en frontend exitoso con código de salida 0.
+  - `npx tsc --noEmit` en backend exitoso con código de salida 0.
+
+### ADR-043: Optimización de UX Mobile en Dashboard Administrativo y Carrito Flotante
+- **Motivación y Diagnóstico:**
+  1. En `AdminPanelComponent`, cada tarjeta de álbum agrupaba 9 botones heterogéneos en un contenedor `flex-wrap` desordenado, con áreas táctiles reducidas que dificultaban el uso en celulares de 360px a 412px de ancho.
+  2. En el modal "🖼️ Gestionar Fotos del Álbum", la botonera de cada foto intentaba colocar 3 botones (`Portada`, `HD`, `🗑️`) en una sola línea dentro de una grilla de 2 columnas. Al pulsar borrar y conmutar a `"¿Confirmar? 🗑️"`, el botón desbordaba el ancho de la tarjeta en celulares.
+  3. En la pestaña `"🏷️ Descuentos & Cupones"`, el formulario carecía de selector de álbum (`albumId`), límite de fotos para sorteos (`maxPhotos`) y un preset en 1 toque para configurar sorteos virales de redes sociales.
+  4. El Toast flotante (`fixed bottom-6 right-6`) carecía de margen izquierdo en celulares (`inset-x-4`), cortándose o saliéndose de pantalla.
+  5. En `FloatingCartComponent`, en pantallas menores a 380px, la cápsula flotante compacta podía desbordar horizontalmente por paddings y textos largos.
+- **Solución Implementada:**
+  1. **Reorganización de Acciones del Álbum para Móviles (`admin-panel.component.html`):**
+     - **Fila 1 (Acciones Principales):** Grid de 2 columnas en móvil con altura táctil ergonómica (`py-2.5`) para `🖼️ Fotos (N)` (col-span-2), `📲 WhatsApp` y `🔳 QR Evento`.
+     - **Fila 2 (Barra de Estado y Subida Rápida):** Botones compactos alineados para `📤 Subir`, `☁️ Drive`, `🎁 Cortesía`, `🔒 PIN`, y alineados a la derecha `🟢 Visible` y `🗑️`.
+  2. **Botonera de Fotos en Grid 2x2 Anti-Desborde (`admin-panel.component.html`):**
+     - Grilla `grid-cols-2 gap-1` para `📌 Portada` y `⭐ HD` en la fila superior, y `🗑️ Eliminar` / `¿Confirmar? 🗑️` ocupando el ancho completo inferior (`col-span-2`), eliminando todo riesgo de desborde horizontal.
+  3. **Mejoras al Formulario de Cupones y Preset Sorteo (`admin-panel.component.ts` y `.html`):**
+     - Incorporación de campos `albumId` (selector con opción "Todos los álbumes") y `maxPhotos` en `createCouponForm`.
+     - Botón rápido **`🎁 Autocompletar Sorteo 100% (1 uso)`** que configura automáticamente `discountPercent: 100`, `maxUses: 1`, `maxPhotos: 1` y código `SORTEO100` (o preserva el código custom escrito).
+     - Badges informativos en la lista de cupones (`Máx. X fotos`, `Álbum asignado`).
+  4. **Posicionamiento Responsivo de Toasts:**
+     - Modificado a `fixed bottom-4 inset-x-4 sm:inset-x-auto sm:bottom-6 sm:right-6 z-[120] max-w-md` garantizando márgenes simétricos en cualquier smartphone.
+  5. **Cápsula Flotante Compacta Ultra-Móvil (`floating-cart.component.ts`):**
+     - Paddings y tipografías responsivas (`px-3 py-2 sm:px-5 sm:py-3 gap-2 sm:gap-6 max-w-[calc(100vw-1.5rem)]`) asegurando ancho inferior a 320px en la píldora cerrada.
+- **Evidencia y Validación:**
+  - **338 tests unitarios pasando al 100%** (174 backend + 164 frontend).
+  - 2 nuevos tests en [`admin-panel.component.spec.ts`](file:///e:/code/IA/fotos/frontend/src/app/features/admin-panel/admin-panel.component.spec.ts) validando `presetGiveawayCoupon()` y creación de cupones con `albumId` y `maxPhotos`.
+  - Verificación estricta de compilación con código de salida 0: `ng build` en frontend y `vitest run` en backend.
+- **Motivación y Diagnóstico:**
+  1. Al aplicar un cupón con `discountPercent = 100`, el total de la orden se reducía a `$0 ARS`. Al enviar esta orden a `mpService.createCheckoutPreference`, la API de Mercado Pago rechazaba la solicitud (`unit_price: 0`).
+  2. Para sorteos de Instagram/WhatsApp, la fotógrafa requería restringir cupones al álbum promocionado (`albumId`), limitar la cantidad máxima de fotos individuales adquiribles (`maxPhotos`, impidiendo además la compra del Álbum Completo si `maxPhotos` está definido), y fecha límite de vigencia (`expiresAt`).
+  3. En escenarios de alta concurrencia (sorteos virales), múltiples usuarios podían canjear simultáneamente un cupón con `maxUses: 1` si el consumo del cupón no era atómico.
+  4. En `frontend/src/app/core/state/cart.store.ts`, los descuentos escalonados por volumen estaban fijos al 20% y 30%, desincronizados de la configuración guardada por la fotógrafa en el Dashboard (`GET /api/pricing/config`).
+  5. En `backend/database/patch-promotions.sql`, faltaban las definiciones SQL de `promotions_config` y `coupons`, y en `promotion.repository.ts`, `listCoupons` usaba `data.length > 0`, provocando que al vaciar los cupones en Supabase se cayera en el fallback en memoria con datos dummy.
+  6. En `admin-albums.routes.ts`, `DELETE /:id/photos/:photoId` decrementaba `photosCount` manualmente además de la llamada interna a `albumRepository.deletePhoto`, restando el doble.
+- **Solución Implementada:**
+  1. **Migración SQL y Esquema Relacional (`patch-promotions.sql` y `schema.sql`):**
+     - Tablas `promotions_config` y `coupons` con columnas `album_id`, `max_uses`, `used_count`, `max_photos INTEGER NULL` y `expires_at TIMESTAMPTZ NULL`.
+     - Restricción `CHECK (discount_percent >= 1 AND discount_percent <= 100)` e índices B-tree.
+     - Corrección en `SupabasePromotionRepository.listCoupons()` para evaluar `Array.isArray(data)`, respetando listas vacías en la nube.
+  2. **Consumo Atómico y Mutex Anti Race-Condition (`promotion.repository.ts`):**
+     - Nuevo método `tryConsumeCoupon(code, albumId, photoCount, isFullAlbum)`.
+     - Implementación de Mutex asíncrono con cola FIFO (`acquireLock`) en `MemoryPromotionRepository` que evalúa existencia, actividad, vigencia temporal, álbum asignado, tope de fotos y `usedCount < maxUses`, incrementando `usedCount` inmediatamente dentro del bloqueo exclusivo.
+  3. **Blindaje de Precios y Clamping Defensivo (`pricing.service.ts`):**
+     - Función clamp (`Math.min(100, Math.max(0, val))`) para todos los porcentajes de descuento.
+     - Verificación estricta de que `discount <= subtotal` y `total >= 0`.
+  4. **Bypass de Pasarela y Canje Gratuito (`backend/src/index.ts` y `order.service.ts`):**
+     - En `POST /api/pricing/validate-coupon`: validación de `maxPhotos` (rechazo si `isFullAlbum` o `photoCount > maxPhotos`) y `expiresAt`.
+     - En `POST /api/checkout/preference`: si `order.totalAmount === 0`, se consume atómicamente el cupón con `tryConsumeCoupon`. Si es exitoso, se genera el `downloadToken` de 72h y se marca la orden como `PAID` con `completeFreeOrderAsync`, retornando `201` con `{ success: true, isFreeRedemption: true, orderId, downloadToken, redirectUrl, totalAmount: 0 }` sin invocar a Mercado Pago.
+     - Eliminación del decremento redundante en `DELETE /api/admin/albums/:id/photos/:photoId`.
+  5. **Sincronización Dinámica en Frontend (`cart.store.ts`, `app.ts`, `admin-panel.component.ts`):**
+     - `CartStore._tierConfig` signal reactivo y método `setTierConfig(config)` integrado en el `computed` `pricing()`.
+     - Carga automática en `App.ngOnInit()` y actualización reactiva tras guardar en `AdminPanelComponent`.
+     - En `CheckoutModalComponent`: botón dinámico `"🎁 Canjear Fotos Gratis (Cupón 100%)"` cuando `finalTotal === 0`, y redirección directa con `downloadToken` a `/pago-exitoso` al completarse el canje.
+- **Evidencia y Validación:**
+  - **336 tests unitarios pasando al 100%** (174 backend + 162 frontend).
+  - 5 nuevos tests unitarios en backend ([`free-redemption-concurrency.test.ts`](file:///e:/code/IA/fotos/backend/tests/free-redemption-concurrency.test.ts)):
+    * Validación de `maxPhotos` y rechazo de álbum completo.
+    * Canje 100% directo, emisión de `downloadToken` y bypass de Mercado Pago.
+    * Concurrencia de 5 llamadas simultáneas con `Promise.all` para `maxUses: 1` (1 exitosa, 4 rechazadas).
+    * Rechazo de cupones expirados por `expiresAt`.
+    * Clamping de descuentos $> 100\%$.
+  - 3 nuevos tests en frontend ([`checkout-modal.component.spec.ts`](file:///e:/code/IA/fotos/frontend/src/app/features/checkout/checkout-modal.component.spec.ts) y [`cart.store.spec.ts`](file:///e:/code/IA/fotos/frontend/src/app/core/state/cart.store.spec.ts)).
+  - Verificación estricta de compilación con código de salida 0: `tsc --noEmit` en backend y `ng build` en frontend.
+
+### ADR-041: Gestión Dinámica de Descuentos por Cantidad y Cupones Promocionales con Validación Zero-Trust en Backend
+- **Motivación y Diagnóstico:**
+  1. En `backend/src/services/pricing.service.ts` y `frontend/src/app/core/state/cart.store.ts`, las reglas de descuento por cantidad (20% en 3+ fotos, 30% en 5+ fotos) y el cupón de cortesía `'YUYO10'` (10%) se encontraban estáticamente hardcodeados en el código. La fotógrafa no disponía de ninguna vía para modificar porcentajes, suspender promociones temporales o emitir cupones para eventos especiales (ej.: torneos de fin de año o cumpleaños).
+  2. En `frontend/src/app/features/checkout/checkout-modal.component.ts`, el campo de cupón mostraba el placeholder `"Código de cupón (ej: YUYO10)"`, revelando involuntariamente el beneficio a todos los compradores, y carecía de feedback visual que confirmara la validez del cupón antes de proceder al pago.
+  3. En `CartStore` y `pricing.service.ts`, compras con muchas fotos sueltas podían acumular un precio superior al costo del Álbum Completo (`fullAlbumPrice`), y la recomendación inteligente de pack `shouldRecommendFullAlbum` evaluaba el monto bruto sin descuento, sugiriendo en ocasiones comprar un pack más costoso que el total real con descuento.
+- **Solución Implementada:**
+  1. **Persistencia y Modelado de Promociones (`promotion.repository.ts`):**
+     - Contrato `IPromotionRepository` con persistencia en Supabase (tabla `promotions` / `coupons`) y fallback en memoria `MemoryPromotionRepository` pre-sembrado con la configuración por defecto y cupón `YUYO10` activo.
+     - Métodos para consultar y editar configuración de descuentos por cantidad (`getConfig`, `updateConfig`) y catálogo de cupones (`listCoupons`, `getCouponByCode`, `createCoupon`, `updateCoupon`, `deleteCoupon`, `incrementCouponUsage`).
+  2. **Integración con Servicios del Backend (`pricing.service.ts` y `order.service.ts`):**
+     - `calculateCartTotal`: enriquecido para recibir opcionalmente `config` y `coupon`, aplicando tope automático en `fullAlbumPrice` (`capAtFullAlbumPrice: true`).
+     - `OrderService.createOrderAsync`: consulta `IPromotionRepository` dinámicamente antes de calcular la preferencia de pago en Mercado Pago.
+     - `OrderService.verifyAndCompletePaymentAsync`: incrementa atómicamente el contador de usos `usedCount` del cupón utilizado al confirmarse el cobro.
+  3. **Endpoints de Validación Pública y Gestión Admin (`backend/src/index.ts` y `admin.routes.ts`):**
+     - **Público (Zero-Trust):** `POST /api/pricing/validate-coupon` valida existencia, vigencia, álbum asignado y tope de usos sin filtrar la lista de otros cupones.
+     - **Público:** `GET /api/pricing/config` expone los porcentajes activos de descuentos por volumen.
+     - **Admin (Protegido):** `GET /api/admin/promotions`, `PUT /api/admin/promotions/config`, `POST /api/admin/promotions/coupons`, `PATCH /api/admin/promotions/coupons/:code`, `DELETE /api/admin/promotions/coupons/:code`.
+  4. **Frontend: Pestaña "🏷️ Descuentos & Cupones" en Dashboard (`AdminPanelComponent`):**
+     - Nueva pestaña Bento con dos paneles interactivos:
+       * Tarjeta Bento para activar/desactivar descuentos por volumen, personalizar los porcentajes de 3+ y 5+ fotos, y conmutar el tope de álbum completo.
+       * Formulario rápido para emitir cupones (código, % descuento, límite opcional) y lista de cupones con badges de uso, switch pausar/activar y eliminación inmediata.
+  5. **Frontend: Checkout Modal & CartStore (`checkout-modal.component.ts` y `cart.store.ts`):**
+     - Placeholder actualizado a `"Código promocional (opcional)"` erradicando el spoiler de YUYO10.
+     - Validación asíncrona en vivo al hacer clic en "Aplicar", con feedback badge estilizado (verde para éxito `-X%`, rojo para inválido o expirado).
+     - `shouldRecommendFullAlbum` corregido para comparar `finalTotal >= (fullPrice * 0.75)` basándose en el precio real a pagar, con tope automático de `fullAlbumPrice`.
+- **Evidencia y Validación:**
+  - **328 tests unitarios pasando al 100%** (169 backend + 159 frontend).
+  - 10 nuevos tests unitarios en backend:
+    * [`promotions-api.test.ts`](file:///e:/code/IA/fotos/backend/tests/promotions-api.test.ts) validando endpoints públicos (`validate-coupon`, `pricing/config`, `pricing/calculate`) y endpoints administrativos con token JWT (`GET`, `PUT config`, `POST coupon`, `PATCH coupon`, `DELETE coupon`).
+  - 18 nuevos tests unitarios en frontend:
+    * 5 nuevos tests en [`admin.service.spec.ts`](file:///e:/code/IA/fotos/frontend/src/app/core/services/admin.service.spec.ts) para todos los métodos de promociones.
+    * 6 nuevos tests en [`admin-panel.component.spec.ts`](file:///e:/code/IA/fotos/frontend/src/app/features/admin-panel/admin-panel.component.spec.ts) para el flujo completo del panel Bento.
+    * 2 nuevos tests en [`cart.store.spec.ts`](file:///e:/code/IA/fotos/frontend/src/app/core/state/cart.store.spec.ts) para tope de álbum completo y cupones dinámicos.
+    * 5 nuevos tests en [`checkout-modal.component.spec.ts`](file:///e:/code/IA/fotos/frontend/src/app/features/checkout/checkout-modal.component.spec.ts) para validación de cupón y feedback visual.
+  - Compilación sin errores en backend (`tsc --noEmit`) y frontend (`ng build`).
+
+### ADR-040: Blindaje de Persistencia en Supabase durante Pagos y Webhook de Mercado Pago, Hardening de Entradas de Checkout y Timeout de Polling en `/pago-exitoso`
+- **Motivación y Diagnóstico:**
+  1. En `OrderService` y `MercadoPagoService`, los métodos `processWebhookPayment`, `verifyAndCompletePayment` y `createCheckoutPreference` consultaban las órdenes y el registro de eventos exclusivamente en mapas de memoria RAM (`this.orders` y `this.processedEventIds`). Si el servidor se reiniciaba mientras un cliente completaba su pago en Mercado Pago, el webhook fallaba con `"Orden no encontrada"` y la orden nunca se acreditaba ni impactaba en la base de datos Supabase PostgreSQL.
+  2. En `SupabaseOrderRepository.createOrder`, si el `album_id` de la orden pertenecía a uno de los álbumes precargados en memoria que aún no tenía fila persistida en la tabla `albums`, PostgreSQL disparaba un error de Foreign Key (`orders_album_id_fkey`).
+  3. En `GET /api/orders/:orderId` (`backend/src/index.ts`), el endpoint realizaba una consulta síncrona `orderService.getOrder(orderId)` en lugar de consultar asíncronamente `orderService.getOrderAsync(orderId)`. Asimismo, exponía `downloadToken` incluso si la orden se encontraba en estado `PENDING` o `PROCESSING`.
+  4. En `POST /api/checkout/preference`, no se deduplicaban los `photoIds` enviados en el body, ni se validaba que en compras individuales (`!isFullAlbum`) se enviara al menos una foto, permitiendo crear órdenes vacías de $0 ARS. Además, no se bloqueaba la compra si el álbum era de descarga gratuita de cortesía (`isFreeDownload: true`).
+  5. En `PaymentSuccessComponent` (`frontend`), cuando el polling superaba los 10 intentos sin que el webhook impactara, el bloque `else` ejecutaba `this.state.set('ready')` con `orderInfo() === null`, dejando al cliente con una pantalla completamente en blanco sin mensaje ni opción de reintento.
+- **Solución Implementada:**
+  1. **Persistencia y Recuperación Asíncrona en `OrderService` (`order.service.ts`):**
+     - Nuevos métodos `verifyAndCompletePaymentAsync(orderId, payment)` y `processWebhookPaymentAsync(input)`, preservando los métodos síncronos legados para retrocompatibilidad.
+     - En `processWebhookPaymentAsync`: verificación de idempotencia dual (primero en memoria local y luego en Supabase PostgreSQL vía `repository.isEventProcessed(input.eventId)`), recuperación resiliente de la orden con `await this.getOrderAsync(input.orderId)` (capaz de restaurar la orden desde la base de datos tras un reinicio del backend), y actualización asíncrona de estado con `await this.repository.updateStatus(...)` y `await this.repository.markEventProcessed(...)`.
+     - Incorporación del método `clearMemoryCache()` para facilitar la simulación determinista de reinicios de servidor en tests unitarios.
+  2. **Prevención de Violación de Foreign Key (`order.repository.ts`):**
+     - En `SupabaseOrderRepository.createOrder`: verificación preventiva de existencia del `albumId` en la tabla `albums`. Si no existe pero coincide con `INITIAL_OFFICIAL_ALBUMS`, se ejecuta un upsert preventivo antes de insertar en `orders`, garantizando la integridad referencial.
+  3. **Conexión Asíncrona en `MercadoPagoService` (`mercadopago.service.ts`):**
+     - `createCheckoutPreference`: utiliza `await this.orderService.getOrderAsync(orderId)`.
+     - `verifyAndProcessPaymentFromAPI`: delega en `await this.orderService.processWebhookPaymentAsync(...)`.
+  4. **Hardening de Endpoints de Checkout y Órdenes (`backend/src/index.ts`):**
+     - En `POST /api/checkout/preference`: deduplicación de fotos con `Array.from(new Set(photoIds))`, validación estricta que exige al menos una foto cuando `!isFullAlbum` (retornando `400 Bad Request` con mensaje claro), y rechazo con `400 Bad Request` si `album.isFreeDownload` es verdadero.
+     - En `GET /api/orders/:orderId`: handler convertido a `async` consumiendo `await orderService.getOrderAsync(orderId)`, con entrega protegida de `downloadToken` únicamente cuando `order.status === 'PAID'`.
+  5. **Corrección de Timeout y Reintento en `PaymentSuccessComponent` (`payment-success.component.ts` y `.html`):**
+     - Registro del signal reactivo `currentOrderId`.
+     - Si `attempt >= 10` y la orden sigue sin acreditarse, transiciona a `this.state.set('error')` con el mensaje: `"El pago sigue procesándose en Mercado Pago. Haz clic en Reintentar en unos segundos."`.
+     - Nuevo método `retryPolling()` que resetea `pollingAttempt.set(0)`, conmuta a estado `'polling'` y vuelve a invocar `loadByOrderId`.
+     - En la plantilla HTML: botón Bento destacado **"🔄 Volver a comprobar estado"** cuando `currentOrderId()` está presente, erradicando por completo la pantalla en blanco.
+- **Evidencia y Validación:**
+  - **300 tests unitarios pasando al 100%** (159 backend + 141 frontend).
+  - 8 nuevas pruebas unitarias en backend:
+    * 2 tests en [`mercadopago.service.test.ts`](file:///e:/code/IA/fotos/backend/tests/mercadopago.service.test.ts) validando acreditación exitosa por webhook e idempotencia tras simular reinicio de servidor con `clearMemoryCache()`, y creación de preferencia post-reinicio.
+    * 6 tests en [`checkout-order-hardening.test.ts`](file:///e:/code/IA/fotos/backend/tests/checkout-order-hardening.test.ts) validando rechazo de órdenes de $0, deduplicación de `photoIds`, rechazo de checkout en álbumes de cortesía gratuita, recuperación asíncrona de orden tras reinicio y ocultamiento de `downloadToken` en órdenes pendientes.
+  - 1 nuevo test en frontend:
+    * [`payment-success.component.spec.ts`](file:///e:/code/IA/fotos/frontend/src/app/features/payment-success/payment-success.component.spec.ts) validando transición a `'error'` al superar 10 intentos y reactivación del polling con `retryPolling()`.
+  - Compilaciones completadas con código 0: `tsc --noEmit` en backend y `ng build` en frontend.
+
+### ADR-039: Corrección de Hit-Testing y Selección/Deselección de Fotos en Catálogo (Z-Index Stacking, Transparencia de Eventos en Gloss Overlay y Delegación Reactiva)
+- **Motivación y Diagnóstico:**
+  1. En la vista de fotos del álbum (`app.html`), los usuarios experimentaban que el botón "+ Elegir" no respondía al hacer clic en las tarjetas de fotos Polaroid, y cuando una foto ya estaba seleccionada (por ejemplo tras seleccionarla en el visor individual Lightbox), el botón "✓ Elegida" tampoco permitía deseleccionarla desde el catálogo.
+  2. Diagnóstico de causa raíz (CSS Stacking Context & 3D Transforms):
+     - La capa cosmética `.gloss-overlay` (reflejo de papel fotográfico satinado en hover) tenía `z-index: 30`, mientras que el contenedor del pie de la tarjeta (`flex items-center justify-between`) y los botones tenían posición `static` (sin `z-index`), quedando físicamente por debajo de la capa de brillo.
+     - Su elemento hijo `.gloss-shine` utilizaba `mix-blend-mode: overlay` (creando un nuevo contexto de apilamiento según especificación CSS Compositing Level 1) y carecía de `pointer-events: none`, interceptando o anulando los clics del usuario en navegadores WebKit/Blink cuando la tarjeta entraba en `:hover` o al tocar la pantalla en móviles.
+     - La tarjeta Polaroid completa (`<article>`) tenía `cursor-pointer`, pero carecía de listener de clic, por lo que clics en la superficie de la tarjeta fuera de la imagen no provocaban acción alguna.
+     - En `app.html`, `(toggleSelect)="cartStore.togglePhoto($event)"` no pasaba por un método del componente padre `App`, y en `cart.store.ts`, `togglePhoto` podía evaluar disparidades si `photo.albumId` no estaba presente.
+- **Solución Implementada:**
+  1. **Aislamiento y Transparencia Absoluta de Eventos (`photo-card-polaroid.component.ts`):**
+     - Se redujo el `z-index` de `.gloss-overlay` a `z-10` y se le asignó `pointer-events: none !important; user-select: none !important;` tanto en clases Tailwind como en bloque CSS.
+     - Se dotó a `.gloss-shine` de la clase nativa `pointer-events-none`.
+     - Se promovió el pie de la tarjeta Polaroid a `relative z-40` y los botones interactivos a `relative z-50 pointer-events-auto cursor-pointer`.
+  2. **Interacción Ergonómica Ampliada (`onCardClicked`):**
+     - Se añadió `(click)="onCardClicked($event)"` a nivel de la tarjeta `<article>`.
+     - Si el álbum es de cortesía gratuita, cualquier clic en la tarjeta o botón "Ver 4K" abre el visor individual Lightbox.
+     - Si el álbum es de venta, hacer clic en el botón "+ Elegir" / "✓ Elegida", en el pie de la foto o en la superficie de la tarjeta Polaroid conmuta la selección (`toggleSelect.emit(this.photo())`).
+     - Al hacer clic específicamente en la imagen (`<div role="button">`), `onViewClicked` invoca `event.stopPropagation()` para abrir el Lightbox sin disparar accidentalmente la selección.
+  3. **Delegación Reactiva en Componente Raíz (`app.ts` y `app.html`):**
+     - Se definió el método `togglePhoto(photo: Photo): void { this.cartStore.togglePhoto(photo); }` en `App`, unificando la selección tanto desde el catálogo como desde el Lightbox (`togglePhotoFromLightbox`).
+     - Se actualizó `app.html` para enlazar `(toggleSelect)="togglePhoto($event)"`.
+  4. **Blindaje Defensivo en `CartStore` (`cart.store.ts`):**
+     - Se agregó verificación preventiva de presencia de `photo.albumId` antes de cotejar cambio de álbum activo, evitando limpiezas involuntarias del carrito ante datos parciales.
+- **Evidencia y Validación:**
+  - **291 tests unitarios pasando al 100%** (151 backend + 140 frontend).
+  - 2 nuevas pruebas unitarias en [`photo-card-polaroid.component.spec.ts`](file:///e:/code/IA/fotos/frontend/src/app/features/photo-card-polaroid/photo-card-polaroid.component.spec.ts) validando deselección con "✓ Elegida", clic en superficie de tarjeta Polaroid y exclusión estricta de `toggleSelect` al hacer clic en la imagen.
+  - 1 nueva prueba unitaria en [`app.spec.ts`](file:///e:/code/IA/fotos/frontend/src/app/app.spec.ts) validando selección y deselección consecutiva desde el catálogo con `togglePhoto`.
+  - Compilación de producción `ng build` completada con éxito (código 0).
+
+### ADR-038: Subagentes Especializados de Movimiento y Carga de Medios, Persistencia de Carrito en SessionStorage, Generador de QR Descargable (PNG) y Confeti de Celebración en Pago Exitoso
+- **Motivación y Diagnóstico:**
+  1. El equipo requería subagentes dedicados en `.agents/plugins/angular/agents/` para delegación de tareas avanzadas de Motion UX (animaciones 3D, CLS = 0, View Transitions) y Media Upload (colas acumulativas, deduplicación, prevención de memory leaks con blob URLs).
+  2. En dispositivos móviles, si el usuario refrescaba la página o alternaba de aplicación antes del checkout, `CartStore` perdía las fotografías seleccionadas y configuración de precios al residir solo en memoria volátil.
+  3. Para promocionar coberturas presenciales en canchas, salones de fiestas y redes sociales (historias de Instagram), la fotógrafa necesitaba generar códigos QR enlazados directamente a cada álbum (`/?album=<id>`), incluyendo el PIN en álbumes privados y posibilitando descargar una tarjeta gráfica publicitaria en PNG lista para imprimir o compartir.
+  4. En la pantalla post-pago (`/pago-exitoso`), tras la acreditación satisfactoria de la compra, faltaba una micro-interacción de celebración con confeti de alta fidelidad respetando los colores de marca de La Tercera.
+- **Solución Implementada:**
+  1. **Nuevos Subagentes Especializados (`.agents/plugins/angular/agents/`):**
+     - `motion-ux-specialist.md`: Especialista en animaciones GPU a 60/120fps, Skeletons CLS = 0, View Transitions API y accesibilidad (`prefers-reduced-motion`).
+     - `media-upload-specialist.md`: Especialista en colas acumulativas con deduplicación por clave hash, ciclo de vida seguro de `URL.createObjectURL`/`revokeObjectURL`, y reportes de progreso HTTP multipart.
+  2. **Persistencia y Auto-Hidratación de Carrito (`cart.store.ts`):**
+     - Sincronización automática de `_selectedPhotos`, `_activeAlbumId`, `_isFullAlbum`, `_unitPrice`, `_fullAlbumPrice`, `_couponCode` y `_customer` en `sessionStorage` (`la_tercera_cart_state`).
+     - Hidratación defensiva en constructor (`hydrateFromSession()`) y persistencia síncrona en cada mutación (`persistToSession()`), preservando la selección ante recargas accidentales.
+  3. **Generador y Descargador de Tarjetas QR en Alta Resolución (`admin-panel.component.ts` & `.html`):**
+     - Integración de `qrcode` en frontend.
+     - Botón **`🔳 QR Evento`** en cada tarjeta de álbum que abre un modal Bento accesible con el código QR del enlace directo `${origin}/?album=${album.id}` y el PIN (si es privado).
+     - Botón **"⬇️ Descargar Tarjeta QR (PNG)"**: genera dinámicamente un lienzo Canvas de 800x1050px con diseño publicitario oscuro, franja dorada, tipografía oficial de La Tercera, datos del evento, marco blanco de QR, precios/cortesía y PIN confidencial, descargable al instante con fallback seguro para entornos sin Canvas 2D.
+     - Botón auxiliar **"🔗 Copiar Link Directo"** con retroalimentación optimista.
+  4. **Confeti de Celebración en Pago Exitoso (`payment-success.component.ts`):**
+     - Integración de `canvas-confetti` con disparo automático al transicionar al estado `'ready'`.
+     - Paleta de marca configurada: `['#FDB813', '#131316', '#10B981', '#FFFFFF']`.
+     - Guardia defensiva contra entornos de prueba headless (jsdom) sin soporte de contexto 2D para garantizar cero excepciones.
+- **Evidencia y Validación:**
+  - **288 tests unitarios pasando al 100%** (151 backend + 137 frontend).
+  - 2 nuevas pruebas unitarias en [`cart.store.spec.ts`](file:///e:/code/IA/fotos/frontend/src/app/core/state/cart.store.spec.ts) validando persistencia e hidratación desde `sessionStorage`.
+  - 3 nuevas pruebas unitarias en [`admin-panel.component.spec.ts`](file:///e:/code/IA/fotos/frontend/src/app/features/admin-panel/admin-panel.component.spec.ts) validando modal QR, copiado de enlace y descarga de tarjeta en PNG.
+  - 1 nueva prueba unitaria en [`payment-success.component.spec.ts`](file:///e:/code/IA/fotos/frontend/src/app/features/payment-success/payment-success.component.spec.ts) validando `triggerConfetti`.
+  - Compilación de producción `ng build` completada con éxito (código 0).
+
+### ADR-037: Splash Screen Cinemático con Obturador de Cámara, Skeletons 3D de Carpetas y Prevención de Parpadeo de Fotos Dummy
+- **Motivación y Diagnóstico:**
+  1. Al cargar la aplicación por primera vez, mientras respondía la petición `GET /api/albums`, el catálogo público evaluaba de inmediato el bloque `@empty`, mostrando incorrectamente el cartel "No se encontraron carpetas" por una fracción de segundo antes de pintar los álbumes.
+  2. En `App.openAlbum(album)`, se vaciaba `activeAlbumPhotos.set([])` y mientras la petición HTTP `getAlbumPhotos(album.id)` estaba en curso, el `computed` `currentPhotos()` caía en un fallback demostrativo que repetía 24 veces la portada `album.coverUrl`, generando un parpadeo visual molesto y confuso antes de que llegaran las fotos reales.
+  3. La plataforma carecía de una pantalla de presentación o Splash Loader representativo de la identidad de la marca La Tercera, y las tarjetas del catálogo y la galería aparecían de golpe sin transiciones escalonadas (stagger).
+- **Solución Implementada:**
+  1. **Splash Screen Cinemático de Inicio (`app.ts`, `app.html`, `styles.css`):**
+     - Signal `showSplash = signal<boolean>(true)` con verificación de persistencia en sesión mediante `sessionStorage.getItem('la_tercera_splash_seen')` para mostrar el loader solo en la primera carga de la sesión.
+     - Overlay fijo `fixed inset-0 z-[200] bg-[#131316]` con animación GPU de obturador fotográfico dorado (`#FDB813`, `.animate-spin-slow` y `.animate-shutter-spin`), logo oficial `assets/branding/logo_la_tercera.jpg`, tipografía Bento y transición de salida suave `scale-105 opacity-0 pointer-events-none duration-500`.
+     - Cierre automático al cargar los álbumes públicos (`dismissSplash()`) o mediante timeout de seguridad de 900ms.
+  2. **Skeletons 3D para el Catálogo de Carpetas (`app.ts`, `app.html`):**
+     - Signal `isLoadingPublicAlbums = signal<boolean>(true)`.
+     - Durante la carga inicial (`isLoadingPublicAlbums() && albums().length === 0`), se renderiza una grilla de **6 Skeletons de Carpetas 3D** con lomo lateral oscuro, 3 anillas metálicas simuladas y barrido Shimmer (`animate-shimmer-sweep`), eliminando por completo el falso estado vacío.
+  3. **Eliminación del Parpadeo de Fotos Dummy y Skeletons Polaroid 3D (`app.ts`, `app.html`):**
+     - Signals `isLoadingAlbumPhotos = signal<boolean>(false)` y `albumPhotosLoaded = signal<boolean>(false)`.
+     - `currentPhotos()` devuelve `[]` estrictamente mientras `isLoadingAlbumPhotos()` sea `true`, evitando el parpadeo de las 24 fotos falsas repetidas mientras el backend responde.
+     - En la vista del álbum, mientras `isLoadingAlbumPhotos()` es activo, se renderizan **8 Skeletons Polaroid 3D** con rotaciones orgánicas alternadas (`-1.5deg`, `1.3deg`, `-1.1deg`, `1.5deg`).
+  4. **Entrada en Cascada Fluida a 60fps (Staggered Entrance):**
+     - Clases CSS `.animate-stagger-fade-in` y retraso escalonado dinámico `staggerDelay` (`(index % 8) * 45 + 'ms'`) implementado en `AlbumCard3dComponent` y `PhotoCardPolaroidComponent`.
+- **Evidencia y Validación:**
+  - **282 tests unitarios pasando al 100%** (151 backend + 131 frontend).
+  - 4 nuevos tests en [`app.spec.ts`](file:///e:/code/IA/fotos/frontend/src/app/app.spec.ts) validando ciclo de vida del Splash Screen, `isLoadingPublicAlbums`, y prevención de parpadeo en `isLoadingAlbumPhotos`.
+  - 1 nuevo test en [`album-card-3d.component.spec.ts`](file:///e:/code/IA/fotos/frontend/src/app/features/album-card-3d/album-card-3d.component.spec.ts) validando `staggerDelay`.
+  - 1 nuevo test en [`photo-card-polaroid.component.spec.ts`](file:///e:/code/IA/fotos/frontend/src/app/features/photo-card-polaroid/photo-card-polaroid.component.spec.ts) validando `staggerDelay`.
+  - Compilación de producción `ng build` completada con éxito (código 0).
+
+### ADR-036: Subida Masiva Acumulativa y Deduplicada, Progreso de Subida HTTP en Tiempo Real, Preservación de PIN en WhatsApp y Confirmación Inline
+- **Motivación y Diagnóstico:**
+  1. En `AdminPanelComponent`, al arrastrar o seleccionar archivos locales por segunda vez para agregar fotos olvidadas a un lote, `handleSelectedFileList` borraba la lista anterior con `revokePreviewUrls()` y reseteaba `selectedFiles()` y `hdIndices()`. Además, `onFileSelect` no limpiaba `input.value = ''`, bloqueando la re-selección de fotos si se habían removido.
+  2. En `AdminService`, `bulkUpload` no reportaba eventos de progreso de carga HTTP (`HttpEventType.UploadProgress`), dejando a la fotógrafa sin visibilidad del estado de transferencia al subir tandas pesadas.
+  3. En `savePrivacy(album, makePrivate)`, el backend devolvía `accessCode: '********'` por protección, pisando el código en claro en memoria y provocando que `copyWhatsAppShareText` no pudiera incluir el PIN recién establecido.
+  4. En `deleteAlbumPhoto`, persistía una llamada a `confirm()` nativo del navegador, rompiendo la estética Bento y bloqueando el hilo principal.
+- **Solución Implementada:**
+  1. **Selección Acumulativa y Deduplicada (`admin-panel.component.ts` & `.html`):**
+     - Modificación de `handleSelectedFileList` para concatenar los nuevos archivos válidos con la selección existente.
+     - Deduplicación comparando la clave única `${f.name}_${f.size}_${f.lastModified}`, emitiendo un toast informativo Bento si se ignoraron fotos duplicadas.
+     - Generación de `URL.createObjectURL` exclusivamente para los archivos nuevos sin revocar las URLs anteriores.
+     - Preservación de `hdIndices` personalizados por el usuario si ya existían fotos previas; inicialización por defecto en `[0, 1]` solo en la primera tanda.
+     - Reseteo de `input.value = ''` en `onFileSelect` tras extraer la lista de archivos.
+     - Zona Drag & Drop dinámica que muestra `"➕ Arrastra o haz clic aquí para AGREGAR más fotos al lote actual"` cuando ya hay archivos en cola.
+  2. **Barra de Progreso de Subida HTTP en Tiempo Real (`admin.service.ts`, `admin-panel.component.ts` & `.html`):**
+     - Configuración de `reportProgress: true` y `observe: 'events'` en `AdminService.bulkUpload`, calculando el porcentaje a partir de `event.loaded` y `event.total` vía callback opcional `onProgress`.
+     - Signal `uploadProgress = signal<number>(0)` en `AdminPanelComponent`.
+     - Barra de progreso animada con gradiente Bento (`amber-500` -> `emerald-400`) y visualización de porcentaje en tiempo real tanto en el panel como en el botón de acción durante `isBulkUploading()`.
+  3. **Preservación de PIN en Claro para Difusión WhatsApp (`admin-panel.component.ts`):**
+     - En `savePrivacy`, al completarse la petición exitosa con `makePrivate === true`, se conserva `accessCode: code` (en texto claro) en el objeto local del álbum, permitiendo que `copyWhatsAppShareText` arme de inmediato el mensaje con `🔒 PIN de acceso: ${code}`.
+  4. **Confirmación Inline de Dos Pasos en Eliminación de Foto (`admin-panel.component.ts` & `.html`):**
+     - Erradicación definitiva de `confirm()` nativo.
+     - Signal `confirmingDeletePhotoId = signal<string | null>(null)` y temporizador automático de 3 segundos con limpieza defensiva en `ngOnDestroy`.
+     - El botón cambia de aspecto a rojo vibrante con animación pulse mostrando `"¿Confirmar? 🗑️"`.
+- **Evidencia y Validación:**
+  - **276 tests unitarios pasando al 100%** (151 backend + 125 frontend).
+  - 1 nuevo test en [`admin.service.spec.ts`](file:///e:/code/IA/fotos/frontend/src/app/core/services/admin.service.spec.ts) validando reporte de porcentaje de subida.
+  - 5 nuevos/actualizados tests en [`admin-panel.component.spec.ts`](file:///e:/code/IA/fotos/frontend/src/app/features/admin-panel/admin-panel.component.spec.ts) validando selección acumulativa, deduplicación, reseteo de input file, preservación de PIN en WhatsApp y doble clic inline para eliminación.
+  - Compilación de producción `ng build` completada con código 0 y `npm test` en backend y frontend con código 0.
 
 ### ADR-035: Kit de Difusión WhatsApp, Miniaturas en Subida Masiva y Sistema de Toasts Bento
 - **Motivación y Diagnóstico:**

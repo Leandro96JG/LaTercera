@@ -158,4 +158,55 @@ describe('MercadoPagoService - Integración de Preferencias y Consulta de Pagos'
     expect(processResult.fraudAlert).toBe(true);
     expect(orderService.getOrder('order-test-123')?.status).toBe('FRAUD_ALERT_PRICE_MISMATCH');
   });
+
+  it('debe acreditar la orden y persistir en repositorio incluso si la memoria se limpia (reinicio de servidor)', async () => {
+    const order = orderService.createOrder({
+      albumId: 'album-1',
+      photoIds: ['p1', 'p2', 'p3'],
+      isFullAlbum: false,
+      customer: { email: 'reboot@latercera.com', name: 'Cliente Reboot' }
+    });
+    (order as any).id = 'order-test-123';
+    await (orderService as any).repository.createOrder(order);
+
+    // Simular reinicio de servidor limpiando la memoria RAM de orderService
+    orderService.clearMemoryCache();
+    expect(orderService.getOrder('order-test-123')).toBeUndefined();
+
+    // El webhook impacta tras el reinicio
+    const processResult = await mpService.verifyAndProcessPaymentFromAPI('pay-approved-123', 'evt-reboot-999');
+
+    expect(processResult.success).toBe(true);
+
+    // La orden debe haberse recuperado del repositorio y pasado a PAID
+    const orderInDb = await orderService.getOrderAsync('order-test-123');
+    expect(orderInDb).not.toBeNull();
+    expect(orderInDb?.status).toBe('PAID');
+    expect(orderInDb?.paymentId).toBe('pay-approved-123');
+    expect(orderInDb?.downloadToken).toBeDefined();
+
+    // Idempotencia persistida tras un segundo reinicio de servidor
+    orderService.clearMemoryCache();
+    const retryResult = await mpService.verifyAndProcessPaymentFromAPI('pay-approved-123', 'evt-reboot-999');
+    expect(retryResult.success).toBe(true);
+    expect(retryResult.alreadyProcessed).toBe(true);
+  });
+
+  it('debe crear una preferencia de checkout recuperando la orden del repositorio tras un reinicio de servidor', async () => {
+    const order = orderService.createOrder({
+      albumId: 'album-1',
+      photoIds: ['p1', 'p2'],
+      isFullAlbum: false,
+      customer: { email: 'checkout-reboot@latercera.com' }
+    });
+    await (orderService as any).repository.createOrder(order);
+
+    // Simular reinicio de servidor
+    orderService.clearMemoryCache();
+    expect(orderService.getOrder(order.id)).toBeUndefined();
+
+    const result = await mpService.createCheckoutPreference(order.id, 'https://latercera.com.ar');
+    expect(result.orderId).toBe(order.id);
+    expect(result.preferenceId).toBe('pref-mock-12345');
+  });
 });

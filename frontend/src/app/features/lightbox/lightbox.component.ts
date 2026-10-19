@@ -6,10 +6,12 @@ import {
   signal,
   computed,
   effect,
-  untracked
+  untracked,
+  inject
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Photo } from '../../core/models/photo.model';
+import { AlbumService } from '../../core/services/album.service';
 
 @Component({
   selector: 'app-lightbox',
@@ -58,7 +60,7 @@ import { Photo } from '../../core/models/photo.model';
               <span class="font-mono text-[11px]">{{ zoomScale() > 1 ? '1x' : '2x' }}</span>
             </button>
 
-            <!-- Botón Rápido de Carrito / Selección -->
+            <!-- Botón Rápido de Carrito / Selección o Descarga Directa HD Gratuita -->
             @if (!isFreeDownload()) {
               <button
                 type="button"
@@ -74,6 +76,16 @@ import { Photo } from '../../core/models/photo.model';
                   <span>+ Seleccionar</span>
                 }
               </button>
+            } @else if (freeDownloadUrl()) {
+              <a
+                [href]="freeDownloadUrl()"
+                [download]="'LA_TERCERA_' + (currentPhoto()?.id || 'foto') + '.jpg'"
+                class="px-4 py-2 rounded-full bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black text-xs flex items-center gap-1.5 transition-all shadow-lg active:scale-95"
+                [attr.aria-label]="'Descargar foto HD gratis'"
+                title="Descargar foto HD gratis"
+              >
+                <span>⬇️ Descargar HD</span>
+              </a>
             }
 
             <!-- Botón Cerrar -->
@@ -150,6 +162,8 @@ import { Photo } from '../../core/models/photo.model';
   `
 })
 export class LightboxComponent {
+  private readonly albumService = inject(AlbumService);
+
   // Inputs
   public readonly isOpen = input<boolean>(false);
   public readonly currentPhoto = input<Photo | null>(null);
@@ -157,6 +171,14 @@ export class LightboxComponent {
   public readonly totalCount = input<number>(0);
   public readonly isSelected = input<boolean>(false);
   public readonly isFreeDownload = input<boolean>(false);
+  public readonly albumId = input<string>();
+
+  public readonly freeDownloadUrl = computed<string>(() => {
+    const albId = this.albumId();
+    const photo = this.currentPhoto();
+    if (!albId || !photo || !this.isFreeDownload()) return '';
+    return this.albumService.getFreePhotoDownloadUrl(albId, photo.id);
+  });
 
   // Outputs
   public readonly close = output<void>();

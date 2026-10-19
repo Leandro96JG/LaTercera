@@ -1,4 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { LightboxComponent } from './lightbox.component';
 import { Photo } from '../../core/models/photo.model';
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -19,7 +21,11 @@ describe('LightboxComponent (Visor Cinemático Táctil)', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [LightboxComponent]
+      imports: [LightboxComponent],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting()
+      ]
     }).compileComponents();
 
     fixture = TestBed.createComponent(LightboxComponent);
@@ -246,6 +252,22 @@ describe('LightboxComponent (Visor Cinemático Táctil)', () => {
     } as unknown as TouchEvent);
 
     expect(component.zoomScale()).toBe(2.2);
+  });
+
+  it('debe mostrar el botón de Descargar HD cuando isFreeDownload es true y renderizar el enlace correcto', () => {
+    fixture.componentRef.setInput('isOpen', true);
+    fixture.componentRef.setInput('currentPhoto', mockPhoto);
+    fixture.componentRef.setInput('currentIndex', 0);
+    fixture.componentRef.setInput('totalCount', 10);
+    fixture.componentRef.setInput('isFreeDownload', true);
+    fixture.componentRef.setInput('albumId', 'album-1');
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).toContain('Descargar HD');
+    const downloadLink = compiled.querySelector('a[download]') as HTMLAnchorElement;
+    expect(downloadLink).not.toBeNull();
+    expect(downloadLink.getAttribute('href')).toContain('/api/downloads/free/album-1/photo/photo-lightbox-1');
   });
 });
 

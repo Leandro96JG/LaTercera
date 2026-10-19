@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createServer, Server } from 'http';
 import sharp from 'sharp';
-import { app, adminAuthService } from '../src/index';
+import { app, adminAuthService, categoryRepository } from '../src/index';
 
 describe('Admin Albums API Endpoints (/api/admin/albums)', () => {
   let server: Server;
@@ -387,7 +387,7 @@ describe('Admin Albums API Endpoints (/api/admin/albums)', () => {
       expect(res.status).toBe(401);
     });
 
-    it('GET /api/admin/albums/:id/photos debe retornar la lista de fotos del álbum', async () => {
+    it('GET /api/admin/albums/:id/photos debe retornar la lista de fotos del álbum con URLs absolutas normalizadas', async () => {
       const res = await fetch(`${baseUrl}/api/admin/albums/${testAlbumId}/photos`, {
         headers: { Authorization: `Bearer ${adminToken}` }
       });
@@ -396,6 +396,20 @@ describe('Admin Albums API Endpoints (/api/admin/albums)', () => {
       expect(data.success).toBe(true);
       expect(data.total).toBeGreaterThanOrEqual(1);
       expect(data.photos.some((p: any) => p.id === testPhotoId)).toBe(true);
+      expect(data.photos[0].previewUrl).toMatch(/^https?:\/\//);
+    });
+
+    it('GET /api/admin/albums/:id/photos debe responder 200 OK con fotos de demostración para álbumes semilla (album-1)', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/albums/album-1/photos`, {
+        headers: { Authorization: `Bearer ${adminToken}` }
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(Array.isArray(data.photos)).toBe(true);
+      expect(data.photos.length).toBeGreaterThan(0);
+      expect(data.photos[0].previewUrl).toMatch(/^https?:\/\//);
+      expect(data.photos.every((p: any) => p.albumId === 'album-1')).toBe(true);
     });
 
     it('PATCH /api/admin/albums/:id/photos/:photoId debe alternar isSampleHD y definir portada', async () => {
@@ -444,6 +458,101 @@ describe('Admin Albums API Endpoints (/api/admin/albums)', () => {
       });
       const getData = await getRes.json();
       expect(getData.photos.some((p: any) => p.id === testPhotoId)).toBe(false);
+    });
+
+    it('GET /api/admin/albums/:id/photos debe responder 200 OK con un array vacío sin arrojar error 404 para álbumes sin fotos o IDs válidos', async () => {
+      // 1. Probar con un ID de álbum que no tiene fotos
+      const resSinFotos = await fetch(`${baseUrl}/api/admin/albums/album-temporal-sin-fotos/photos`, {
+        headers: { Authorization: `Bearer ${adminToken}` }
+      });
+      expect(resSinFotos.status).toBe(200);
+      const dataSinFotos = await resSinFotos.json();
+      expect(dataSinFotos.success).toBe(true);
+      expect(dataSinFotos.albumId).toBe('album-temporal-sin-fotos');
+      expect(dataSinFotos.total).toBe(0);
+      expect(Array.isArray(dataSinFotos.photos)).toBe(true);
+      expect(dataSinFotos.photos).toEqual([]);
+
+      // 2. Crear un álbum nuevo con photosCount: 0 explícito
+      const createRes = await fetch(`${baseUrl}/api/admin/albums`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({
+          title: 'Álbum Reciente Sin Fotos',
+          category: 'sociales',
+          unitPrice: 1500,
+          fullAlbumPrice: 10000
+        })
+      });
+      expect(createRes.status).toBe(201);
+      const createData = await createRes.json();
+      const nuevoId = createData.album.id;
+
+      const resNuevo = await fetch(`${baseUrl}/api/admin/albums/${nuevoId}/photos`, {
+        headers: { Authorization: `Bearer ${adminToken}` }
+      });
+      expect(resNuevo.status).toBe(200);
+      const dataNuevo = await resNuevo.json();
+      expect(dataNuevo.success).toBe(true);
+      expect(dataNuevo.albumId).toBe(nuevoId);
+      expect(dataNuevo.total).toBe(0);
+      expect(dataNuevo.photos).toEqual([]);
+    });
+
+    it('debe permitir crear un álbum con categoría dinámica "motos" y asignar badge correspondiente', async () => {
+      const createRes = await fetch(`${baseUrl}/api/admin/albums`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({
+          title: 'Enduro La Rioja 2026',
+          category: 'motos',
+          unitPrice: 2000,
+          fullAlbumPrice: 15000
+        })
+      });
+
+      expect(createRes.status).toBe(201);
+      const data = await createRes.json();
+      expect(data.success).toBe(true);
+      expect(data.album.category).toBe('motos');
+      expect(data.album.badge).toBe('🏍️ Motos');
+    });
+
+    it('debe permitir crear un álbum con una categoría dinámica recién creada en tiempo de ejecución', async () => {
+      await categoryRepository.createCategory({
+        id: 'padel-open',
+        name: 'Pádel Tour',
+        icon: '🎾',
+        badgeLabel: '🎾 Pádel Tour',
+        order: 10,
+        isActive: true
+      });
+
+      const createRes = await fetch(`${baseUrl}/api/admin/albums`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({
+          title: 'Torneo Pádel La Rioja Open',
+          category: 'padel-open',
+          unitPrice: 1800,
+          fullAlbumPrice: 12000
+        })
+      });
+
+      expect(createRes.status).toBe(201);
+      const data = await createRes.json();
+      expect(data.success).toBe(true);
+      expect(data.album.category).toBe('padel-open');
+      expect(data.album.badge).toBe('🎾 Pádel Tour');
     });
   });
 });

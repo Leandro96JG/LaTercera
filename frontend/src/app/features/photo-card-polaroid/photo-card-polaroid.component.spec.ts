@@ -1,4 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { PhotoCardPolaroidComponent } from './photo-card-polaroid.component';
 import { Photo } from '../../core/models/photo.model';
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -19,7 +21,11 @@ describe('PhotoCardPolaroidComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [PhotoCardPolaroidComponent]
+      imports: [PhotoCardPolaroidComponent],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting()
+      ]
     }).compileComponents();
 
     fixture = TestBed.createComponent(PhotoCardPolaroidComponent);
@@ -85,21 +91,63 @@ describe('PhotoCardPolaroidComponent', () => {
     expect(emittedPhoto).toEqual(mockPhoto);
   });
 
-  it('debe emitir openViewer al hacer clic en el contenedor de la imagen', () => {
+  it('debe emitir toggleSelect al hacer clic en el botón ✓ Elegida para deseleccionar', () => {
+    fixture.componentRef.setInput('photo', mockPhoto);
+    fixture.componentRef.setInput('index', 0);
+    fixture.componentRef.setInput('unitPrice', 1200);
+    fixture.componentRef.setInput('isSelected', true);
+    fixture.detectChanges();
+
+    let emittedPhoto: Photo | undefined;
+    component.toggleSelect.subscribe((p) => {
+      emittedPhoto = p;
+    });
+
+    const button = fixture.nativeElement.querySelector('button') as HTMLButtonElement;
+    expect(button.textContent).toContain('✓ Elegida');
+    button.click();
+
+    expect(emittedPhoto).toEqual(mockPhoto);
+  });
+
+  it('debe emitir toggleSelect al hacer clic en la superficie de la tarjeta polaroid fuera de la imagen', () => {
+    fixture.componentRef.setInput('photo', mockPhoto);
+    fixture.componentRef.setInput('index', 0);
+    fixture.componentRef.setInput('unitPrice', 1200);
+    fixture.componentRef.setInput('isSelected', false);
+    fixture.detectChanges();
+
+    let emittedPhoto: Photo | undefined;
+    component.toggleSelect.subscribe((p) => {
+      emittedPhoto = p;
+    });
+
+    const card = fixture.nativeElement.querySelector('article') as HTMLElement;
+    card.click();
+
+    expect(emittedPhoto).toEqual(mockPhoto);
+  });
+
+  it('debe emitir openViewer al hacer clic en el contenedor de la imagen sin emitir toggleSelect', () => {
     fixture.componentRef.setInput('photo', mockPhoto);
     fixture.componentRef.setInput('index', 3);
     fixture.componentRef.setInput('unitPrice', 1200);
     fixture.detectChanges();
 
-    let emittedEvent: { photo: Photo; index: number } | undefined;
+    let emittedViewer: { photo: Photo; index: number } | undefined;
+    let emittedToggle: Photo | undefined;
     component.openViewer.subscribe((evt) => {
-      emittedEvent = evt;
+      emittedViewer = evt;
+    });
+    component.toggleSelect.subscribe((p) => {
+      emittedToggle = p;
     });
 
     const imgContainer = fixture.nativeElement.querySelector('[role="button"]') as HTMLElement;
     imgContainer.click();
 
-    expect(emittedEvent).toEqual({ photo: mockPhoto, index: 3 });
+    expect(emittedViewer).toEqual({ photo: mockPhoto, index: 3 });
+    expect(emittedToggle).toBeUndefined();
   });
 
   it('debe mostrar la insignia de Muestra HD si la foto lo indica', () => {
@@ -155,5 +203,29 @@ describe('PhotoCardPolaroidComponent', () => {
     expect(compiled.querySelector('.gloss-shine')).not.toBeNull();
     const card = compiled.querySelector('.polaroid-card') as HTMLElement;
     expect(card.classList.contains('is-selected')).toBe(true);
+  });
+
+  it('debe calcular el staggerDelay de entrada en cascada a partir del index', () => {
+    fixture.componentRef.setInput('photo', mockPhoto);
+    fixture.componentRef.setInput('index', 5);
+    fixture.componentRef.setInput('unitPrice', 1200);
+    fixture.detectChanges();
+
+    expect(component.staggerDelay()).toBe((5 * 45) + 'ms');
+  });
+
+  it('debe mostrar el botón de Descargar HD cuando isFreeDownload es true y renderizar el enlace correcto', () => {
+    fixture.componentRef.setInput('photo', mockPhoto);
+    fixture.componentRef.setInput('index', 0);
+    fixture.componentRef.setInput('unitPrice', 1200);
+    fixture.componentRef.setInput('isFreeDownload', true);
+    fixture.componentRef.setInput('albumId', 'album-teso');
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).toContain('Descargar HD');
+    const downloadLink = compiled.querySelector('a[download]') as HTMLAnchorElement;
+    expect(downloadLink).not.toBeNull();
+    expect(downloadLink.getAttribute('href')).toContain('/api/downloads/free/album-teso/photo/photo-101');
   });
 });

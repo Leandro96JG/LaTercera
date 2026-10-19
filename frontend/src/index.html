@@ -1,56 +1,67 @@
 <!doctype html>
-<html lang="es" class="scroll-smooth">
+<html lang="es" class="scroll-smooth overflow-x-hidden">
 <head>
   <meta charset="utf-8">
-  <title>LA TERCERA | Fotografía Profesional • Deportes & Eventos</title>
+  <title>LA TERCERA - Fotografía Deportiva y Eventos en La Rioja | Yuyo Espeche</title>
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/jpeg" href="assets/branding/logo_la_tercera.jpg">
+
+  <!-- SEO Local: La Rioja Capital, Argentina -->
+  <meta name="description" content="Cobertura fotográfica profesional de fútbol, básquet, hockey, motocross enduro y eventos sociales en La Rioja Capital. Descargá tus fotos en alta resolución con LA TERCERA.">
+  <meta name="keywords" content="fotografía deportiva La Rioja, fotos fútbol La Rioja, fotos motos enduro La Rioja, básquet La Rioja, hockey La Rioja, eventos sociales La Rioja, Yuyo Espeche, La Tercera fotografía">
+  <meta name="author" content="Jenifer 'Yuyo' Espeche - LA TERCERA">
+  <meta name="geo.region" content="AR-F">
+  <meta name="geo.placename" content="La Rioja, Argentina">
+  <meta name="robots" content="index, follow">
+
+  <!-- Open Graph / Redes Sociales (WhatsApp & Instagram previews) -->
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="es_AR">
+  <meta property="og:site_name" content="LA TERCERA Fotografía">
+  <meta property="og:title" content="LA TERCERA - Fotografía Deportiva y Eventos en La Rioja | Yuyo Espeche">
+  <meta property="og:description" content="Cobertura fotográfica deportiva y eventos en La Rioja Capital. Encontrá tus fotos en alta resolución y descargalas al instante.">
+  <meta property="og:image" content="assets/branding/logo_la_tercera.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="LA TERCERA - Fotografía Deportiva y Eventos en La Rioja">
+  <meta name="twitter:description" content="Coberturas deportivas y eventos sociales en La Rioja Capital por Yuyo Espeche.">
+  <meta name="twitter:image" content="assets/branding/logo_la_tercera.jpg">
+
+  <!-- Schema.org JSON-LD para Negocio Local y Fotógrafo Georreferenciado -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": ["Photographer", "LocalBusiness"],
+    "name": "LA TERCERA - Fotografía Deportiva y Eventos",
+    "image": "assets/branding/logo_la_tercera.jpg",
+    "description": "Coberturas fotográficas deportivas y sociales en La Rioja Capital: Fútbol, Motos Enduro, Hockey, Básquet y Quinceañeras.",
+    "founder": {
+      "@type": "Person",
+      "name": "Jenifer 'Yuyo' Espeche"
+    },
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": "La Rioja",
+      "addressRegion": "La Rioja",
+      "addressCountry": "AR"
+    },
+    "areaServed": {
+      "@type": "AdministrativeArea",
+      "name": "La Rioja, Argentina"
+    },
+    "priceRange": "$$",
+    "currenciesAccepted": "ARS",
+    "paymentAccepted": "Mercado Pago, Transferencia"
+  }
+  </script>
 
   <!-- Google Fonts: Plus Jakarta Sans & Outfit -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800;900&display=swap" rel="stylesheet">
 
-  <!-- Tailwind CSS CDN con configuración del Bento Theme -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            brand: {
-              dark: '#131316',
-              pill: '#1A1A1E',
-              gold: '#FDB813',
-              goldHover: '#F59E0B',
-              sky: '#38BDF8',
-              canvas: '#ECEEF2'
-            },
-            surface: {
-              canvas: '#ECEEF2',
-              card: '#FFFFFF',
-              darkCard: '#131316',
-              darkPill: '#1A1A1E',
-              border: 'rgba(0, 0, 0, 0.05)',
-              muted: '#71717A'
-            }
-          },
-          fontFamily: {
-            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
-            display: ['Outfit', 'sans-serif'],
-          },
-          boxShadow: {
-            'bento': '0 12px 32px -8px rgba(0, 0, 0, 0.05), 0 4px 12px -2px rgba(0, 0, 0, 0.03)',
-            'bento-hover': '0 20px 40px -12px rgba(0, 0, 0, 0.1), 0 6px 16px -4px rgba(0, 0, 0, 0.04)',
-            'glass': '0 24px 60px -15px rgba(0, 0, 0, 0.08)'
-          }
-        }
-      }
-    }
-  </script>
 </head>
-<body class="text-zinc-900 font-sans antialiased min-h-screen p-2 sm:p-5 md:p-8 relative selection:bg-zinc-900 selection:text-white">
+<body class="text-zinc-900 font-sans antialiased min-h-screen p-2 sm:p-5 md:p-8 relative selection:bg-zinc-900 selection:text-white overflow-x-hidden">
   <app-root></app-root>
 </body>
 </html>

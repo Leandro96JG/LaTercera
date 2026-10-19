@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Order, OrderStatus } from '../services/order.service';
+import { INITIAL_OFFICIAL_ALBUMS } from './album.repository';
 
 export interface IOrderRepository {
   createOrder(order: Order): Promise<Order>;
@@ -12,6 +13,7 @@ export interface IOrderRepository {
     downloadToken?: string
   ): Promise<Order | null>;
   findByPaymentId(paymentId: string): Promise<Order | null>;
+  findOrdersByEmail(email: string): Promise<Order[]>;
 
   // Métodos de retrocompatibilidad
   create(order: Order): Promise<Order>;
@@ -70,6 +72,16 @@ export class MemoryOrderRepository implements IOrderRepository {
     return null;
   }
 
+  async findOrdersByEmail(email: string): Promise<Order[]> {
+    const normalized = email.trim().toLowerCase();
+    const list = Array.from(this.orders.values())
+      .filter(o => o.customer.email.trim().toLowerCase() === normalized && o.status === 'PAID')
+      .map(o => ({ ...o, photoIds: [...o.photoIds] }));
+    return list
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 20);
+  }
+
   async update(order: Order): Promise<void> {
     this.orders.set(order.id, { ...order, photoIds: [...order.photoIds] });
   }
@@ -112,6 +124,7 @@ export class MemoryOrderRepository implements IOrderRepository {
 export interface SupabaseOrderRow {
   id: string;
   album_id: string;
+  album_title_snapshot?: string | null;
   is_full_album?: boolean | null;
   photo_count?: number | null;
   unit_price?: number | string | null;
@@ -146,6 +159,8 @@ export class SupabaseOrderRepository implements IOrderRepository {
     return {
       id: row.id,
       albumId: row.album_id,
+      albumTitle: row.album_title_snapshot || undefined,
+      albumTitleSnapshot: row.album_title_snapshot || undefined,
       photoIds,
       isFullAlbum: Boolean(row.is_full_album),
       photoCount: row.photo_count || 0,
@@ -171,31 +186,76 @@ export class SupabaseOrderRepository implements IOrderRepository {
   }
 
   async createOrder(order: Order): Promise<Order> {
+    // 0. Prevenir fallas de Foreign Key (orders_album_id_fkey) verificando la existencia del álbum
+    try {
+      const { data: albumCheck } = await this.supabase
+        .from('albums')
+        .select('id')
+        .eq('id', order.albumId)
+        .maybeSingle();
+
+      if (!albumCheck) {
+        const official = INITIAL_OFFICIAL_ALBUMS.find(a => a.id === order.albumId);
+        if (official) {
+          await this.supabase.from('albums').upsert({
+            id: official.id,
+            category: official.category,
+            title: official.title,
+            subtitle: official.subtitle,
+            event_date: official.date,
+            cover_url: official.coverUrl,
+            photos_count: official.photosCount,
+            unit_price: official.unitPrice,
+            full_album_price: official.fullAlbumPrice,
+            badge: official.badge,
+            is_published: official.isPublished ?? true
+          }, { onConflict: 'id' });
+        }
+      }
+    } catch (err: unknown) {
+      console.warn('[SupabaseOrderRepository] Warning al verificar/upsert de álbum:', err);
+    }
+
     // 1. Insertar orden principal
-    const { error: orderError } = await this.supabase
+    const insertPayload: Record<string, unknown> = {
+      id: order.id,
+      album_id: order.albumId,
+      status: order.status,
+      total_amount: order.totalAmount,
+      currency: order.currency,
+      unit_price: order.unitPrice,
+      subtotal: order.subtotal,
+      discount: order.discount,
+      discount_percentage: order.discountPercentage,
+      is_full_album: order.isFullAlbum,
+      photo_count: order.photoCount,
+      customer_email: order.customer.email,
+      customer_name: order.customer.name,
+      customer_phone: order.customer.phone,
+      coupon_applied: order.couponApplied,
+      preference_id: order.preferenceId,
+      payment_id: order.paymentId,
+      download_token: order.downloadToken,
+      created_at: order.createdAt,
+      updated_at: order.updatedAt
+    };
+
+    if (order.albumTitleSnapshot || order.albumTitle) {
+      insertPayload.album_title_snapshot = order.albumTitleSnapshot || order.albumTitle;
+    }
+
+    let { error: orderError } = await this.supabase
       .from('orders')
-      .insert({
-        id: order.id,
-        album_id: order.albumId,
-        status: order.status,
-        total_amount: order.totalAmount,
-        currency: order.currency,
-        unit_price: order.unitPrice,
-        subtotal: order.subtotal,
-        discount: order.discount,
-        discount_percentage: order.discountPercentage,
-        is_full_album: order.isFullAlbum,
-        photo_count: order.photoCount,
-        customer_email: order.customer.email,
-        customer_name: order.customer.name,
-        customer_phone: order.customer.phone,
-        coupon_applied: order.couponApplied,
-        preference_id: order.preferenceId,
-        payment_id: order.paymentId,
-        download_token: order.downloadToken,
-        created_at: order.createdAt,
-        updated_at: order.updatedAt
-      });
+      .insert(insertPayload);
+
+    // Fallback defensivo si la columna album_title_snapshot aún no está en el schema cache
+    if (orderError && orderError.message?.includes('album_title_snapshot')) {
+      delete insertPayload.album_title_snapshot;
+      const retryResult = await this.supabase
+        .from('orders')
+        .insert(insertPayload);
+      orderError = retryResult.error;
+    }
 
     if (orderError) {
       throw new Error(`[Supabase Error createOrder] ${orderError.message}`);
@@ -203,19 +263,6 @@ export class SupabaseOrderRepository implements IOrderRepository {
 
     // 2. Insertar items individuales si no es full album
     if (!order.isFullAlbum && order.photoIds.length > 0) {
-      // Aseguramos que las fotos existan en la tabla 'photos' para prevenir fallas de FK
-      const photoUpserts = order.photoIds.map(pId => ({
-        id: pId,
-        album_id: order.albumId,
-        filename: `${pId}.jpg`,
-        original_path: `originals/${order.albumId}/${pId}.jpg`,
-        preview_url: `previews/${order.albumId}/${pId}.webp`
-      }));
-
-      await this.supabase
-        .from('photos')
-        .upsert(photoUpserts, { onConflict: 'id', ignoreDuplicates: true });
-
       const items = order.photoIds.map(pId => ({
         order_id: order.id,
         photo_id: pId
@@ -330,6 +377,46 @@ export class SupabaseOrderRepository implements IOrderRepository {
 
     const photoIds = (itemRows || []).map(i => i.photo_id).filter(Boolean);
     return this.mapRowToOrder(orderRow, photoIds);
+  }
+
+  async findOrdersByEmail(email: string): Promise<Order[]> {
+    const cleanEmail = email.trim();
+    const { data: orderRows, error } = await this.supabase
+      .from('orders')
+      .select('*')
+      .ilike('customer_email', cleanEmail)
+      .eq('status', 'PAID')
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (error || !orderRows || orderRows.length === 0) {
+      return [];
+    }
+
+    const orderIds = orderRows.map(r => r.id);
+    const itemsMap = new Map<string, string[]>();
+
+    try {
+      const { data: itemRows } = await this.supabase
+        .from('order_items')
+        .select('order_id, photo_id')
+        .in('order_id', orderIds);
+
+      if (itemRows) {
+        for (const item of itemRows) {
+          if (!itemsMap.has(item.order_id)) {
+            itemsMap.set(item.order_id, []);
+          }
+          if (item.photo_id) {
+            itemsMap.get(item.order_id)!.push(item.photo_id);
+          }
+        }
+      }
+    } catch {
+      // Ignorar fallback defensivo si order_items falla
+    }
+
+    return orderRows.map(row => this.mapRowToOrder(row, itemsMap.get(row.id) || []));
   }
 
   async update(order: Order): Promise<void> {

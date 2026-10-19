@@ -5,6 +5,7 @@ import { Album, AlbumsApiResponse } from '../models/album.model';
 import { Photo } from '../models/photo.model';
 import { VerifyAlbumAccessResponse } from '../models/admin.model';
 import { environment } from '../../../environments/environment';
+import { AlbumAccessStore } from '../state/album-access.store';
 
 export interface AlbumPhotosApiResponse {
   readonly success: boolean;
@@ -27,6 +28,7 @@ export interface AlbumPhotosApiResponse {
 })
 export class AlbumService {
   private readonly http = inject(HttpClient);
+  private readonly albumAccessStore = inject(AlbumAccessStore);
   private readonly apiUrl = `${environment.apiUrl}/albums`;
   private readonly downloadApiUrl = `${environment.apiUrl}/downloads`;
 
@@ -46,7 +48,13 @@ export class AlbumService {
    * Obtiene las fotos reales de un álbum procesadas y protegidas
    */
   public getAlbumPhotos(albumId: string): Observable<readonly Photo[]> {
-    return this.http.get<AlbumPhotosApiResponse>(`${this.apiUrl}/${albumId}/photos`).pipe(
+    const token = this.albumAccessStore.getAccessToken(albumId);
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['x-album-access-token'] = token;
+    }
+
+    return this.http.get<AlbumPhotosApiResponse>(`${this.apiUrl}/${albumId}/photos`, { headers }).pipe(
       map(res => {
         if (!res || !res.photos || res.photos.length === 0) return [];
         return res.photos.map(p => ({
@@ -76,7 +84,24 @@ export class AlbumService {
    * Obtiene la URL de descarga directa para el ZIP de un álbum liberado de cortesía
    */
   public getFreeAlbumZipUrl(albumId: string): string {
-    return `${this.downloadApiUrl}/free/${albumId}/zip`;
+    const token = this.albumAccessStore.getAccessToken(albumId);
+    const baseUrl = `${this.downloadApiUrl}/free/${albumId}/zip`;
+    if (token) {
+      return `${baseUrl}?accessToken=${encodeURIComponent(token)}`;
+    }
+    return baseUrl;
+  }
+
+  /**
+   * Obtiene la URL de descarga directa para una foto individual en alta calidad de un álbum de cortesía
+   */
+  public getFreePhotoDownloadUrl(albumId: string, photoId: string): string {
+    const token = this.albumAccessStore.getAccessToken(albumId);
+    const baseUrl = `${this.downloadApiUrl}/free/${albumId}/photo/${photoId}`;
+    if (token) {
+      return `${baseUrl}?accessToken=${encodeURIComponent(token)}`;
+    }
+    return baseUrl;
   }
 }
 

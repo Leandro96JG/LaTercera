@@ -1,3 +1,48 @@
+<!-- Splash Screen Cinemático de Inicio (Obturador de Cámara & Branding La Tercera) -->
+<div
+  [class]="showSplash()
+    ? 'fixed inset-0 z-[200] bg-[#131316] flex flex-col items-center justify-center p-6 transition-all duration-500 ease-out select-none'
+    : 'fixed inset-0 z-[200] bg-[#131316] flex flex-col items-center justify-center p-6 transition-all duration-500 ease-out select-none scale-105 opacity-0 pointer-events-none'"
+  aria-hidden="true"
+>
+  <div class="relative flex flex-col items-center max-w-sm text-center">
+    <!-- Anillo de Obturador Fotográfico Dorado -->
+    <div class="relative w-28 h-28 sm:w-32 sm:h-32 mb-6 flex items-center justify-center">
+      <!-- Aro exterior sutil pulsante -->
+      <div class="absolute inset-0 rounded-full border border-[#FDB813]/20 animate-ping"></div>
+      <!-- Aro giratorio lento con marcas de obturador -->
+      <div class="absolute inset-0 rounded-full border-2 border-dashed border-[#FDB813]/60 animate-spin-slow"></div>
+      <!-- Obturador de apertura -->
+      <div class="absolute inset-2 rounded-full border border-[#FDB813]/40 animate-shutter-spin flex items-center justify-center">
+        <div class="w-2 h-2 rounded-full bg-[#FDB813] shadow-[0_0_12px_#FDB813]"></div>
+      </div>
+      <!-- Logo de La Tercera en el centro del lente -->
+      <div class="relative z-10 w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden border-2 border-[#FDB813] shadow-lg shadow-black/80 bg-black flex items-center justify-center">
+        <img
+          src="assets/branding/logo_la_tercera.jpg"
+          alt="La Tercera Fotografía"
+          class="w-full h-full object-cover"
+        />
+      </div>
+    </div>
+
+    <!-- Tipografía y Subtítulo de Presentación -->
+    <h1 class="text-white font-display font-extrabold text-xl sm:text-2xl tracking-widest uppercase mb-1">
+      LA TERCERA <span class="text-[#FDB813]">•</span> FOTOGRAFÍA
+    </h1>
+    <p class="text-zinc-400 text-xs font-medium tracking-wide">
+      Jenifer "Yuyo" Espeche • Coberturas Deportivas & Sociales
+    </p>
+
+    <!-- Indicador de Carga Minimalista -->
+    <div class="mt-6 flex items-center gap-1.5">
+      <span class="w-1.5 h-1.5 rounded-full bg-[#FDB813] animate-bounce"></span>
+      <span class="w-1.5 h-1.5 rounded-full bg-[#FDB813] animate-bounce [animation-delay:150ms]"></span>
+      <span class="w-1.5 h-1.5 rounded-full bg-[#FDB813] animate-bounce [animation-delay:300ms]"></span>
+    </div>
+  </div>
+</div>
+
 <!-- Fondo con Silueta Artística de la Autora -->
 <div class="fixed inset-0 pointer-events-none z-0 overflow-hidden" aria-hidden="true">
   <div class="absolute right-0 top-1/4 w-[380px] sm:w-[560px] h-[700px] sm:h-[900px] opacity-[0.04] filter grayscale contrast-125 mix-blend-darken pointer-events-none transition-opacity duration-700">
@@ -6,7 +51,7 @@
 </div>
 
 <!-- Contenedor Principal Bento Grid Flotante (sin backdrop-blur directo para permitir centrado de modales fixed) -->
-<div class="relative z-10 max-w-[1440px] mx-auto p-4 sm:p-6 lg:p-10 transition-all">
+<div class="relative z-10 w-full max-w-[1440px] mx-auto p-4 sm:p-6 lg:p-10 transition-all overflow-x-hidden box-border">
   <!-- Capa de fondo vítreo aislada -->
   <div class="absolute inset-0 bg-white/60 backdrop-blur-3xl rounded-[32px] sm:rounded-[42px] border border-white/80 shadow-glass -z-10 pointer-events-none" aria-hidden="true"></div>
 
@@ -17,6 +62,7 @@
     (goHome)="goHome()"
     (changeView)="switchView($event)"
     (logout)="logoutAdmin()"
+    (openRecoveryModal)="openOrderRecovery()"
   />
 
   <!-- VISTA 1: PORTFOLIO & CATÁLOGO DE ÁLBUMES -->
@@ -62,7 +108,7 @@
             </div>
 
             <!-- Filtro de Categorías con Scroll Elástico y Zero-Wrap -->
-            <div class="w-full sm:w-auto overflow-x-auto no-scrollbar scroll-smooth -mx-1 px-1 sm:mx-0 sm:px-0 pb-1 touch-pan-x">
+            <div class="w-full max-w-full overflow-x-auto no-scrollbar scroll-smooth pb-2 touch-pan-x">
               <div class="flex items-center gap-2 min-w-max">
                 <button
                   type="button"
@@ -73,64 +119,73 @@
                 >
                   Todos ({{ albums().length }})
                 </button>
-                <button
-                  type="button"
-                  (click)="setCategory('futbol')"
-                  [class]="selectedCategory() === 'futbol'
-                    ? 'px-4 py-2 rounded-full bg-zinc-950 text-white font-semibold text-xs shadow-sm transition-all duration-200 whitespace-nowrap shrink-0 active:scale-95'
-                    : 'px-4 py-2 rounded-full bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.05] transition-all duration-200 whitespace-nowrap shrink-0 active:scale-95'"
-                >
-                  ⚽ Fútbol
-                </button>
-                <button
-                  type="button"
-                  (click)="setCategory('hockey')"
-                  [class]="selectedCategory() === 'hockey'
-                    ? 'px-4 py-2 rounded-full bg-zinc-950 text-white font-semibold text-xs shadow-sm transition-all duration-200 whitespace-nowrap shrink-0 active:scale-95'
-                    : 'px-4 py-2 rounded-full bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.05] transition-all duration-200 whitespace-nowrap shrink-0 active:scale-95'"
-                >
-                  🏑 Hockey
-                </button>
-                <button
-                  type="button"
-                  (click)="setCategory('basquet')"
-                  [class]="selectedCategory() === 'basquet'
-                    ? 'px-4 py-2 rounded-full bg-zinc-950 text-white font-semibold text-xs shadow-sm transition-all duration-200 whitespace-nowrap shrink-0 active:scale-95'
-                    : 'px-4 py-2 rounded-full bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.05] transition-all duration-200 whitespace-nowrap shrink-0 active:scale-95'"
-                >
-                  🏀 Básquet
-                </button>
-                <button
-                  type="button"
-                  (click)="setCategory('sociales')"
-                  [class]="selectedCategory() === 'sociales'
-                    ? 'px-4 py-2 rounded-full bg-zinc-950 text-white font-semibold text-xs shadow-sm transition-all duration-200 whitespace-nowrap shrink-0 active:scale-95'
-                    : 'px-4 py-2 rounded-full bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.05] transition-all duration-200 whitespace-nowrap shrink-0 active:scale-95'"
-                >
-                  🎉 Cumpleaños & 15s
-                </button>
+                @for (cat of publicCategories(); track cat.id) {
+                  <button
+                    type="button"
+                    (click)="setCategory(cat.id)"
+                    [class]="selectedCategory() === cat.id
+                      ? 'px-4 py-2 rounded-full bg-zinc-950 text-white font-semibold text-xs shadow-sm transition-all duration-200 whitespace-nowrap shrink-0 active:scale-95'
+                      : 'px-4 py-2 rounded-full bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.05] transition-all duration-200 whitespace-nowrap shrink-0 active:scale-95'"
+                  >
+                    {{ cat.icon }} {{ cat.name }} ({{ cat.count }})
+                  </button>
+                }
               </div>
             </div>
           </div>
         </div>
 
         <!-- Grilla Bento de Portafolios / Carpetas 3D con Entreabierto y Aceleración GPU -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          @for (album of paginatedAlbums(); track album.id) {
-            <app-album-card-3d
-              [album]="album"
-              [isSelected]="currentAlbum()?.id === album.id"
-              [isUnlocked]="albumAccessStore.isUnlocked(album.id)"
-              (selectAlbum)="openAlbum($event)"
-              (openPinModal)="openPinModal($event)"
-            />
-          } @empty {
-            <div class="col-span-full py-16 text-center bg-white rounded-3xl border border-black/[0.05] p-8">
-              <span class="text-4xl block mb-3">📁</span>
-              <h3 class="text-lg font-bold text-zinc-800">No se encontraron carpetas</h3>
-              <p class="text-xs text-zinc-500 mt-1">Prueba con otra disciplina o término de búsqueda.</p>
-            </div>
-          }
+        <div class="px-2 py-3 sm:px-3 sm:py-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
+            @if (isLoadingPublicAlbums() && albums().length === 0) {
+              <!-- Skeletons 3D de Carpetas mientras carga GET /api/albums -->
+              @for (skeleton of [1, 2, 3, 4, 5, 6]; track skeleton) {
+                <div class="relative bg-white rounded-3xl p-4 sm:p-5 border border-black/[0.06] shadow-sm overflow-hidden flex flex-col justify-between h-[280px] animate-pulse">
+                  <!-- Lomo lateral simulado de carpeta 3D con 3 anillas -->
+                  <div class="absolute left-0 top-0 bottom-0 w-8 sm:w-9 bg-zinc-950 flex flex-col justify-around items-center py-6 border-r border-zinc-800">
+                    <div class="w-3 h-2 rounded-r-full bg-zinc-500 border border-zinc-400"></div>
+                    <div class="w-3 h-2 rounded-r-full bg-zinc-500 border border-zinc-400"></div>
+                    <div class="w-3 h-2 rounded-r-full bg-zinc-500 border border-zinc-400"></div>
+                  </div>
+
+                  <!-- Contenido interior con Shimmer Sweep -->
+                  <div class="pl-7 sm:pl-8 space-y-3">
+                    <!-- Portada Skeleton -->
+                    <div class="w-full h-36 rounded-2xl bg-gradient-to-r from-zinc-200 via-zinc-100 to-zinc-200 animate-shimmer-sweep"></div>
+                    <!-- Textos Skeleton -->
+                    <div class="space-y-1.5 pt-1">
+                      <div class="h-4 w-3/4 bg-zinc-200 rounded-md"></div>
+                      <div class="h-3 w-1/2 bg-zinc-100 rounded-md"></div>
+                    </div>
+                  </div>
+
+                  <!-- Footer Skeleton -->
+                  <div class="pl-7 sm:pl-8 pt-3 flex items-center justify-between border-t border-zinc-100">
+                    <div class="h-3 w-20 bg-zinc-100 rounded-md"></div>
+                    <div class="h-7 w-24 bg-zinc-200 rounded-xl"></div>
+                  </div>
+                </div>
+              }
+            } @else {
+              @for (album of paginatedAlbums(); track album.id; let idx = $index) {
+                <app-album-card-3d
+                  [album]="album"
+                  [index]="idx"
+                  [isSelected]="currentAlbum()?.id === album.id"
+                  [isUnlocked]="albumAccessStore.isUnlocked(album.id)"
+                  (selectAlbum)="openAlbum($event)"
+                  (openPinModal)="openPinModal($event)"
+                />
+              } @empty {
+                <div class="col-span-full py-16 text-center bg-white rounded-3xl border border-black/[0.05] p-8">
+                  <span class="text-4xl block mb-3">📁</span>
+                  <h3 class="text-lg font-bold text-zinc-800">No se encontraron carpetas</h3>
+                  <p class="text-xs text-zinc-500 mt-1">Prueba con otra disciplina o término de búsqueda.</p>
+                </div>
+              }
+            }
+          </div>
         </div>
 
         <!-- Barra de Paginación Bento de Álbumes -->
@@ -143,7 +198,7 @@
             </span>
 
             @if (totalPages() > 1) {
-              <div class="inline-flex items-center gap-1.5 p-1 rounded-2xl bg-white border border-black/[0.06] shadow-sm order-1 sm:order-2">
+              <div class="inline-flex flex-wrap justify-center items-center gap-1.5 p-1 rounded-2xl bg-white border border-black/[0.06] shadow-sm order-1 sm:order-2">
                 <button
                   type="button"
                   (click)="prevPage()"
@@ -256,34 +311,178 @@
         </div>
       </div>
 
-      <!-- Grilla Polaroid 3D de Fotos Protegidas con Carga Progresiva @defer (on viewport) -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 sm:gap-6 py-2">
-        @for (photo of currentPhotos(); track photo.id; let idx = $index) {
-          @defer (on viewport) {
-            <app-photo-card-polaroid
-              [photo]="photo"
-              [index]="idx"
-              [unitPrice]="album.unitPrice"
-              [isFreeDownload]="album.isFreeDownload || false"
-              [isSelected]="cartStore.isPhotoSelected(photo.id)"
-              (toggleSelect)="cartStore.togglePhoto($event)"
-              (openViewer)="openLightbox($event.photo, $event.index)"
-            />
-          } @placeholder {
-            <!-- Skeleton Shimmer Placeholder con proporción idéntica a la tarjeta Polaroid -->
-            <div class="bg-white rounded-[26px] p-3 pb-4 border border-black/[0.06] shadow-sm animate-pulse flex flex-col justify-between">
-              <div class="w-full aspect-[4/3] rounded-[20px] bg-gradient-to-r from-zinc-200 via-zinc-100 to-zinc-200 animate-shimmer-sweep"></div>
-              <div class="flex items-center justify-between pt-3 px-1 mt-1">
-                <div class="space-y-1">
-                  <div class="h-3 w-16 bg-zinc-200 rounded-md"></div>
-                  <div class="h-2.5 w-24 bg-zinc-100 rounded-md"></div>
-                </div>
-                <div class="h-8 w-20 bg-zinc-200 rounded-xl"></div>
-              </div>
-            </div>
-          }
+      <!-- Barra Bento de Filtros de Fotos (Todas / Mis Elegidas / Muestras HD) -->
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+        <div class="inline-flex flex-wrap items-center gap-1.5 p-1 rounded-2xl bg-white border border-black/[0.06] shadow-sm">
+          <button
+            type="button"
+            (click)="setPhotosFilterMode('todas')"
+            [class]="photosFilterMode() === 'todas'
+              ? 'px-3.5 py-1.5 rounded-xl bg-zinc-950 text-white font-extrabold text-xs shadow-sm transition active:scale-95'
+              : 'px-3.5 py-1.5 rounded-xl text-zinc-600 hover:bg-zinc-100 font-bold text-xs transition active:scale-95'"
+          >
+            🖼️ Todas ({{ currentPhotos().length }})
+          </button>
+          <button
+            type="button"
+            (click)="setPhotosFilterMode('elegidas')"
+            [class]="photosFilterMode() === 'elegidas'
+              ? 'px-3.5 py-1.5 rounded-xl bg-zinc-950 text-white font-extrabold text-xs shadow-sm transition active:scale-95'
+              : 'px-3.5 py-1.5 rounded-xl text-zinc-600 hover:bg-zinc-100 font-bold text-xs transition active:scale-95'"
+          >
+            ✓ Mis Elegidas ({{ cartStore.totalItemsCount() }})
+          </button>
+          <button
+            type="button"
+            (click)="setPhotosFilterMode('hd')"
+            [class]="photosFilterMode() === 'hd'
+              ? 'px-3.5 py-1.5 rounded-xl bg-zinc-950 text-white font-extrabold text-xs shadow-sm transition active:scale-95'
+              : 'px-3.5 py-1.5 rounded-xl text-zinc-600 hover:bg-zinc-100 font-bold text-xs transition active:scale-95'"
+          >
+            ✦ Muestras HD
+          </button>
+        </div>
+
+        @if (filteredAlbumPhotos().length > 0) {
+          <span class="text-xs text-zinc-500 font-medium">
+            Mostrando <strong class="text-zinc-900 font-bold">{{ photosShowingFrom() }}</strong> a
+            <strong class="text-zinc-900 font-bold">{{ photosShowingTo() }}</strong> de
+            <strong class="text-zinc-900 font-bold">{{ filteredAlbumPhotos().length }}</strong> fotos
+          </span>
         }
       </div>
+
+      <!-- Grilla Polaroid 3D de Fotos Protegidas con Carga Progresiva @defer (on viewport) -->
+      <div class="px-3 py-2.5 sm:px-2 sm:py-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 py-2">
+          @if (isLoadingAlbumPhotos()) {
+            <!-- Skeletons Polaroid 3D con rotaciones orgánicas alternadas mientras carga GET /api/albums/:id/photos -->
+            @for (skeleton of [1, 2, 3, 4, 5, 6, 7, 8]; track skeleton; let sIdx = $index) {
+              <div
+                class="bg-white rounded-[26px] p-3 pb-4 border border-black/[0.06] shadow-md animate-pulse flex flex-col justify-between transform transition-transform duration-300"
+                [style.transform]="sIdx % 4 === 0 ? 'rotate(-1.5deg)' : (sIdx % 4 === 1 ? 'rotate(1.3deg)' : (sIdx % 4 === 2 ? 'rotate(-1.1deg)' : 'rotate(1.5deg)'))"
+              >
+                <!-- Ventana de foto Polaroid con Shimmer Sweep -->
+                <div class="w-full aspect-[4/3] rounded-[20px] bg-gradient-to-r from-zinc-200 via-zinc-100 to-zinc-200 animate-shimmer-sweep"></div>
+                <!-- Pie de tarjeta Polaroid -->
+                <div class="flex items-center justify-between pt-3 px-1 mt-1">
+                  <div class="space-y-1">
+                    <div class="h-3 w-16 bg-zinc-200 rounded-md"></div>
+                    <div class="h-2.5 w-24 bg-zinc-100 rounded-md"></div>
+                  </div>
+                  <div class="h-8 w-20 bg-zinc-200 rounded-xl"></div>
+                </div>
+              </div>
+            }
+          } @else {
+            @for (item of paginatedAlbumPhotos(); track item.photo.id) {
+              @defer (on viewport) {
+                <app-photo-card-polaroid
+                  [photo]="item.photo"
+                  [index]="item.originalIndex"
+                  [unitPrice]="album.unitPrice"
+                  [isFreeDownload]="album.isFreeDownload || false"
+                  [albumId]="album.id"
+                  [isSelected]="cartStore.isPhotoSelected(item.photo.id)"
+                  (toggleSelect)="togglePhoto($event)"
+                  (openViewer)="openLightbox($event.photo, $event.index)"
+                />
+              } @placeholder {
+                <!-- Skeleton Shimmer Placeholder con proporción idéntica a la tarjeta Polaroid -->
+                <div class="bg-white rounded-[26px] p-3 pb-4 border border-black/[0.06] shadow-sm animate-pulse flex flex-col justify-between">
+                  <div class="w-full aspect-[4/3] rounded-[20px] bg-gradient-to-r from-zinc-200 via-zinc-100 to-zinc-200 animate-shimmer-sweep"></div>
+                  <div class="flex items-center justify-between pt-3 px-1 mt-1">
+                    <div class="space-y-1">
+                      <div class="h-3 w-16 bg-zinc-200 rounded-md"></div>
+                      <div class="h-2.5 w-24 bg-zinc-100 rounded-md"></div>
+                    </div>
+                    <div class="h-8 w-20 bg-zinc-200 rounded-xl"></div>
+                  </div>
+                </div>
+              }
+            } @empty {
+              <div class="col-span-full py-12 text-center bg-white rounded-3xl border border-black/[0.05] p-8">
+                <span class="text-4xl block mb-2">
+                  @if (photosFilterMode() === 'elegidas') {
+                    🛒
+                  } @else if (photosFilterMode() === 'hd') {
+                    ✦
+                  } @else {
+                    📷
+                  }
+                </span>
+                <h3 class="text-base font-bold text-zinc-800">
+                  @if (photosFilterMode() === 'elegidas') {
+                    Aún no has elegido fotos
+                  } @else if (photosFilterMode() === 'hd') {
+                    No hay fotos marcadas como muestra HD
+                  } @else {
+                    No hay fotos disponibles en este álbum
+                  }
+                </h3>
+                <p class="text-xs text-zinc-500 mt-1 max-w-sm mx-auto">
+                  @if (photosFilterMode() === 'elegidas') {
+                    Toca el botón "+ Elegir" en las fotos que más te gusten para verlas reunidas aquí.
+                  } @else {
+                    Explora las demás fotografías del evento o prueba con otro filtro.
+                  }
+                </p>
+                @if (photosFilterMode() !== 'todas') {
+                  <button
+                    type="button"
+                    (click)="setPhotosFilterMode('todas')"
+                    class="mt-4 px-4 py-2 rounded-xl bg-zinc-950 text-white font-bold text-xs hover:bg-zinc-800 transition"
+                  >
+                    Ver todas las fotos
+                  </button>
+                }
+              </div>
+            }
+          }
+        </div>
+      </div>
+
+      <!-- Barra de Paginación Bento de Fotos del Álbum -->
+      @if (photosTotalPages() > 1) {
+        <div class="mt-8 pt-6 border-t border-black/[0.05] flex flex-col sm:flex-row items-center justify-between gap-4">
+          <span class="text-xs text-zinc-500 font-medium order-2 sm:order-1">
+            Página <strong class="text-zinc-900 font-bold">{{ photosCurrentPage() }}</strong> de
+            <strong class="text-zinc-900 font-bold">{{ photosTotalPages() }}</strong>
+          </span>
+
+          <div class="inline-flex flex-wrap justify-center items-center gap-1.5 p-1 rounded-2xl bg-white border border-black/[0.06] shadow-sm order-1 sm:order-2">
+            <button
+              type="button"
+              (click)="prevPhotosPage()"
+              [disabled]="photosCurrentPage() === 1"
+              class="px-3 py-1.5 rounded-xl text-xs font-bold text-zinc-700 hover:bg-zinc-100 disabled:opacity-30 disabled:pointer-events-none transition flex items-center gap-1"
+            >
+              ← Anterior
+            </button>
+
+            @for (p of photosPaginationPages(); track p) {
+              <button
+                type="button"
+                (click)="goToPhotosPage(p)"
+                [class]="photosCurrentPage() === p
+                  ? 'w-8 h-8 rounded-xl bg-zinc-950 text-white font-extrabold text-xs shadow-sm transition'
+                  : 'w-8 h-8 rounded-xl text-zinc-600 hover:bg-zinc-100 font-bold text-xs transition'"
+              >
+                {{ p }}
+              </button>
+            }
+
+            <button
+              type="button"
+              (click)="nextPhotosPage()"
+              [disabled]="photosCurrentPage() === photosTotalPages()"
+              class="px-3 py-1.5 rounded-xl text-xs font-bold text-zinc-700 hover:bg-zinc-100 disabled:opacity-30 disabled:pointer-events-none transition flex items-center gap-1"
+            >
+              Siguiente →
+            </button>
+          </div>
+        </div>
+      }
     </div>
   }
 
@@ -324,6 +523,15 @@
     </div>
 
     <div class="flex items-center gap-4">
+      <button
+        type="button"
+        (click)="openOrderRecovery()"
+        class="text-zinc-400 hover:text-zinc-700 transition flex items-center gap-1 text-[11px] font-medium"
+        title="Recuperar fotos de compras anteriores"
+      >
+        <span>📥</span>
+        <span>¿Ya compraste? Recuperar mis fotos</span>
+      </button>
       <span class="text-[11px] text-zinc-400">Fotos protegidas con marca de agua • Cobros vía Mercado Pago</span>
       @if (!adminAuthStore.isAuthenticated()) {
         <button
@@ -353,6 +561,7 @@
   [totalCount]="currentPhotos().length"
   [isSelected]="isCurrentLightboxPhotoSelected()"
   [isFreeDownload]="currentAlbum()?.isFreeDownload || false"
+  [albumId]="currentAlbum()?.id || ''"
   (close)="closeLightbox()"
   (next)="nextLightboxPhoto()"
   (prev)="prevLightboxPhoto()"
@@ -374,4 +583,11 @@
     (unlocked)="onAlbumUnlocked($event)"
   />
 }
+
+<!-- Modal de Recuperación de Compras / Fotos Pagadas -->
+<app-order-recovery-modal
+  [isOpen]="isOrderRecoveryOpen()"
+  (close)="closeOrderRecovery()"
+/>
+
 

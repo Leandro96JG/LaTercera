@@ -10,6 +10,13 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 // En el backend preferimos SERVICE_ROLE_KEY para operaciones transaccionales y bypass de RLS, con fallback a ANON_KEY
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 
+function isTestEnvironment(): boolean {
+  if (process.env.FORCE_SUPABASE_LIVE === 'true') {
+    return false;
+  }
+  return process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
+}
+
 function normalizeSupabaseUrl(url: string): string {
   const clean = url.trim().replace(/\/+$/, '');
   const dashboardMatch = clean.match(/supabase\.com\/dashboard\/project\/([a-z0-9_-]+)/i);
@@ -20,6 +27,10 @@ function normalizeSupabaseUrl(url: string): string {
 }
 
 export function getSupabaseClient(): SupabaseClient | null {
+  if (isTestEnvironment()) {
+    return null;
+  }
+
   if (!SUPABASE_URL || !SUPABASE_KEY) {
     return null;
   }
@@ -35,5 +46,8 @@ export function getSupabaseClient(): SupabaseClient | null {
 }
 
 export const isSupabaseConfigured = (): boolean => {
+  if (isTestEnvironment()) {
+    return false;
+  }
   return Boolean(SUPABASE_URL && SUPABASE_KEY);
 };

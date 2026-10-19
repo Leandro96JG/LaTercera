@@ -217,4 +217,12 @@ describe('AlbumCard3dComponent', () => {
     const article = fixture.nativeElement.querySelector('.album-card-root') as HTMLElement;
     expect(article.style.viewTransitionName).toBe('album-cover-album-teso');
   });
+
+  it('debe calcular el staggerDelay de entrada en cascada a partir del index', () => {
+    fixture.componentRef.setInput('album', mockPublicAlbum);
+    fixture.componentRef.setInput('index', 3);
+    fixture.detectChanges();
+
+    expect(component.staggerDelay()).toBe((3 * 45) + 'ms');
+  });
 });

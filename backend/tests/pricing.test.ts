@@ -60,7 +60,7 @@ describe('Pricing Service - Cálculo de Precios y Packs', () => {
     expect(result.isFullAlbum).toBe(true);
   });
 
-  it('debe aplicar cupón de descuento adicional sobre el total', () => {
+  it('debe aplicar cupón de descuento adicional sobre el total si coupon es undefined (retrocompatibilidad)', () => {
     const result = calculateCartTotal({
       photoCount: 1,
       unitPrice: UNIT_PRICE,
@@ -71,5 +71,23 @@ describe('Pricing Service - Cálculo de Precios y Packs', () => {
 
     // 1200 - 10% = 1080
     expect(result.total).toBe(1080);
+    expect(result.discount).toBe(120);
+    expect(result.couponApplied).toBe('YUYO10');
+  });
+
+  it('NO debe aplicar cupón YUYO10 si req.coupon es null (fue buscado en repositorio y no existe o está inactivo)', () => {
+    const result = calculateCartTotal({
+      photoCount: 1,
+      unitPrice: UNIT_PRICE,
+      fullAlbumPrice: FULL_ALBUM_PRICE,
+      isFullAlbum: false,
+      couponCode: 'YUYO10',
+      coupon: null
+    });
+
+    // 1200 sin descuento
+    expect(result.total).toBe(1200);
+    expect(result.discount).toBe(0);
+    expect(result.couponApplied).toBeUndefined();
   });
 });

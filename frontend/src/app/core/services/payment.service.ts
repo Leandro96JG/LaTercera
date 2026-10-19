@@ -4,8 +4,10 @@ import { Observable, timer, switchMap, takeWhile, tap } from 'rxjs';
 import {
   CreatePreferenceRequest,
   CreatePreferenceResponse,
-  OrderStatusResponse
+  OrderStatusResponse,
+  RecoverOrdersResponse
 } from '../models/order.model';
+import { ValidateCouponResponse, PricingTierConfig } from '../models/admin.model';
 import { environment } from '../../../environments/environment';
 
 @Injectable({
@@ -35,4 +37,36 @@ export class PaymentService {
       takeWhile(order => order.status === 'PENDING', true)
     );
   }
+
+  public validateCoupon(
+    code: string,
+    albumId?: string,
+    photoCount?: number,
+    isFullAlbum?: boolean
+  ): Observable<ValidateCouponResponse> {
+    return this.http.post<ValidateCouponResponse>(`${this.apiUrl}/pricing/validate-coupon`, {
+      code,
+      albumId,
+      photoCount,
+      isFullAlbum
+    });
+  }
+
+  /**
+   * Obtiene la configuración de descuentos por volumen activa
+   */
+  public getPricingConfig(): Observable<PricingTierConfig> {
+    return this.http.get<PricingTierConfig>(`${this.apiUrl}/pricing/config`);
+  }
+
+  /**
+   * Recupera las compras vigentes de las últimas 72 horas asociadas a un correo electrónico
+   */
+  public recoverOrdersByEmail(email: string, paymentId?: string): Observable<RecoverOrdersResponse> {
+    return this.http.post<RecoverOrdersResponse>(`${this.apiUrl}/orders/recover`, {
+      email,
+      paymentId
+    });
+  }
 }
+

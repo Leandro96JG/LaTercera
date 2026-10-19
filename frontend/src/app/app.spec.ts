@@ -2,14 +2,16 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import { App } from './app';
 import { AlbumService } from './core/services/album.service';
 import { Album } from './core/models/album.model';
+import { Photo } from './core/models/photo.model';
 
 describe('App Root Component - LA TERCERA', () => {
   beforeEach(async () => {
     localStorage.clear();
+    sessionStorage.clear();
     await TestBed.configureTestingModule({
       imports: [App],
       providers: [
@@ -121,6 +123,120 @@ describe('App Root Component - LA TERCERA', () => {
     app.setCategory('futbol');
     expect(app.currentPage()).toBe(1);
     expect(app.filteredAlbums().length).toBe(2);
+  });
+
+  it('debe tener pageSize por defecto en 6 y permitir filtrar por selectedDate', () => {
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+    expect(app.pageSize()).toBe(6);
+
+    app.albums.set([
+      { id: '1', category: 'futbol', title: 'Álbum 1', subtitle: 'Sub 1', date: '12 Octubre, 2026', eventDate: '2026-10-12', badge: '⚽', photosCount: 10, unitPrice: 1000, fullAlbumPrice: 8000, coverUrl: '' },
+      { id: '2', category: 'futbol', title: 'Álbum 2', subtitle: 'Sub 2', date: '15 Octubre, 2026', eventDate: '2026-10-15', badge: '⚽', photosCount: 10, unitPrice: 1000, fullAlbumPrice: 8000, coverUrl: '' }
+    ]);
+
+    app.selectedDate.set('2026-10-12');
+    expect(app.filteredAlbums().length).toBe(1);
+    expect(app.filteredAlbums()[0].id).toBe('1');
+  });
+
+  it('debe paginar y filtrar las fotos de la galería interna con photosPageSize = 12', () => {
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+
+    const mockAlbum: Album = {
+      id: 'album-test-photos',
+      category: 'futbol',
+      title: 'Torneo Paginado',
+      subtitle: 'Sub',
+      date: '2026',
+      badge: '⚽',
+      photosCount: 20,
+      unitPrice: 1000,
+      fullAlbumPrice: 8000,
+      coverUrl: ''
+    };
+
+    const mockPhotos: Photo[] = Array.from({ length: 20 }, (_, i) => ({
+      id: `photo-${i + 1}`,
+      albumId: mockAlbum.id,
+      title: `Foto ${i + 1}`,
+      previewUrl: `http://localhost:4000/previews/${i + 1}.webp`,
+      originalWidth: 4000,
+      originalHeight: 3000,
+      isSampleHD: i < 3
+    }));
+
+    app.currentAlbum.set(mockAlbum);
+    app.activeAlbumPhotos.set(mockPhotos);
+    app.albumPhotosLoaded.set(true);
+
+    expect(app.photosPageSize()).toBe(12);
+    expect(app.filteredAlbumPhotos().length).toBe(20);
+    expect(app.photosTotalPages()).toBe(2);
+    expect(app.paginatedAlbumPhotos().length).toBe(12);
+    expect(app.paginatedAlbumPhotos()[0].photo.id).toBe('photo-1');
+    expect(app.paginatedAlbumPhotos()[0].originalIndex).toBe(0);
+
+    // Navegar a página 2
+    app.nextPhotosPage();
+    expect(app.photosCurrentPage()).toBe(2);
+    expect(app.paginatedAlbumPhotos().length).toBe(8);
+    expect(app.paginatedAlbumPhotos()[0].photo.id).toBe('photo-13');
+    expect(app.paginatedAlbumPhotos()[0].originalIndex).toBe(12);
+
+    // Filtro HD
+    app.setPhotosFilterMode('hd');
+    expect(app.photosCurrentPage()).toBe(1);
+    expect(app.filteredAlbumPhotos().length).toBe(3);
+    expect(app.photosTotalPages()).toBe(1);
+    expect(app.paginatedAlbumPhotos().length).toBe(3);
+
+    // Filtro Elegidas
+    app.cartStore.togglePhoto(mockPhotos[5]); // photo-6
+    app.cartStore.togglePhoto(mockPhotos[10]); // photo-11
+    app.setPhotosFilterMode('elegidas');
+    expect(app.filteredAlbumPhotos().length).toBe(2);
+    expect(app.paginatedAlbumPhotos().map(p => p.photo.id)).toEqual(['photo-6', 'photo-11']);
+    expect(app.paginatedAlbumPhotos()[0].originalIndex).toBe(5);
+    expect(app.paginatedAlbumPhotos()[1].originalIndex).toBe(10);
+  });
+
+  it('debe mapear el índice original de la foto al abrir el visor Lightbox desde una galería filtrada', () => {
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+
+    const mockAlbum: Album = {
+      id: 'album-lightbox-test',
+      category: 'futbol',
+      title: 'Torneo Lightbox',
+      subtitle: 'Sub',
+      date: '2026',
+      badge: '⚽',
+      photosCount: 5,
+      unitPrice: 1000,
+      fullAlbumPrice: 8000,
+      coverUrl: ''
+    };
+
+    const mockPhotos: Photo[] = Array.from({ length: 5 }, (_, i) => ({
+      id: `photo-lb-${i + 1}`,
+      albumId: mockAlbum.id,
+      title: `Foto ${i + 1}`,
+      previewUrl: '',
+      originalWidth: 4000,
+      originalHeight: 3000,
+      isSampleHD: i === 3
+    }));
+
+    app.currentAlbum.set(mockAlbum);
+    app.activeAlbumPhotos.set(mockPhotos);
+    app.albumPhotosLoaded.set(true);
+
+    // Abrir foto con índice 3 en currentPhotos pasando un índice local 0
+    app.openLightbox(mockPhotos[3], 0);
+    expect(app.isLightboxOpen()).toBe(true);
+    expect(app.lightboxIndex()).toBe(3);
   });
 
   it('debe interceptar álbumes privados solicitando PIN antes de abrirlos', () => {
@@ -270,4 +386,149 @@ describe('App Root Component - LA TERCERA', () => {
 
     window.history.pushState({}, '', '/');
   });
+
+  it('debe inicializar showSplash y ocultarlo al llamar a dismissSplash() guardando en sessionStorage', () => {
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+
+    app.showSplash.set(true);
+    expect(app.showSplash()).toBe(true);
+
+    app.dismissSplash();
+    expect(app.showSplash()).toBe(false);
+    expect(sessionStorage.getItem('la_tercera_splash_seen')).toBe('true');
+
+    // Al re-inicializar con la sesión ya vista, debe desactivarse de inmediato
+    app.initSplashScreen();
+    expect(app.showSplash()).toBe(false);
+  });
+
+  it('debe gestionar isLoadingPublicAlbums y actualizarlo a false al recibir álbumes', () => {
+    const albumService = TestBed.inject(AlbumService);
+    const mockAlbum: Album = {
+      id: 'album-1',
+      category: 'futbol',
+      title: 'Tesorieri',
+      subtitle: 'Liga Riojana',
+      date: '2026',
+      badge: '⚽',
+      photosCount: 5,
+      unitPrice: 1000,
+      fullAlbumPrice: 8000,
+      coverUrl: 'https://example.com/cover.webp'
+    };
+    vi.spyOn(albumService, 'getAlbums').mockReturnValue(of([mockAlbum]));
+
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+
+    app.loadPublicAlbums();
+    expect(app.isLoadingPublicAlbums()).toBe(false);
+    expect(app.albums().length).toBe(1);
+  });
+
+  it('debe prevenir el parpadeo de fotos dummy retornando lista vacía mientras isLoadingAlbumPhotos es true', () => {
+    const albumService = TestBed.inject(AlbumService);
+    const mockAlbum: Album = {
+      id: 'album-demo',
+      category: 'futbol',
+      title: 'Partido Final',
+      subtitle: 'Polideportivo',
+      date: '2026',
+      badge: '⚽',
+      photosCount: 20,
+      unitPrice: 1000,
+      fullAlbumPrice: 8000,
+      coverUrl: 'https://example.com/cover.jpg'
+    };
+
+    const photosSubject = new Subject<any[]>();
+    vi.spyOn(albumService, 'getAlbumPhotos').mockReturnValue(photosSubject.asObservable());
+
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+
+    app.openAlbum(mockAlbum);
+
+    // Mientras la petición HTTP de fotos está en vuelo:
+    expect(app.isLoadingAlbumPhotos()).toBe(true);
+    expect(app.albumPhotosLoaded()).toBe(false);
+    // currentPhotos() DEBE retornar [] para no parpadear con 24 fotos dummy repetidas
+    expect(app.currentPhotos()).toEqual([]);
+
+    // Cuando el servidor responde con las fotos reales
+    const realPhotos = [
+      {
+        id: 'real-1',
+        albumId: 'album-demo',
+        title: 'Foto Real 1',
+        previewUrl: 'https://example.com/p1.webp',
+        originalWidth: 4000,
+        originalHeight: 3000,
+        isSampleHD: true
+      }
+    ];
+    photosSubject.next(realPhotos);
+    photosSubject.complete();
+
+    expect(app.isLoadingAlbumPhotos()).toBe(false);
+    expect(app.albumPhotosLoaded()).toBe(true);
+    expect(app.currentPhotos()).toEqual(realPhotos);
+  });
+
+  it('debe renderizar los skeletons 3D de carpetas en el catálogo mientras isLoadingPublicAlbums es true', () => {
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+
+    app.isLoadingPublicAlbums.set(true);
+    app.albums.set([]);
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    // No debe mostrar "No se encontraron carpetas" mientras carga
+    expect(compiled.textContent).not.toContain('No se encontraron carpetas');
+    // Debe tener elementos con animate-shimmer-sweep para los skeletons
+    const skeletons = compiled.querySelectorAll('.animate-shimmer-sweep');
+    expect(skeletons.length).toBeGreaterThanOrEqual(6);
+  });
+
+  it('debe permitir seleccionar y deseleccionar fotos en el catálogo mediante togglePhoto', () => {
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+
+    const testPhoto: Photo = {
+      id: 'photo-toggle-catalog-1',
+      albumId: 'album-1',
+      title: 'Foto de Prueba Catálogo',
+      previewUrl: 'https://example.com/p.webp',
+      originalWidth: 4000,
+      originalHeight: 3000,
+      isSampleHD: true
+    };
+
+    // Estado inicial: no seleccionada
+    expect(app.cartStore.isPhotoSelected(testPhoto.id)).toBe(false);
+
+    // 1. Seleccionar desde el catálogo
+    app.togglePhoto(testPhoto);
+    expect(app.cartStore.isPhotoSelected(testPhoto.id)).toBe(true);
+    expect(app.cartStore.totalItemsCount()).toBe(1);
+
+    // 2. Deseleccionar desde el catálogo
+    app.togglePhoto(testPhoto);
+    expect(app.cartStore.isPhotoSelected(testPhoto.id)).toBe(false);
+    expect(app.cartStore.totalItemsCount()).toBe(0);
+  });
+
+  it('debe abrir y cerrar el modal de recuperación de órdenes', () => {
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+
+    expect(app.isOrderRecoveryOpen()).toBe(false);
+    app.openOrderRecovery();
+    expect(app.isOrderRecoveryOpen()).toBe(true);
+    app.closeOrderRecovery();
+    expect(app.isOrderRecoveryOpen()).toBe(false);
+  });
 });
+

@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, signal, input, output } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, input, output, OnInit } from '@angular/core';
 import { ReactiveFormsModule, FormGroup, FormControl, Validators } from '@angular/forms';
 import { CartStore } from '../../core/state/cart.store';
 import { PaymentService } from '../../core/services/payment.service';
@@ -63,6 +63,11 @@ import { PaymentService } from '../../core/services/payment.service';
 
                 <p class="text-[10px] text-zinc-400 mt-2">
                   Archivos JPG originales en máxima resolución (4K) sin marcas de agua.
+                  @if (!cartStore.isFullAlbum() && cartStore.tierConfig().enableTierDiscounts) {
+                    <span class="block text-emerald-600 font-semibold mt-1">
+                      Promoción por volumen: {{ cartStore.tier3DiscountPercent() }}% OFF en 3+ fotos • {{ cartStore.tier5DiscountPercent() }}% OFF en 5+ fotos
+                    </span>
+                  }
                 </p>
               </div>
 
@@ -100,20 +105,40 @@ import { PaymentService } from '../../core/services/payment.service';
                 </div>
 
                 <!-- Cupón de Descuento -->
-                <div class="flex gap-2 mb-5">
-                  <input
-                    type="text"
-                    formControlName="coupon"
-                    placeholder="Código de cupón (ej: YUYO10)"
-                    class="flex-1 bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs uppercase text-zinc-900 focus:outline-none focus:border-zinc-950 transition"
-                  >
-                  <button
-                    type="button"
-                    (click)="applyCoupon()"
-                    class="px-3.5 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-bold transition"
-                  >
-                    Aplicar
-                  </button>
+                <div class="mb-4">
+                  <div class="flex gap-2">
+                    <input
+                      type="text"
+                      formControlName="coupon"
+                      placeholder="Código promocional (opcional)"
+                      class="flex-1 bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs uppercase text-zinc-900 focus:outline-none focus:border-zinc-950 transition"
+                    >
+                    <button
+                      type="button"
+                      (click)="applyCoupon()"
+                      [disabled]="isValidatingCoupon()"
+                      class="px-3.5 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 disabled:opacity-50 text-zinc-800 text-xs font-bold transition flex items-center gap-1.5"
+                    >
+                      @if (isValidatingCoupon()) {
+                        <span class="animate-spin text-[10px]">⏳</span>
+                      }
+                      <span>Aplicar</span>
+                    </button>
+                  </div>
+
+                  @if (couponFeedback(); as feedback) {
+                    <div
+                      class="mt-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 border transition"
+                      [class.bg-emerald-50]="feedback.success"
+                      [class.text-emerald-700]="feedback.success"
+                      [class.border-emerald-200]="feedback.success"
+                      [class.bg-rose-50]="!feedback.success"
+                      [class.text-rose-700]="!feedback.success"
+                      [class.border-rose-200]="!feedback.success"
+                    >
+                      <span>{{ feedback.message }}</span>
+                    </div>
+                  }
                 </div>
 
                 <!-- Error Message si ocurre -->
@@ -123,7 +148,7 @@ import { PaymentService } from '../../core/services/payment.service';
                   </div>
                 }
 
-                <!-- Botón Pagar con Mercado Pago -->
+                <!-- Botón Pagar con Mercado Pago o Canjear Fotos Gratis -->
                 <button
                   type="submit"
                   [disabled]="form.invalid || isSubmitting()"
@@ -132,6 +157,8 @@ import { PaymentService } from '../../core/services/payment.service';
                   @if (isSubmitting()) {
                     <span class="animate-spin">⏳</span>
                     <span>Generando Checkout Seguro...</span>
+                  } @else if (cartStore.pricing().finalTotal === 0) {
+                    <span>🎁 Canjear Fotos Gratis (Cupón 100%)</span>
                   } @else {
                     <span>💳 Pagar con Mercado Pago</span>
                   }
@@ -171,14 +198,20 @@ import { PaymentService } from '../../core/services/payment.service';
     }
   `
 })
-export class CheckoutModalComponent {
+export class CheckoutModalComponent implements OnInit {
   public readonly cartStore = inject(CartStore);
   private readonly paymentService = inject(PaymentService);
+
+  public ngOnInit(): void {
+    this.cartStore.refreshPricingConfig();
+  }
 
   public readonly isOpen = input<boolean>(false);
   public readonly close = output<void>();
 
   public readonly isSubmitting = signal<boolean>(false);
+  public readonly isValidatingCoupon = signal<boolean>(false);
+  public readonly couponFeedback = signal<{ success: boolean; message: string } | null>(null);
   public readonly errorMessage = signal<string | null>(null);
   public readonly preferenceCreated = signal<boolean>(false);
   public readonly initPointUrl = signal<string>('');
@@ -193,8 +226,46 @@ export class CheckoutModalComponent {
   });
 
   public applyCoupon(): void {
-    const code = this.form.controls.coupon.value;
-    this.cartStore.applyCoupon(code);
+    const rawCode = this.form.controls.coupon.value.trim();
+    if (!rawCode) {
+      this.cartStore.applyCoupon(null);
+      this.couponFeedback.set(null);
+      return;
+    }
+
+    this.isValidatingCoupon.set(true);
+    this.couponFeedback.set(null);
+    const albumId = this.cartStore.activeAlbumId() ?? undefined;
+    const photoCount = this.cartStore.totalItemsCount();
+    const isFullAlbum = this.cartStore.isFullAlbum();
+
+    this.paymentService.validateCoupon(rawCode, albumId, photoCount, isFullAlbum).subscribe({
+      next: (resp) => {
+        this.isValidatingCoupon.set(false);
+        if (resp.valid) {
+          const discountPct = resp.discountPercentage ?? 10;
+          this.cartStore.applyCoupon(resp.code || rawCode, discountPct);
+          this.couponFeedback.set({
+            success: true,
+            message: `✅ Cupón aplicado: -${discountPct}%`
+          });
+        } else {
+          this.cartStore.applyCoupon(null);
+          this.couponFeedback.set({
+            success: false,
+            message: `⚠️ ${resp.message || 'Cupón inválido o expirado'}`
+          });
+        }
+      },
+      error: () => {
+        this.isValidatingCoupon.set(false);
+        this.cartStore.applyCoupon(null);
+        this.couponFeedback.set({
+          success: false,
+          message: '⚠️ Error al validar cupón. Intenta nuevamente.'
+        });
+      }
+    });
   }
 
   public submitPayment(): void {
@@ -222,10 +293,23 @@ export class CheckoutModalComponent {
     }).subscribe({
       next: (resp) => {
         this.isSubmitting.set(false);
+        // Si es canje directo 100% OFF (gratis), limpiar carrito y redirigir inmediatamente a entrega de descarga
+        if (resp.isFreeRedemption && resp.downloadToken) {
+          this.close.emit();
+          this.cartStore.clearCart();
+          const targetUrl = resp.redirectUrl || `/pago-exitoso?token=${resp.downloadToken}`;
+          if (typeof window !== 'undefined') {
+            window.location.href = targetUrl;
+          }
+          return;
+        }
+
         this.preferenceCreated.set(true);
-        this.initPointUrl.set(resp.initPoint);
+        this.initPointUrl.set(resp.initPoint || '');
         // Intentar redirigir automáticamente
-        window.location.href = resp.initPoint;
+        if (resp.initPoint && typeof window !== 'undefined') {
+          window.location.href = resp.initPoint;
+        }
       },
       error: (err) => {
         console.error('Error al generar Checkout Pro:', err);

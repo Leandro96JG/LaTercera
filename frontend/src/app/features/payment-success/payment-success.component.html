@@ -219,7 +219,11 @@
       </div>
       <div>
         <h2 class="text-2xl font-display font-extrabold text-zinc-900 tracking-tight">
-          No pudimos localizar la orden de compra
+          @if (currentOrderId()) {
+            El pago aún no se acreditó
+          } @else {
+            No pudimos localizar la orden de compra
+          }
         </h2>
         <p class="text-sm text-zinc-600 mt-2 max-w-md mx-auto">
           {{ errorMessage() || 'El enlace provisto es inválido o la orden no se encuentra disponible.' }}
@@ -227,9 +231,19 @@
       </div>
 
       <div class="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+        @if (currentOrderId()) {
+          <button
+            (click)="retryPolling()"
+            class="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-zinc-950 font-bold text-xs shadow-md transition flex items-center justify-center gap-2"
+          >
+            <span>🔄</span>
+            <span>Volver a comprobar estado</span>
+          </button>
+        }
+
         <button
           (click)="onGoHome()"
-          class="px-6 py-3 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white font-bold text-xs transition"
+          class="w-full sm:w-auto px-6 py-3 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white font-bold text-xs transition"
         >
           Volver a la Portada
         </button>
@@ -238,7 +252,7 @@
           href="https://wa.me/5493804868714"
           target="_blank"
           rel="noopener noreferrer"
-          class="px-5 py-3 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-semibold text-xs transition"
+          class="w-full sm:w-auto px-5 py-3 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-semibold text-xs transition"
         >
           Contactar Soporte
         </a>

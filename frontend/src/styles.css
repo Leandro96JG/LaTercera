@@ -1,4 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* Estilos globales y Motion Design para La Tercera */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+  position: relative;
+}
+
 body {
   background-color: #ECEEF2;
   background-image: 
@@ -95,6 +105,39 @@ body {
 ::view-transition-new(root) {
   animation-duration: 380ms;
   animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 8. Obturador de Cámara Splash Screen */
+.animate-spin-slow {
+  animation: spinSlow 12s linear infinite;
+}
+@keyframes spinSlow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-shutter-spin {
+  animation: shutterSpin 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes shutterSpin {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.06); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+/* 9. Animación de Entrada en Cascada (Staggered Fade-In / Scale-Up) */
+.animate-stagger-fade-in {
+  animation: staggerFadeIn 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes staggerFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* Accesibilidad: Reducción de Movimiento */

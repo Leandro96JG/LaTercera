@@ -99,7 +99,7 @@ export interface AdminBulkUploadResponse {
 // 3. GESTIÓN DE ÁLBUMES & PRECIOS (CRUD)
 // ==========================================
 
-export type AlbumCategory = 'futbol' | 'hockey' | 'basquet' | 'sociales' | 'otros';
+export type AlbumCategory = 'futbol' | 'hockey' | 'basquet' | 'sociales' | 'otros' | string;
 
 export interface CreateAlbumRequest {
   title: string;

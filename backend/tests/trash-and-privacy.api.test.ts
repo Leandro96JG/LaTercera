@@ -136,6 +136,14 @@ describe('Trash, Privacy & Courtesy Download API Endpoints', () => {
       expect(zipRes.status).toBe(200);
       expect(zipRes.headers.get('content-type')).toContain('application/zip');
 
+      // Descargar foto individual gratuita -> 200 con Content-Disposition: attachment
+      const singlePhotoRes = await fetch(`${baseUrl}/api/downloads/free/${albumId}/photo/foto_1`);
+      expect(singlePhotoRes.status).toBe(200);
+      expect(singlePhotoRes.headers.get('content-type')).toContain('image/');
+      expect(singlePhotoRes.headers.get('content-disposition')).toContain('attachment');
+      const photoBuffer = await singlePhotoRes.arrayBuffer();
+      expect(photoBuffer.byteLength).toBeGreaterThan(0);
+
       // Limpieza
       await fetch(`${baseUrl}/api/admin/albums/${albumId}/permanent`, {
         method: 'DELETE',
@@ -188,7 +196,7 @@ describe('Trash, Privacy & Courtesy Download API Endpoints', () => {
       const wrongData = await wrongPinRes.json();
       expect(wrongData.valid).toBe(false);
 
-      // 2. PIN correcto -> 200
+      // 2. PIN correcto -> 200 y obtención de accessToken firmado
       const okPinRes = await fetch(`${baseUrl}/api/albums/${albumId}/verify-access`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -198,12 +206,87 @@ describe('Trash, Privacy & Courtesy Download API Endpoints', () => {
       const okData = await okPinRes.json();
       expect(okData.valid).toBe(true);
       expect(okData.accessToken).toBeDefined();
+      const accessToken = okData.accessToken;
+
+      // 3. Proteger GET /api/albums/:id/photos en álbum privado
+      // Sin token -> 403
+      const noTokenPhotosRes = await fetch(`${baseUrl}/api/albums/${albumId}/photos`);
+      expect(noTokenPhotosRes.status).toBe(403);
+      const noTokenData = await noTokenPhotosRes.json();
+      expect(noTokenData.error).toContain('privado');
+
+      // Con token inválido -> 403
+      const badTokenPhotosRes = await fetch(`${baseUrl}/api/albums/${albumId}/photos`, {
+        headers: { 'x-album-access-token': 'token_invalido_falso' }
+      });
+      expect(badTokenPhotosRes.status).toBe(403);
+
+      // Con x-album-access-token válido -> 200
+      const okHeaderPhotosRes = await fetch(`${baseUrl}/api/albums/${albumId}/photos`, {
+        headers: { 'x-album-access-token': accessToken }
+      });
+      expect(okHeaderPhotosRes.status).toBe(200);
+      const okHeaderData = await okHeaderPhotosRes.json();
+      expect(okHeaderData.success).toBe(true);
+
+      // Con query param ?accessToken=... -> 200
+      const okQueryPhotosRes = await fetch(`${baseUrl}/api/albums/${albumId}/photos?accessToken=${accessToken}`);
+      expect(okQueryPhotosRes.status).toBe(200);
+
+      // Con admin Bearer -> 200
+      const adminPhotosRes = await fetch(`${baseUrl}/api/albums/${albumId}/photos`, {
+        headers: { Authorization: `Bearer ${adminToken}` }
+      });
+      expect(adminPhotosRes.status).toBe(200);
+
+      // 4. Proteger GET /api/downloads/free/:albumId/zip en álbum privado con cortesía
+      await fetch(`${baseUrl}/api/admin/albums/${albumId}/courtesy-download`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({ isFreeDownload: true })
+      });
+
+      // Sin token -> 403
+      const noTokenZipRes = await fetch(`${baseUrl}/api/downloads/free/${albumId}/zip`);
+      expect(noTokenZipRes.status).toBe(403);
+
+      // Con query param ?accessToken=... -> 200
+      const okQueryZipRes = await fetch(`${baseUrl}/api/downloads/free/${albumId}/zip?accessToken=${accessToken}`);
+      expect(okQueryZipRes.status).toBe(200);
+      expect(okQueryZipRes.headers.get('content-type')).toContain('application/zip');
+
+      // 5. Proteger GET /api/downloads/free/:albumId/photo/:photoId en álbum privado
+      // Sin token -> 403
+      const noTokenPhotoRes = await fetch(`${baseUrl}/api/downloads/free/${albumId}/photo/foto_1`);
+      expect(noTokenPhotoRes.status).toBe(403);
+
+      // Con query param ?accessToken=... -> 200
+      const okQueryPhotoRes = await fetch(`${baseUrl}/api/downloads/free/${albumId}/photo/foto_1?accessToken=${accessToken}`);
+      expect(okQueryPhotoRes.status).toBe(200);
+      expect(okQueryPhotoRes.headers.get('content-type')).toContain('image/');
+      expect(okQueryPhotoRes.headers.get('content-disposition')).toContain('attachment');
+
+      // Con cabecera x-album-access-token -> 200
+      const okHeaderPhotoRes = await fetch(`${baseUrl}/api/downloads/free/${albumId}/photo/foto_1`, {
+        headers: { 'x-album-access-token': accessToken }
+      });
+      expect(okHeaderPhotoRes.status).toBe(200);
 
       // Limpieza
       await fetch(`${baseUrl}/api/admin/albums/${albumId}/permanent`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${adminToken}` }
       });
+    });
+
+    it('POST /api/images/process debe exigir autenticación de administrador', async () => {
+      const res = await fetch(`${baseUrl}/api/images/process`, {
+        method: 'POST'
+      });
+      expect(res.status).toBe(401);
     });
   });
 });

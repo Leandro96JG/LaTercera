@@ -4,10 +4,12 @@ import {
   input,
   output,
   signal,
-  computed
+  computed,
+  inject
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Photo } from '../../core/models/photo.model';
+import { AlbumService } from '../../core/services/album.service';
 
 @Component({
   selector: 'app-photo-card-polaroid',
@@ -15,9 +17,10 @@ import { Photo } from '../../core/models/photo.model';
   imports: [CommonModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
-    'class': 'block',
+    'class': 'block animate-stagger-fade-in',
     '[style.--polaroid-rotation]': 'rotationDeg()',
-    '[style.--polaroid-rotation-num]': 'rotationValue()'
+    '[style.--polaroid-rotation-num]': 'rotationValue()',
+    '[style.animation-delay]': 'staggerDelay()'
   },
   template: `
     <article
@@ -26,13 +29,14 @@ import { Photo } from '../../core/models/photo.model';
       [class.ring-2]="isSelected()"
       [class.ring-zinc-950]="isSelected()"
       [attr.aria-label]="photo().title || ('Foto #' + (index() + 1))"
+      (click)="onCardClicked($event)"
     >
       <!-- REFLEJO DE PAPEL FOTOGRÁFICO GLOSS EN HOVER / TOUCH -->
       <div
-        class="gloss-overlay absolute inset-0 rounded-[26px] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-30 overflow-hidden"
+        class="gloss-overlay absolute inset-0 rounded-[26px] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 overflow-hidden"
         aria-hidden="true"
       >
-        <div class="gloss-shine absolute inset-0"></div>
+        <div class="gloss-shine absolute inset-0 pointer-events-none"></div>
       </div>
 
       <!-- CONTENEDOR DE LA IMAGEN CON PROPORCIÓN Y CAPA ANTI-DESCARGA -->
@@ -105,7 +109,7 @@ import { Photo } from '../../core/models/photo.model';
       </div>
 
       <!-- PIE DE TARJETA POLAROID: NÚMERO, PRECIO Y BOTÓN ELECCIÓN -->
-      <div class="flex items-center justify-between pt-3 px-1 mt-1">
+      <div class="relative z-40 flex items-center justify-between pt-3 px-1 mt-1">
         <div>
           <span class="text-[11px] font-bold text-zinc-800 block">
             Foto #{{ index() + 1 }}
@@ -125,8 +129,8 @@ import { Photo } from '../../core/models/photo.model';
             type="button"
             (click)="onSelectClicked($event)"
             [class]="isSelected()
-              ? 'px-3.5 py-1.5 rounded-xl bg-zinc-950 text-white font-extrabold text-xs flex items-center gap-1 shadow-md transition-all active:scale-90 animate-check-pop'
-              : 'px-3.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 font-bold text-xs flex items-center gap-1 transition-all active:scale-90'"
+              ? 'relative z-50 pointer-events-auto cursor-pointer px-3.5 py-1.5 rounded-xl bg-zinc-950 text-white font-extrabold text-xs flex items-center gap-1 shadow-md transition-all active:scale-90 animate-check-pop'
+              : 'relative z-50 pointer-events-auto cursor-pointer px-3.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 font-bold text-xs flex items-center gap-1 transition-all active:scale-90'"
             [attr.aria-label]="isSelected() ? 'Quitar foto de la selección' : 'Elegir foto para comprar'"
           >
             @if (isSelected()) {
@@ -136,14 +140,27 @@ import { Photo } from '../../core/models/photo.model';
             }
           </button>
         } @else {
-          <button
-            type="button"
-            (click)="onViewClicked($event)"
-            class="px-3.5 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-zinc-900 font-extrabold text-xs flex items-center gap-1 transition-all active:scale-90"
-            [attr.aria-label]="'Ver foto ' + (index() + 1) + ' en máxima calidad'"
-          >
-            <span>Ver 4K →</span>
-          </button>
+          <div class="flex items-center gap-1.5">
+            <a
+              [href]="freeDownloadUrl()"
+              [download]="'LA_TERCERA_' + photo().id + '.jpg'"
+              (click)="$event.stopPropagation()"
+              class="relative z-50 pointer-events-auto cursor-pointer px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[11px] flex items-center gap-1 shadow-sm transition-all active:scale-95"
+              [attr.aria-label]="'Descargar foto ' + (index() + 1) + ' en máxima calidad HD'"
+              title="Descargar foto HD gratis"
+            >
+              <span>⬇️ Descargar HD</span>
+            </a>
+            <button
+              type="button"
+              (click)="onViewClicked($event)"
+              class="relative z-50 pointer-events-auto cursor-pointer p-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 font-bold text-xs flex items-center justify-center transition-all active:scale-90"
+              [attr.aria-label]="'Ver foto ' + (index() + 1) + ' en máxima calidad'"
+              title="Ver en pantalla completa"
+            >
+              <span>🔍</span>
+            </button>
+          </div>
         }
       </div>
     </article>
@@ -162,15 +179,22 @@ import { Photo } from '../../core/models/photo.model';
       transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 320ms ease;
     }
 
-    /* Levitación 3D elevada al pasar el mouse o enfocar (+ reflejo de papel fotográfico) */
-    .polaroid-card:hover,
-    .polaroid-card:focus-within {
-      transform: perspective(1000px) rotate(0deg) translateZ(28px) scale(1.03) !important;
-      box-shadow: 0 24px 38px -12px rgba(0, 0, 0, 0.22), 0 10px 16px -6px rgba(0, 0, 0, 0.1), inset 0 1px 1px rgba(255, 255, 255, 0.85);
-      z-index: 25;
+    /* Levitación 3D elevada al pasar el mouse en desktop (+ reflejo de papel fotográfico) */
+    @media (hover: hover) and (pointer: fine) {
+      .polaroid-card:hover {
+        transform: perspective(1000px) rotate(0deg) translateZ(28px) scale(1.03) !important;
+        box-shadow: 0 24px 38px -12px rgba(0, 0, 0, 0.22), 0 10px 16px -6px rgba(0, 0, 0, 0.1), inset 0 1px 1px rgba(255, 255, 255, 0.85);
+        z-index: 25;
+      }
     }
 
-    /* Efecto de Reflejo Gloss de Papel Fotográfico Satinado */
+    /* Efecto de Reflejo Gloss de Papel Fotográfico Satinado (completamente transparente a eventos del ratón/touch) */
+    .gloss-overlay,
+    .gloss-shine {
+      pointer-events: none !important;
+      user-select: none !important;
+    }
+
     .gloss-shine {
       background: linear-gradient(
         135deg,
@@ -184,9 +208,10 @@ import { Photo } from '../../core/models/photo.model';
 
     /* Rebote Físico Elástico cuando pasa a isSelected */
     .polaroid-card.is-selected {
-      border-color: rgba(0, 0, 0, 0.85);
-      box-shadow: 0 14px 28px -6px rgba(0, 0, 0, 0.22);
-      animation: polaroidBounce 380ms cubic-bezier(0.34, 1.56, 0.64, 1);
+      transform: perspective(1000px) rotate(0deg) translateZ(12px) scale(1.01);
+      border-color: #09090b;
+      box-shadow: 0 14px 28px -6px rgba(0, 0, 0, 0.2);
+      animation: polaroidBounce 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
     }
 
     @keyframes polaroidBounce {
@@ -217,12 +242,26 @@ import { Photo } from '../../core/models/photo.model';
   `]
 })
 export class PhotoCardPolaroidComponent {
+  private readonly albumService = inject(AlbumService);
+
   // Inputs
   public readonly photo = input.required<Photo>();
   public readonly index = input.required<number>();
   public readonly unitPrice = input.required<number>();
   public readonly isFreeDownload = input<boolean>(false);
+  public readonly albumId = input<string>();
   public readonly isSelected = input<boolean>(false);
+
+  public readonly freeDownloadUrl = computed<string>(() => {
+    const albId = this.albumId();
+    if (!albId || !this.isFreeDownload()) return '';
+    return this.albumService.getFreePhotoDownloadUrl(albId, this.photo().id);
+  });
+
+  // Retraso de animación de entrada en cascada a 60fps
+  public readonly staggerDelay = computed<string>(() => {
+    return ((this.index() % 8) * 45) + 'ms';
+  });
 
   // Outputs
   public readonly toggleSelect = output<Photo>();
@@ -258,6 +297,14 @@ export class PhotoCardPolaroidComponent {
     this.hasError.set(true);
   }
 
+  public onCardClicked(event: Event): void {
+    if (this.isFreeDownload()) {
+      this.onViewClicked(event);
+    } else {
+      this.onSelectClicked(event);
+    }
+  }
+
   public onViewClicked(event: Event): void {
     event.stopPropagation();
     this.openViewer.emit({ photo: this.photo(), index: this.index() });
@@ -265,6 +312,7 @@ export class PhotoCardPolaroidComponent {
 
   public onSelectClicked(event: Event): void {
     event.stopPropagation();
+    (event.currentTarget as HTMLElement | null)?.blur();
     this.toggleSelect.emit(this.photo());
   }
 }
