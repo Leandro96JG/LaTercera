@@ -338,6 +338,11 @@ export class CartStore {
     }
   }
 
+  public removeFullAlbum(): void {
+    this._isFullAlbum.set(false);
+    this.persistToSession();
+  }
+
   public applyCoupon(code: string | null, discountPercent?: number): void {
     this._couponCode.set(code?.trim() || null);
     this._couponDiscountPercent.set(

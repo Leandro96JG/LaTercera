@@ -50,7 +50,7 @@ import { CartStore } from '../../core/state/cart.store';
               </div>
 
               <div class="flex items-center gap-2">
-                @if (!cartStore.isFullAlbum() && cartStore.totalItemsCount() > 0) {
+                @if (cartStore.hasItems()) {
                   <button
                     type="button"
                     (click)="clearCart()"
@@ -95,6 +95,19 @@ import { CartStore } from '../../core/state/cart.store';
                       &dollar;{{ cartStore.fullAlbumPrice().toLocaleString('es-AR') }} ARS
                     </span>
                   </div>
+                </div>
+
+                <!-- Botón Deseleccionar Álbum Completo -->
+                <div class="flex items-center justify-between p-3.5 rounded-2xl bg-white/5 border border-white/10">
+                  <span class="text-xs text-zinc-300">¿Prefieres no llevar el álbum completo?</span>
+                  <button
+                    type="button"
+                    (click)="removeFullAlbum()"
+                    class="px-3.5 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-xs font-bold transition flex items-center gap-1.5 active:scale-95"
+                    title="Quitar álbum completo del carrito"
+                  >
+                    <span>🗑️ Quitar Álbum</span>
+                  </button>
                 </div>
               } @else {
                 <!-- Sugerencia Inteligente para Pasar a Pack Álbum Completo -->
@@ -327,6 +340,13 @@ export class FloatingCartComponent {
 
   public removePhoto(photoId: string): void {
     this.cartStore.removePhoto(photoId);
+  }
+
+  public removeFullAlbum(): void {
+    this.cartStore.removeFullAlbum();
+    if (!this.cartStore.hasItems()) {
+      this.isExpanded.set(false);
+    }
   }
 
   public clearCart(): void {

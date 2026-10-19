@@ -25,7 +25,6 @@ import { Album } from '../../core/models/album.model';
     '(pointerleave)': 'onPointerLeave()',
     '(pointermove)': 'onPointerMove($event)',
     '(touchstart)': 'onTouchStart($event)',
-    '(touchmove)': 'onTouchMove($event)',
     '(touchend)': 'onTouchEnd()',
     '(touchcancel)': 'onTouchEnd()'
   },

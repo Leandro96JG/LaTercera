@@ -295,5 +295,21 @@ describe('CartStore - Lógica Reactiva de Precios y Descuentos con Signals', () 
     expect(rehydratedStore.couponDiscountPercent()).toBe(100);
     expect(rehydratedStore.pricing().finalTotal).toBe(0);
   });
+
+  it('debe deseleccionar el modo de álbum completo con removeFullAlbum sin perder las fotos seleccionadas', () => {
+    store.setAlbumPricing('album-1', 9500, 1200);
+    store.togglePhoto(createDummyPhoto('foto-1', 'album-1'));
+    store.setFullAlbumMode('album-1', 9500);
+
+    expect(store.isFullAlbum()).toBe(true);
+    expect(store.totalItemsCount()).toBe(1);
+
+    store.removeFullAlbum();
+
+    expect(store.isFullAlbum()).toBe(false);
+    expect(store.hasItems()).toBe(true);
+    expect(store.totalItemsCount()).toBe(1); // vuelve a la foto que tenía
+    expect(store.isPhotoSelected('foto-1')).toBe(true);
+  });
 });
 
