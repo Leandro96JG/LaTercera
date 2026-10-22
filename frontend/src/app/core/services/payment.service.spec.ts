@@ -3,29 +3,100 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { PaymentService } from './payment.service';
-import { RecoverOrdersResponse } from '../models/order.model';
+import { AlbumAccessStore } from '../state/album-access.store';
+import { RecoverOrdersResponse, CreatePreferenceRequest, CreatePreferenceResponse } from '../models/order.model';
 import { environment } from '../../../environments/environment';
 
 describe('PaymentService', () => {
   let service: PaymentService;
+  let albumAccessStore: AlbumAccessStore;
   let httpTesting: HttpTestingController;
   const apiUrl = environment.apiUrl;
 
   beforeEach(() => {
+    sessionStorage.clear();
     TestBed.configureTestingModule({
       providers: [
         PaymentService,
+        AlbumAccessStore,
         provideHttpClient(),
         provideHttpClientTesting()
       ]
     });
 
     service = TestBed.inject(PaymentService);
+    albumAccessStore = TestBed.inject(AlbumAccessStore);
     httpTesting = TestBed.inject(HttpTestingController);
   });
 
   afterEach(() => {
     httpTesting.verify();
+  });
+
+  it('debe enviar POST a /checkout/preference sin header si el álbum no tiene token guardado', () => {
+    const request: CreatePreferenceRequest = {
+      albumId: 'album-publico',
+      photoIds: ['p1'],
+      isFullAlbum: false,
+      customer: { email: 'comprador@test.com' }
+    };
+
+    const mockResponse: CreatePreferenceResponse = {
+      success: true,
+      orderId: 'ord-101',
+      totalAmount: 1500,
+      photoCount: 1,
+      isFullAlbum: false,
+      discount: 0
+    };
+
+    service.createPreference(request).subscribe(res => {
+      expect(res.success).toBe(true);
+      expect(res.orderId).toBe('ord-101');
+    });
+
+    const req = httpTesting.expectOne(`${apiUrl}/checkout/preference`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.headers.has('x-album-access-token')).toBe(false);
+    req.flush(mockResponse);
+  });
+
+  it('debe adjuntar la cabecera x-album-access-token en createPreference si AlbumAccessStore tiene el token guardado', () => {
+    albumAccessStore.unlockAlbum('album-privado-123', 'tok_pin_desbloqueado_xyz');
+
+    const request: CreatePreferenceRequest = {
+      albumId: 'album-privado-123',
+      photoIds: ['p2'],
+      isFullAlbum: false,
+      customer: { email: 'invitado@test.com' }
+    };
+
+    service.createPreference(request).subscribe(res => {
+      expect(res.success).toBe(true);
+    });
+
+    const req = httpTesting.expectOne(`${apiUrl}/checkout/preference`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.headers.get('x-album-access-token')).toBe('tok_pin_desbloqueado_xyz');
+    req.flush({ success: true, orderId: 'ord-priv-1', totalAmount: 2000, photoCount: 1, isFullAlbum: false, discount: 0 });
+  });
+
+  it('debe adjuntar la cabecera x-album-access-token si request.accessToken viene explícito', () => {
+    const request: CreatePreferenceRequest = {
+      albumId: 'album-explícito',
+      photoIds: ['p3'],
+      isFullAlbum: false,
+      accessToken: 'token-en-request-body',
+      customer: { email: 'expl@test.com' }
+    };
+
+    service.createPreference(request).subscribe(res => {
+      expect(res.success).toBe(true);
+    });
+
+    const req = httpTesting.expectOne(`${apiUrl}/checkout/preference`);
+    expect(req.request.headers.get('x-album-access-token')).toBe('token-en-request-body');
+    req.flush({ success: true, orderId: 'ord-expl-1', totalAmount: 2000, photoCount: 1, isFullAlbum: false, discount: 0 });
   });
 
   it('debe enviar POST a /orders/recover con el email provisto', () => {

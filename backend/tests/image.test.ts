@@ -80,4 +80,27 @@ describe('Image Service - Procesamiento y Marca de Agua con Sharp', () => {
     expect(metadata.format).toBe('webp');
     expect(metadata.width).toBeLessThanOrEqual(800);
   });
+
+  it('debe procesar imagen HD de muestra utilizando el watermarkText personalizado del usuario en lugar de texto hardcodeado', async () => {
+    const testImageBuffer = await sharp({
+      create: {
+        width: 1600,
+        height: 1200,
+        channels: 3,
+        background: { r: 80, g: 120, b: 160 }
+      }
+    }).jpeg().toBuffer();
+
+    const customText = 'CLUB ATLÉTICO TESORIERI • EXCLUSIVO';
+    const result = await processImageWithWatermark(testImageBuffer, {
+      isHD: true,
+      watermarkText: customText
+    });
+
+    expect(result.previewBuffer).toBeDefined();
+    expect(result.format).toBe('webp');
+    const metadata = await sharp(result.previewBuffer).metadata();
+    expect(metadata.format).toBe('webp');
+    expect(metadata.width).toBeLessThanOrEqual(1400);
+  });
 });

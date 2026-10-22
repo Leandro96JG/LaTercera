@@ -4,10 +4,12 @@ import { of, throwError } from 'rxjs';
 import { CheckoutModalComponent } from './checkout-modal.component';
 import { CartStore } from '../../core/state/cart.store';
 import { PaymentService } from '../../core/services/payment.service';
+import { AlbumAccessStore } from '../../core/state/album-access.store';
 
 describe('CheckoutModalComponent - Validaciones y Feedback de Cupones Zero-Trust', () => {
   let component: CheckoutModalComponent;
   let cartStore: CartStore;
+  let albumAccessStore: AlbumAccessStore;
   let mockPaymentService: {
     createPreference: ReturnType<typeof vi.fn>;
     validateCoupon: ReturnType<typeof vi.fn>;
@@ -24,6 +26,7 @@ describe('CheckoutModalComponent - Validaciones y Feedback de Cupones Zero-Trust
       imports: [CheckoutModalComponent],
       providers: [
         CartStore,
+        AlbumAccessStore,
         { provide: PaymentService, useValue: mockPaymentService }
       ]
     }).compileComponents();
@@ -31,6 +34,7 @@ describe('CheckoutModalComponent - Validaciones y Feedback de Cupones Zero-Trust
     const fixture = TestBed.createComponent(CheckoutModalComponent);
     component = fixture.componentInstance;
     cartStore = TestBed.inject(CartStore);
+    albumAccessStore = TestBed.inject(AlbumAccessStore);
     cartStore.setAlbumPricing('album-1', 9500, 1200);
     fixture.detectChanges();
   });
@@ -117,5 +121,27 @@ describe('CheckoutModalComponent - Validaciones y Feedback de Cupones Zero-Trust
     expect(closed).toBe(true);
     expect(cartStore.totalItemsCount()).toBe(0);
     expect(component.isSubmitting()).toBe(false);
+  });
+
+  it('debe enviar accessToken en createPreference si el álbum activo está desbloqueado con PIN', () => {
+    albumAccessStore.unlockAlbum('album-1', 'token-pin-999');
+
+    mockPaymentService.createPreference.mockReturnValue(of({
+      success: true,
+      orderId: 'order-priv-1',
+      initPoint: 'https://mp.com/checkout-pro',
+      totalAmount: 1200
+    }));
+
+    component.form.controls.email.setValue('comprador@gmail.com');
+    component.submitPayment();
+
+    expect(mockPaymentService.createPreference).toHaveBeenCalledWith(
+      expect.objectContaining({
+        albumId: 'album-1',
+        accessToken: 'token-pin-999',
+        customer: expect.objectContaining({ email: 'comprador@gmail.com' })
+      })
+    );
   });
 });

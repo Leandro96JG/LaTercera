@@ -130,15 +130,6 @@ import { AlbumService } from '../../core/services/album.service';
               (contextmenu)="$event.preventDefault()"
               draggable="false"
             />
-
-            <!-- MARCA DE AGUA CENTRADA Y BLURREADA DE MUESTRA -->
-            <div class="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
-              <div class="bg-black/60 backdrop-blur-md px-5 sm:px-7 py-2 sm:py-3 rounded-full border border-white/20 shadow-2xl">
-                <span class="font-display font-extrabold text-white/95 tracking-widest text-xs sm:text-sm">
-                  LA TERCERA • MUESTRA
-                </span>
-              </div>
-            </div>
           </div>
 
           <!-- Botón Foto Siguiente (Desktop / Tablet) -->

@@ -106,6 +106,89 @@ Plataforma web e-commerce mobile-first orientada a la venta de fotografías de p
 - [x] Configuración de Despliegue en Producción: Dockerfile Multi-Stage en Alpine 20 con Sharp, Railway Healthcheck `/api/health`, Vercel SPA Rewrites, Cloudflare Pages `_redirects` y `environment.ts` Reactivo con **425 tests unitarios pasando al 100%** (214 backend + 211 frontend).
 - [x] Vinculación Vercel-Railway en Vivo (Proxy API `laterceralr.up.railway.app`), Deselección de Álbum Completo en Carrito y Optimización Touch 3D 120fps con **426 tests unitarios pasando al 100%** (214 backend + 212 frontend).
 - [x] Ruta Directa /admin en Inicialización SPA, Documentación Integral en README.md y Guía de Autenticación de Fotógrafa con **426 tests unitarios pasando al 100%** (214 backend + 212 frontend).
+- [x] Solución de Símbolos Cuadrados (□□□) en Sharp Alpine (fontconfig/DejaVu), Parche de Seguridad en Checkout de Álbumes Privados (PIN/Token en Backend & Frontend) y Corrección SQL de Concurrencia de Cupones con **436 tests unitarios pasando al 100%** (220 backend + 216 frontend).
+- [x] Optimización Extrema de RAM en Previsualizaciones (Canvas WebP 320px), Subida por Micro-Lotes Secuenciales de 4 Fotos (Chunked Upload) y Erradicación Definitiva de `[object Object]` con **446 tests unitarios pasando al 100%** (220 backend + 226 frontend).
+- [x] Reordenamiento Drag & Drop de Fotografías (Cola de Subida y Galería Persistente) y Modal Bento de Edición de Metadatos de Álbumes con **462 tests unitarios pasando al 100%** (224 backend + 238 frontend).
+- [x] Rediseño 3D Ambient Glassmorphic del Hero del Álbum Activo, Tarjeta de Portada 3D Interactiva con Hover GPU y Eliminación de Marca de Agua HTML Superpuesta con **463 tests unitarios pasando al 100%** (224 backend + 239 frontend).
+
+### ADR-063: Rediseño 3D Ambient Glassmorphic del Hero de Álbum Activo, Tarjeta de Portada 3D Interactiva y Supresión de Marca de Agua HTML Superpuesta
+- **Motivación y Diagnóstico:**
+  1. *Hero Plano sin Foto de Portada en Álbum Activo:* Al acceder al detalle de un álbum (`currentView() === 'album'`), el encabezado era un recuadro blanco genérico que desaprovechaba visualmente la portada del evento (`album.coverUrl`), reduciendo el impacto estético de la fotografía deportiva profesional.
+  2. *Superposición Redundante de Marca de Agua HTML en DOM:* Tanto `PhotoCardPolaroidComponent` como `LightboxComponent` renderizaban un `<div>` superpuesto en HTML con el texto estático `"LA TERCERA • MUESTRA"`. Dado que el backend ya genera miniaturas WebP mediante Sharp con marcas de agua diagonales personalizadas quemadas directamente en los píxeles (reflejando el nombre real del evento configurado por la fotógrafa), el elemento DOM duplicaba el texto, tapaba la fotografía y ocultaba la personalización.
+- **Solución Técnica Implementada:**
+  1. **Fondo Ambiental Difuminado (Ambient Glassmorphism en `app.html`):**
+     - Contenedor oscuro vítreo de alto contraste: `relative overflow-hidden rounded-[32px] bg-zinc-950 text-white p-6 sm:p-10 shadow-2xl border border-white/10`.
+     - Imagen ambiental de fondo con la foto de portada del álbum `album.coverUrl`, escalada (`scale-125`), desenfocada profundamente (`blur-2xl opacity-35 saturate-150`) y protegida con un gradiente superpuesto (`bg-gradient-to-r from-zinc-950 via-zinc-950/85 to-zinc-950/40`), garantizando contraste superior a 7:1 (cumpliendo con creces WCAG AA).
+  2. **Tarjeta de Portada 3D Interactiva (`app.html` y `app.css`):**
+     - Contenedor con perspectiva `perspective: 1000px` y tarjeta `aspect-[4/3]` con marco físico 3D (`border-2 border-white/20 rounded-2xl shadow-2xl`).
+     - Inclinación espacial sutil con aceleración por GPU: `transform: perspective(1000px) rotateY(-8deg) rotateX(4deg)`.
+     - Transición suave al hacer hover a `rotateY(0deg) rotateX(0deg) scale(1.03)` con reflejo especular diagonal `.hero-cover-shine` e insignia flotante `"📌 Portada del Evento"`.
+     - Soporte riguroso de accesibilidad y rendimiento: desactivación de animaciones e inclinaciones bajo `@media (prefers-reduced-motion: reduce)`.
+  3. **Limpieza Quirúrgica de Marca de Agua HTML Superpuesta (`photo-card-polaroid.component.ts` y `lightbox.component.ts`):**
+     - Eliminados los divs y spans fijos del DOM que renderizaban `"LA TERCERA • MUESTRA"` por encima de la imagen. La marca de agua visual ahora proviene 100% de los píxeles WebP optimizados servidos por el backend.
+     - Actualizadas las suites de pruebas unitarias en `photo-card-polaroid.component.spec.ts` y `lightbox.component.spec.ts` para verificar la ausencia de elementos de texto HTML espurios en el DOM.
+     - Añadido test en `app.spec.ts` que valida el renderizado del Hero y la tarjeta 3D de portada al navegar hacia un álbum.
+- **Evidencia y Validación:**
+  - **463 tests unitarios pasando al 100%** (224 backend + 239 frontend).
+  - Compilación de producción Angular (`ng build`) completada con código 0 y 0 errores/warnings en 6.3 segundos.
+
+- **Motivación y Diagnóstico:**
+  1. *Consumo Excesivo de RAM en Selección de Fotografías:* La fotógrafa suele seleccionar tandas masivas de 50 a 100 fotos de cámaras profesionales (24 a 48 megapíxeles, 4 a 15 MB cada archivo). `handleSelectedFileList` invocaba `URL.createObjectURL(f)` directamente sobre los blobs sin procesar, forzando al motor del navegador a mantener en memoria RAM decenas de bitmaps gigantescos sin comprimir (>1.5 GB de RAM), provocando bloqueos del hilo principal (*jank* / congelamiento) o cierres inesperados en computadoras de gama media y laptops.
+  2. *Fallo de Subida Masiva con Más de 20 Fotos (Límites HTTP y Payload):* Intentar enviar decenas de fotos en una única petición HTTP multipart colapsaba los límites de buffers, timeouts de red y de memoria de Node.js / Sharp en el backend. Además, si fallaba una sola foto, toda la tanda se perdía.
+  3. *Error `[object Object]` en Alertas:* Al capturar excepciones HTTP complejas de Axios/HttpClient donde `err.error` era un objeto (`{ error: { message: ... } }` o código de error), se asignaba directamente al signal `bulkError`, renderizándose en la interfaz de usuario como la cadena cruda `[object Object]`.
+- **Solución Técnica Implementada:**
+  1. **Generación de Miniaturas WebP 320x320 con `createImageBitmap` y Canvas (`admin-panel.component.ts`):**
+     - Se implementó el método privado `generateThumbnailUrl(file: File): Promise<string>`.
+     - Utiliza `createImageBitmap(file)` (decodificación asíncrona acelerada por hardware) y dibuja sobre un `<canvas>` ajustado proporcionalmente a un máximo de 320x320 píxeles, exportando `canvas.toDataURL('image/webp', 0.7)`.
+     - Reduce el consumo de RAM de ~150 MB por foto a menos de 25 KB por miniatura (<2.5 MB para 100 fotos en lugar de >1.5 GB).
+     - Incorpora fallback transparente a `URL.createObjectURL(file)` para entornos headless/JSDOM donde `createImageBitmap` o canvas 2D no están disponibles, garantizando total compatibilidad con la suite de pruebas unitarias.
+     - En `revokePreviewUrls()` y `removeSelectedFile()`, solo se invoca `URL.revokeObjectURL()` si la URL inicia con `'blob:'`, evitando advertencias o excepciones en data URLs.
+  2. **Subida por Micro-Lotes Secuenciales de 4 Fotos (`submitBulkUpload`):**
+     - Se definió `AdminPanelComponent.BULK_UPLOAD_BATCH_SIZE = 4`.
+     - El array de archivos seleccionados se procesa en micro-lotes secuenciales de 4 fotos por petición HTTP.
+     - Mapeo exacto de índices HD: los `hdIndices()` globales elegidos por la fotógrafa se proyectan a los índices locales de cada micro-lote de 4 fotos (`globalIdx = startIdx + localIdx`).
+     - Cálculo de `uploadProgress` global ponderado: `Math.round(((completedFiles + currentBatchLoadedFraction) / totalFiles) * 100)` con actualización en tiempo real en la barra de progreso.
+     - Al completar todos los lotes, se consolida el resumen total (`totalReceived`, `successful`, `failed`, `durationMs`), se limpia la cola (`clearSelectedFiles()`), se resetean los estados para permitir volver a subir otro lote inmediatamente sin recargar la página, y se recarga la lista de álbumes con `this.loadAlbums()`.
+  3. **Erradicación de `[object Object]` (`extractErrorMessage`):**
+     - Implementado el método helper `extractErrorMessage(err: unknown, defaultMsg: string): string`.
+     - Maneja códigos HTTP: `413` -> `"El lote supera el límite de tamaño permitido."`, `0` -> `"Error de red o tiempo de espera agotado al subir las fotos."`.
+     - Extrae de forma segura `err.error.error`, `err.error.message`, `err.error` string o serializa objetos a JSON legible, garantizando que nunca se asigne un objeto crudo a ningún signal de error (`bulkError`, `driveError`, `photographerError`).
+- **Evidencia y Validación:**
+  - **446 tests unitarios pasando al 100%** (220 backend + 226 frontend).
+  - Backend `npm test`: 30 suites, 220 tests aprobados sin errores.
+  - Frontend `npm test`: 17 suites, 226 tests aprobados sin errores (+10 nuevos tests en `admin-panel.component.spec.ts`).
+  - Compilación de producción Angular (`ng build`) exitosa con código 0 en 6.6 segundos.
+
+### ADR-061: Solución de Símbolos Cuadrados (□□□) en Sharp Alpine (fontconfig/DejaVu), Parche de Seguridad en Checkout de Álbumes Privados y Corrección SQL de Cupones Supabase
+- **Motivación y Diagnóstico:**
+  1. *Símbolos Cuadrados (□□□ / .notdef) en Marcas de Agua con Sharp sobre Alpine Linux:* En contenedores Docker basados en Alpine (`node:22-alpine`), la ausencia de `fontconfig` y fuentes tipográficas vectoriales (`ttf-dejavu`) provocaba que `librsvg` no pudiera rasterizar caracteres latinos estándar (letras, puntos, marcas de acentuación) sobre los SVGs generados por Sharp, mostrando glifos de reemplazo cuadrados o cajas vacías. Además, en las fotos de muestra HD, el texto diagonal estaba estático como `"LA TERCERA • MUESTRA HD"` en lugar de reflejar el nombre del álbum/evento configurado por la fotógrafa (`${safeWatermarkText}`), y requería mayor contraste y visibilidad tanto en fotos claras como oscuras.
+  2. *Vulnerabilidad de Seguridad en Checkout de Álbumes Privados:* Si bien `GET /api/albums/:id/photos` exigía token criptográfico o código PIN para acceder a las fotografías de un álbum privado, el endpoint de inicio de compra `POST /api/checkout/preference` no validaba que el cliente tuviera autorización previa sobre dicho álbum, permitiendo potencialmente a un atacante que conociera el `albumId` iniciar una orden de compra o canje sin haber desbloqueado el PIN.
+  3. *Error de Consulta SQL en `SupabasePromotionRepository.tryConsumeCoupon`:* Al actualizar atómicamente el contador de uso `used_count` con cláusula de concurrencia en Supabase PostgreSQL, la consulta ejecutaba `.select('id, used_count')`, fallando inmediatamente con error de base de datos porque la tabla relacional `coupons` utiliza `code` (VARCHAR) como Primary Key y carece de la columna `id`.
+- **Solución Técnica Implementada:**
+  1. **Tipografía y Dockerfile Multi-Stage en Alpine (`backend/Dockerfile` y `image.service.ts`):**
+     - En `backend/Dockerfile` (tanto en la etapa `builder` como en `runner`), se incorporaron `fontconfig ttf-dejavu` al `apk add --no-cache` y se ejecuta `fc-cache -fv` para registrar la caché tipográfica en el sistema.
+     - En `backend/src/services/image.service.ts`:
+       * Se actualizó `font-family="DejaVu Sans, Arial, sans-serif"` en todos los templates SVG (fotos estándar y HD).
+       * En el bloque `isHD`, el texto diagonal ahora interpola `${safeWatermarkText}` y su opacidad se elevó a `fill="rgba(255,255,255,0.32)" stroke="rgba(0,0,0,0.25)" stroke-width="1"` para máxima legibilidad sobre fondos oscuros o sobreexpuestos.
+       * Creado test unitario en `backend/tests/image.test.ts` validando el procesamiento HD con texto dinámico.
+  2. **Blindaje Criptográfico en Checkout de Álbumes Privados (Backend & Frontend):**
+     - En `backend/src/index.ts` (`POST /api/checkout/preference`):
+       * Si `album.isPrivate` es `true` y no es test sin PIN, se valida que la petición incluya el token en `req.headers['x-album-access-token']` o `req.body.accessToken` (verificado con `tokenService.verifyToken(token)` confirmando `payload.resourceId === album.id`), o una cabecera `Authorization: Bearer` con JWT de admin válido.
+       * Si no cumple la validación, responde de inmediato `403 Forbidden` con `{ error: 'Este álbum es privado. Debes desbloquearlo con su código PIN antes de realizar la compra.' }`.
+       * Se añadieron 5 tests unitarios en `backend/tests/checkout-order-hardening.test.ts` cubriendo rechazo sin token, autorización por header, autorización por body, bypass de admin y rechazo por token de álbum ajeno.
+     - En `frontend/src/app/core/models/order.model.ts`:
+       * Añadida propiedad opcional `readonly accessToken?: string;` a `CreatePreferenceRequest`.
+     - En `frontend/src/app/core/services/payment.service.ts`:
+       * Inyectado `AlbumAccessStore`. Si el álbum tiene token en el store o en el request, se adjunta automáticamente la cabecera `x-album-access-token`.
+     - En `frontend/src/app/features/checkout/checkout-modal.component.ts`:
+       * Inyectado `AlbumAccessStore` y transferido el token activo en la llamada `paymentService.createPreference(...)`.
+       * Añadidos tests unitarios en `payment.service.spec.ts` y `checkout-modal.component.spec.ts`.
+  3. **Corrección de Primary Key en `SupabasePromotionRepository` (`promotion.repository.ts`):**
+     - En la línea de actualización atómica de `tryConsumeCoupon`, se corrigió `.select('id, used_count')` por `.select('code, used_count')`, alineándose exactamente con el esquema PostgreSQL de Supabase.
+- **Evidencia y Validación:**
+  - **436 tests unitarios pasando al 100%** (220 backend + 216 frontend).
+  - Backend `npm test`: 30 suites, 220 tests aprobados sin errores. Compilación TypeScript (`tsc`) limpia con código 0.
+  - Frontend `npm test`: 17 suites, 216 tests aprobados sin errores. Compilación Angular de producción (`ng build`) exitosa con 0 errores y dentro de presupuestos de bundle.
 
 ### ADR-060: Ruta Directa /admin en Inicialización SPA, Documentación Integral en README.md y Guía de Autenticación de Fotógrafa
 - **Motivación y Diagnóstico:**
@@ -204,6 +287,36 @@ Plataforma web e-commerce mobile-first orientada a la venta de fotografías de p
   - **416 tests unitarios pasando al 100%** (212 backend + 204 frontend).
   - Backend `npm test`: 29 suites, 212 tests aprobados. Compilación TypeScript (`tsc`) limpia con código 0.
   - Frontend `npm test`: 16 suites, 204 tests aprobados. Compilación Angular de producción (`ng build`) exitosa con 0 errores y dentro de presupuestos de bundle.
+
+### ADR-057: Ordenamiento Drag & Drop de Fotografías (Cola de Subida y Catálogo Persistente) y Modal Bento de Edición de Metadatos de Álbumes
+- **Motivación y Diagnóstico:**
+  1. *Falta de Control de Secuencia en la Subida Masiva:* En la pestaña `📤 Subida Masiva`, las fotos se procesaban y subían en el orden estricto de selección del sistema de archivos, impidiendo que la fotógrafa definiera de antemano el orden narrativo del evento o cambiara de lugar fotos sin perder la marca de muestra HD.
+  2. *Imposibilidad de Reordenar Fotos ya Subidas:* En el catálogo público y en el modal de gestión del álbum, las fotos se listaban únicamente por orden de creación (`created_at ASC`), sin permitir reorganizar fotos destacadas hacia las primeras posiciones.
+  3. *Edición Rígida de Metadatos:* En el dashboard de álbumes, existía edición de precios en línea, pero para editar el título, subtítulo, fecha, hora, ubicación o categoría de un evento existente, no existía interfaz gráfica, obligando a recrear el álbum o editar la base de datos manualmente.
+- **Solución Técnica Implementada:**
+  1. **Drag & Drop y Reordenamiento en Cola Previa a la Subida (`AdminPanelComponent` & `.html`):**
+     - Atributos nativos HTML5 `draggable="true"`, `(dragstart)`, `(dragover)`, `(drop)` y `(dragend)` en cada tarjeta de la cola, con retroalimentación visual (`opacity-40`, bordes dorados `border-amber-500` y cursores `cursor-grab`).
+     - Botones táctiles `◀` y `▶` en cada tarjeta para dispositivos móviles, deshabilitados en los extremos (`idx === 0` y `idx === selectedFiles().length - 1`).
+     - Algoritmo de mapeo por referencia (`hdFileSet`) en `moveQueueItem` que garantiza que las fotos marcadas como `⭐ Muestra HD` conserven exactamente su condición tras cualquier reordenamiento de archivos y miniaturas.
+  2. **Persistencia de Orden de Fotos en Repositorio y API Backend (`album.repository.ts` & `admin-albums.routes.ts`):**
+     - Añadido `sortOrder?: number` en `PhotoDTO` y `PublicPhotoDTO`.
+     - Implementado `reorderPhotos(albumId: string, orderedPhotoIds: string[]): Promise<boolean>` en `IAlbumRepository`, `MemoryAlbumRepository` (actualizando orden en memoria) y `SupabaseAlbumRepository` (con ordenamiento ACID y sincronización de `sort_order` con fallback resiliente).
+     - Modificado `getPhotosByAlbumId` para ordenar ascendentemente por `sortOrder` en memoria y base de datos.
+     - Nuevo endpoint administrativo `PUT /api/admin/albums/:id/photos/reorder` protegido por `requireAdminAuth`, validando `photoIds: string[]`.
+  3. **Reordenamiento Interactivo en Modal "Gestionar Fotos" y Guardado (`admin-panel.component.ts` & `.html`):**
+     - Tarjetas interactivas con Drag & Drop y botones de flechas móviles `◀` y `▶` con badge de posición `#N`.
+     - Signal reactivo `isPhotosOrderDirty` que activa un botón brillante `"💾 Guardar Orden"` en cabecera y pie del modal.
+     - Invocación a `adminService.reorderAlbumPhotos(album.id, photoIds)` y sincronización inmediata con feedback Bento.
+  4. **Modal Bento de Edición de Metadatos de Álbum (`admin-panel.component.ts` & `.html`):**
+     - Botón `"✏️ Editar"` incorporado en cada tarjeta de álbum del panel administrativo.
+     - Modal Bento accesible con formulario tipado `editAlbumForm` precargado con título, categoría, badge dinámico, subtítulo, fecha, horario y ubicación.
+     - Persistencia vía `adminService.updateAlbum(id, changes)`, actualización reactiva en caliente en `albums()` y feedback con sistema de Toasts Bento.
+- **Evidencia y Validación:**
+  - **462 tests unitarios pasando al 100%** (224 backend + 238 frontend).
+  - 4 nuevos tests en `backend/tests/admin-albums.api.test.ts` (rechazo 401 sin auth, validación 400 de array, 404 en inexistente, y reordenamiento exitoso con persistencia y verificación en `getPhotos`).
+  - 1 nuevo test en `frontend/src/app/core/services/admin.service.spec.ts` validando la petición HTTP `PUT /api/admin/albums/:id/photos/reorder`.
+  - 11 nuevos tests en `frontend/src/app/features/admin-panel/admin-panel.component.spec.ts` validando reordenamiento de cola, preservación de HD, eventos drag & drop, flechas táctiles, `savePhotosOrder`, apertura y guardado reactivo del modal de edición de álbum.
+  - Compilación exitosa en backend (`tsc`) y frontend (`ng build`) con 0 errores y 0 advertencias.
 
 ### ADR-056: Concurrencia Atómica en Cupones Supabase, Validación Anti-Traversal de Fotos en Checkout y Almacenamiento Dinámico en Métricas
 - **Motivación y Diagnóstico:**

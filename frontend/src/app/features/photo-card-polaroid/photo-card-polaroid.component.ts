@@ -86,13 +86,6 @@ import { AlbumService } from '../../core/services/album.service';
           />
         }
 
-        <!-- MARCA DE AGUA CENTRADA PERPETUA "LA TERCERA • MUESTRA" -->
-        <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-45 group-hover:opacity-75 transition-opacity">
-          <span class="font-display font-extrabold text-white text-[11px] sm:text-xs tracking-widest bg-black/45 px-3 py-1.5 rounded-full backdrop-blur-sm -rotate-12 border border-white/20 shadow-lg">
-            LA TERCERA • MUESTRA
-          </span>
-        </div>
-
         <!-- BADGE SUPERIOR DE MUESTRA HD -->
         @if (photo().isSampleHD) {
           <div class="absolute top-2.5 left-2.5 px-2.5 py-0.5 rounded-full bg-emerald-500 text-zinc-950 font-black text-[9px] shadow-md flex items-center gap-1 z-20">

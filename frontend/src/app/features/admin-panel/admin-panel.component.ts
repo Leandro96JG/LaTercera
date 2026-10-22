@@ -1,6 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, effect, untracked, OnInit, OnDestroy, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { firstValueFrom } from 'rxjs';
 import QRCode from 'qrcode';
 import { AdminAuthStore } from '../../core/state/admin-auth.store';
 import { CartStore } from '../../core/state/cart.store';
@@ -13,6 +14,7 @@ import {
   AdminStats,
   DriveImportResponse,
   BulkUploadResponse,
+  ProcessedPhotoSummary,
   RegisterPhotographerResponse,
   CreateAlbumRequest,
   UpdateAlbumRequest,
@@ -253,6 +255,12 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
   public readonly confirmingDeletePhotoId = signal<string | null>(null);
   private deletePhotoTimer: any = null;
 
+  // Reordenamiento interactivo de fotos gestionadas
+  public readonly draggedPhotoIndex = signal<number | null>(null);
+  public readonly dragOverPhotoIndex = signal<number | null>(null);
+  public readonly isPhotosOrderDirty = signal<boolean>(false);
+  public readonly isSavingPhotosOrder = signal<boolean>(false);
+
   // Estado de actualización de visibilidad (Ocultar/Publicar) por tarjeta
   public readonly isTogglingPublishId = signal<string | null>(null);
 
@@ -385,6 +393,12 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
   public readonly createAlbumSuccess = signal<string | null>(null);
   public readonly pendingTargetForm = signal<'drive' | 'bulk' | null>(null);
 
+  // Modal Bento de Edición de Álbum
+  public readonly isEditAlbumModalOpen = signal<boolean>(false);
+  public readonly editingAlbum = signal<Album | null>(null);
+  public readonly isUpdatingAlbum = signal<boolean>(false);
+  public readonly editAlbumError = signal<string | null>(null);
+
   // Borradores de edición de precios por tarjeta: { [albumId]: { unitPrice, fullAlbumPrice } }
   public readonly priceDrafts = signal<Record<string, { unitPrice: number; fullAlbumPrice: number }>>({});
   public readonly updatingAlbumId = signal<string | null>(null);
@@ -420,6 +434,8 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
   // Archivos seleccionados para subida masiva
   public readonly selectedFiles = signal<File[]>([]);
   public readonly hdIndices = signal<number[]>([0, 1]);
+  public readonly draggedQueueIndex = signal<number | null>(null);
+  public readonly dragOverQueueIndex = signal<number | null>(null);
   public readonly MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB límite Supabase Storage
 
   public readonly oversizedFiles = computed(() =>
@@ -475,6 +491,17 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     isFreeDownload: [false],
     isPrivate: [false],
     accessCode: ['']
+  });
+
+  // Formulario de Edición de Datos del Álbum
+  public readonly editAlbumForm = this.fb.nonNullable.group({
+    title: ['', [Validators.required, Validators.minLength(3)]],
+    subtitle: [''],
+    category: ['futbol' as AlbumCategory, [Validators.required]],
+    badge: [''],
+    eventDate: [''],
+    eventTime: [''],
+    location: ['']
   });
 
   // Formulario de Importación de Google Drive
@@ -1610,6 +1637,79 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     });
   }
 
+  // --- Modal de Edición de Metadatos del Álbum ---
+  public openEditAlbumModal(album: Album): void {
+    this.editingAlbum.set(album);
+    this.editAlbumError.set(null);
+    this.editAlbumForm.reset({
+      title: album.title,
+      subtitle: album.subtitle || '',
+      category: (album.category as AlbumCategory) || 'futbol',
+      badge: album.badge || '',
+      eventDate: album.eventDate || album.date || '',
+      eventTime: album.eventTime || '',
+      location: album.location || ''
+    });
+    this.isEditAlbumModalOpen.set(true);
+  }
+
+  public closeEditAlbumModal(): void {
+    this.isEditAlbumModalOpen.set(false);
+    this.editingAlbum.set(null);
+    this.editAlbumError.set(null);
+  }
+
+  public onEditCategoryChange(event: Event): void {
+    const selectedCatId = (event.target as HTMLSelectElement).value;
+    const cat = this.categories().find(c => c.id === selectedCatId);
+    if (cat) {
+      this.editAlbumForm.patchValue({
+        badge: cat.badgeLabel || `${cat.icon} ${cat.name}`
+      });
+    }
+  }
+
+  public submitUpdateAlbum(): void {
+    if (this.editAlbumForm.invalid || this.isUpdatingAlbum()) {
+      this.editAlbumForm.markAllAsTouched();
+      return;
+    }
+
+    const album = this.editingAlbum();
+    if (!album) return;
+
+    this.isUpdatingAlbum.set(true);
+    this.editAlbumError.set(null);
+
+    const formVal = this.editAlbumForm.getRawValue();
+
+    this.adminService.updateAlbum(album.id, {
+      title: formVal.title.trim(),
+      subtitle: formVal.subtitle.trim() || undefined,
+      category: formVal.category,
+      badge: formVal.badge.trim() || undefined,
+      eventDate: formVal.eventDate || undefined,
+      eventTime: formVal.eventTime.trim() || undefined,
+      location: formVal.location.trim() || undefined
+    }).subscribe({
+      next: (res) => {
+        this.isUpdatingAlbum.set(false);
+        if (res.success && res.album) {
+          const updated = res.album;
+          this.albums.update(list =>
+            list.map(a => a.id === album.id ? { ...a, ...updated } : a)
+          );
+          this.closeEditAlbumModal();
+          this.showToast(`¡Álbum "${updated.title}" actualizado con éxito!`, 'success');
+        }
+      },
+      error: (err) => {
+        this.isUpdatingAlbum.set(false);
+        this.editAlbumError.set(this.extractErrorMessage(err, 'Error al actualizar el álbum.'));
+      }
+    });
+  }
+
   // --- Edición de Precios en Línea ---
   public onPriceDraftChange(albumId: string, field: 'unitPrice' | 'fullAlbumPrice', event: Event): void {
     const rawVal = (event.target as HTMLInputElement).value;
@@ -1888,6 +1988,9 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     this.albumPhotos.set([]);
     this.photosModalError.set(null);
     this.photosModalFeedback.set(null);
+    this.isPhotosOrderDirty.set(false);
+    this.draggedPhotoIndex.set(null);
+    this.dragOverPhotoIndex.set(null);
   }
 
   public loadAlbumPhotos(albumId: string): void {
@@ -2050,6 +2153,78 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     });
   }
 
+  // --- Reordenamiento de Fotos del Álbum (Drag & Drop y Móvil) ---
+  public moveManagedPhoto(fromIndex: number, toIndex: number): void {
+    const photos = [...this.albumPhotos()];
+    if (toIndex < 0 || toIndex >= photos.length || fromIndex === toIndex) return;
+
+    const moved = photos.splice(fromIndex, 1)[0];
+    photos.splice(toIndex, 0, moved);
+    this.albumPhotos.set(photos);
+    this.isPhotosOrderDirty.set(true);
+  }
+
+  public onPhotoDragStart(event: DragEvent, index: number): void {
+    this.draggedPhotoIndex.set(index);
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', index.toString());
+    }
+  }
+
+  public onPhotoDragOver(event: DragEvent, index: number): void {
+    event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'move';
+    }
+    this.dragOverPhotoIndex.set(index);
+  }
+
+  public onPhotoDrop(event: DragEvent, targetIndex: number): void {
+    event.preventDefault();
+    const fromIndex = this.draggedPhotoIndex();
+    if (fromIndex !== null && fromIndex !== targetIndex) {
+      this.moveManagedPhoto(fromIndex, targetIndex);
+    }
+    this.draggedPhotoIndex.set(null);
+    this.dragOverPhotoIndex.set(null);
+  }
+
+  public onPhotoDragEnd(): void {
+    this.draggedPhotoIndex.set(null);
+    this.dragOverPhotoIndex.set(null);
+  }
+
+  public savePhotosOrder(): void {
+    const album = this.selectedAlbumForPhotos();
+    if (!album) return;
+
+    this.isSavingPhotosOrder.set(true);
+    this.photosModalFeedback.set(null);
+    const photoIds = this.albumPhotos().map(p => p.id);
+
+    this.adminService.reorderAlbumPhotos(album.id, photoIds).subscribe({
+      next: (res) => {
+        this.isSavingPhotosOrder.set(false);
+        if (res.success) {
+          this.isPhotosOrderDirty.set(false);
+          this.photosModalFeedback.set({
+            message: 'Orden de fotos guardado exitosamente en el catálogo.',
+            success: true
+          });
+          this.showToast('¡Orden de fotos actualizado correctamente!', 'success');
+        }
+      },
+      error: (err) => {
+        this.isSavingPhotosOrder.set(false);
+        this.photosModalFeedback.set({
+          message: this.extractErrorMessage(err, 'Error al guardar el nuevo orden de fotos.'),
+          success: false
+        });
+      }
+    });
+  }
+
   // --- Navegación Rápida a Subida ---
   public navigateToUploadWithAlbum(albumId: string): void {
     this.bulkForm.patchValue({ albumId });
@@ -2088,7 +2263,7 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.isDriveImporting.set(false);
-        this.driveError.set(err.error?.error || err.message || 'Error al conectar con el importador de Google Drive');
+        this.driveError.set(this.extractErrorMessage(err, 'Error al conectar con el importador de Google Drive'));
       }
     });
   }
@@ -2106,6 +2281,130 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
       this.handleSelectedFileList(Array.from(input.files));
       input.value = '';
     }
+  }
+
+  public static readonly BULK_UPLOAD_BATCH_SIZE = 4;
+
+  /**
+   * Helper seguro que extrae mensajes de error en formato string evitando [object Object]
+   */
+  public extractErrorMessage(err: unknown, defaultMsg: string = 'Error inesperado'): string {
+    if (!err) return defaultMsg;
+
+    const errorObj = err as Record<string, unknown>;
+
+    // Códigos de estado HTTP específicos
+    if (errorObj['status'] === 413) {
+      return 'El lote supera el límite de tamaño permitido.';
+    }
+    if (errorObj['status'] === 0) {
+      return 'Error de red o tiempo de espera agotado al subir las fotos.';
+    }
+
+    const innerError = errorObj['error'];
+
+    // 1. err?.error?.error es string
+    if (
+      innerError &&
+      typeof innerError === 'object' &&
+      typeof (innerError as Record<string, unknown>)['error'] === 'string'
+    ) {
+      const msg = (innerError as Record<string, unknown>)['error'] as string;
+      if (msg.trim().length > 0) return msg.trim();
+    }
+
+    // 2. err?.error?.message es string
+    if (
+      innerError &&
+      typeof innerError === 'object' &&
+      typeof (innerError as Record<string, unknown>)['message'] === 'string'
+    ) {
+      const msg = (innerError as Record<string, unknown>)['message'] as string;
+      if (msg.trim().length > 0) return msg.trim();
+    }
+
+    // 3. err?.error es string directo
+    if (typeof innerError === 'string' && innerError.trim().length > 0) {
+      return innerError.trim();
+    }
+
+    // 4. err?.error es un objeto: intentar serializarlo de forma legible
+    if (innerError && typeof innerError === 'object') {
+      try {
+        const str = JSON.stringify(innerError);
+        if (str && str !== '{}') return str;
+      } catch {
+        // Fallback a propiedades posteriores
+      }
+    }
+
+    // 5. err?.message es string directo
+    if (typeof errorObj['message'] === 'string' && errorObj['message'].trim().length > 0) {
+      return errorObj['message'].trim();
+    }
+
+    return defaultMsg;
+  }
+
+  /**
+   * Genera miniaturas WebP ligeras (320x320) con canvas para optimizar consumo de RAM,
+   * con fallback defensivo a URL.createObjectURL en entornos de test/JSDOM.
+   */
+  private async generateThumbnailUrl(file: File): Promise<string> {
+    try {
+      if (
+        typeof window !== 'undefined' &&
+        typeof (window as any).createImageBitmap === 'function' &&
+        typeof document !== 'undefined'
+      ) {
+        let bitmap: ImageBitmap | null = null;
+        try {
+          bitmap = await createImageBitmap(file);
+        } catch {
+          // Fallback silencioso si falla la decodificación por bitmap
+        }
+
+        if (bitmap) {
+          const maxDim = 320;
+          let targetW = bitmap.width;
+          let targetH = bitmap.height;
+
+          if (targetW > maxDim || targetH > maxDim) {
+            if (targetW > targetH) {
+              targetH = Math.round((targetH * maxDim) / targetW);
+              targetW = maxDim;
+            } else {
+              targetW = Math.round((targetW * maxDim) / targetH);
+              targetH = maxDim;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = targetW;
+          canvas.height = targetH;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(bitmap, 0, 0, targetW, targetH);
+            bitmap.close();
+            return canvas.toDataURL('image/webp', 0.7);
+          }
+          bitmap.close();
+        }
+      }
+    } catch {
+      // Ignorar excepciones de canvas en entornos headless
+    }
+
+    // Fallback defensivo a createObjectURL para tests y navegadores sin canvas 2D
+    if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+      try {
+        return URL.createObjectURL(file);
+      } catch {
+        return '';
+      }
+    }
+
+    return '';
   }
 
   private handleSelectedFileList(files: File[]): void {
@@ -2151,14 +2450,44 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     const updatedFiles = [...currentFiles, ...newFilesToAdd];
     this.selectedFiles.set(updatedFiles);
 
-    // Generar URL.createObjectURL únicamente para los archivos nuevos sin revocar los previos
-    const newPreviewUrls = newFilesToAdd.map(f => {
-      if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
-        return URL.createObjectURL(f);
-      }
-      return '';
-    });
-    this.filePreviewUrls.set([...this.filePreviewUrls(), ...newPreviewUrls]);
+    // Detección de entorno con soporte real de canvas/bitmap
+    const hasCanvasSupport =
+      typeof window !== 'undefined' &&
+      typeof (window as any).createImageBitmap === 'function' &&
+      typeof document !== 'undefined';
+
+    if (!hasCanvasSupport && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+      // Modo síncrono para entornos de test (JSDOM/Vitest) o navegadores básicos
+      const newPreviewUrls = newFilesToAdd.map(f => {
+        try {
+          return URL.createObjectURL(f);
+        } catch {
+          return '';
+        }
+      });
+      this.filePreviewUrls.set([...this.filePreviewUrls(), ...newPreviewUrls]);
+    } else {
+      // Modo optimizado de memoria: generar WebP 320px ultra-liviano para evitar colapso de RAM
+      const startIndex = this.filePreviewUrls().length;
+      // Colocar placeholders inmediatos para preservar la alineación de índices
+      const placeholders = newFilesToAdd.map(() => '');
+      this.filePreviewUrls.set([...this.filePreviewUrls(), ...placeholders]);
+
+      Promise.all(
+        newFilesToAdd.map(async (file, offset) => {
+          const thumbUrl = await this.generateThumbnailUrl(file);
+          return { targetIndex: startIndex + offset, thumbUrl };
+        })
+      ).then(results => {
+        const currentUrls = [...this.filePreviewUrls()];
+        for (const item of results) {
+          if (item.targetIndex < currentUrls.length && item.thumbUrl) {
+            currentUrls[item.targetIndex] = item.thumbUrl;
+          }
+        }
+        this.filePreviewUrls.set(currentUrls);
+      });
+    }
 
     // Si era la primera tanda de archivos, marcar [0, 1] como hdIndices; si ya había archivos, conservar intactos los elegidos
     if (isFirstBatch) {
@@ -2182,7 +2511,9 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
   public revokePreviewUrls(): void {
     if (typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
       this.filePreviewUrls().forEach(url => {
-        if (url) URL.revokeObjectURL(url);
+        if (url && url.startsWith('blob:')) {
+          URL.revokeObjectURL(url);
+        }
       });
     }
     this.filePreviewUrls.set([]);
@@ -2191,7 +2522,7 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
   public removeSelectedFile(index: number): void {
     const urls = this.filePreviewUrls();
     const urlToRemove = urls[index];
-    if (urlToRemove && typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
+    if (urlToRemove && urlToRemove.startsWith('blob:') && typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
       URL.revokeObjectURL(urlToRemove);
     }
     this.filePreviewUrls.set(urls.filter((_, i) => i !== index));
@@ -2213,7 +2544,72 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     this.revokePreviewUrls();
     this.selectedFiles.set([]);
     this.hdIndices.set([]);
+    this.draggedQueueIndex.set(null);
+    this.dragOverQueueIndex.set(null);
     this.bulkError.set(null);
+  }
+
+  // --- Reordenamiento de Cola de Subida Masiva (Drag & Drop y Móvil) ---
+  public moveQueueItem(fromIndex: number, toIndex: number): void {
+    const currentFiles = this.selectedFiles();
+    if (toIndex < 0 || toIndex >= currentFiles.length || fromIndex === toIndex) return;
+
+    // Rastrear por referencia los archivos HD para que no pierdan la marca
+    const hdFileSet = new Set(this.hdIndices().map(i => currentFiles[i]).filter(Boolean));
+
+    // Reordenar archivos
+    const files = [...currentFiles];
+    const movedFile = files.splice(fromIndex, 1)[0];
+    files.splice(toIndex, 0, movedFile);
+    this.selectedFiles.set(files);
+
+    // Reordenar URLs de previsualización en sincronía
+    const urls = [...this.filePreviewUrls()];
+    if (fromIndex < urls.length && toIndex < urls.length) {
+      const movedUrl = urls.splice(fromIndex, 1)[0];
+      urls.splice(toIndex, 0, movedUrl);
+      this.filePreviewUrls.set(urls);
+    }
+
+    // Remapear índices HD según la nueva posición de cada archivo
+    const newHdIndices: number[] = [];
+    files.forEach((f, idx) => {
+      if (hdFileSet.has(f)) {
+        newHdIndices.push(idx);
+      }
+    });
+    this.hdIndices.set(newHdIndices);
+  }
+
+  public onQueueDragStart(event: DragEvent, index: number): void {
+    this.draggedQueueIndex.set(index);
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', index.toString());
+    }
+  }
+
+  public onQueueDragOver(event: DragEvent, index: number): void {
+    event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'move';
+    }
+    this.dragOverQueueIndex.set(index);
+  }
+
+  public onQueueDrop(event: DragEvent, targetIndex: number): void {
+    event.preventDefault();
+    const fromIndex = this.draggedQueueIndex();
+    if (fromIndex !== null && fromIndex !== targetIndex) {
+      this.moveQueueItem(fromIndex, targetIndex);
+    }
+    this.draggedQueueIndex.set(null);
+    this.dragOverQueueIndex.set(null);
+  }
+
+  public onQueueDragEnd(): void {
+    this.draggedQueueIndex.set(null);
+    this.dragOverQueueIndex.set(null);
   }
 
   public toggleHdIndex(index: number): void {
@@ -2230,7 +2626,8 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
   }
 
   public submitBulkUpload(): void {
-    if (this.selectedFiles().length === 0) {
+    const filesToUpload = this.selectedFiles();
+    if (filesToUpload.length === 0) {
       this.bulkError.set('Selecciona al menos una fotografía para subir');
       return;
     }
@@ -2248,31 +2645,106 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     this.bulkError.set(null);
 
     const formVal = this.bulkForm.getRawValue();
+    const albumId = formVal.albumId;
+    const watermarkText = formVal.watermarkText;
+    const globalHdIndices = this.hdIndices();
+    const totalFiles = filesToUpload.length;
+    const BATCH_SIZE = AdminPanelComponent.BULK_UPLOAD_BATCH_SIZE;
 
-    this.adminService.bulkUpload(
-      formVal.albumId,
-      this.selectedFiles(),
-      formVal.watermarkText,
-      this.hdIndices(),
-      (percent) => {
-        this.uploadProgress.set(percent);
-      }
-    ).subscribe({
-      next: (res) => {
+    let completedFiles = 0;
+    let totalReceived = 0;
+    let totalSuccessful = 0;
+    let totalFailed = 0;
+    let totalDurationMs = 0;
+    const allPhotos: ProcessedPhotoSummary[] = [];
+    const allErrors: Array<{ fileName: string; error: string }> = [];
+
+    const uploadNextBatch = (startIdx: number): void => {
+      if (startIdx >= totalFiles) {
+        // Consolidar resumen de todas las tandas completadas
+        const consolidatedResult: BulkUploadResponse = {
+          success: true,
+          albumId,
+          summary: {
+            totalReceived,
+            successful: totalSuccessful,
+            failed: totalFailed,
+            durationMs: totalDurationMs
+          },
+          photos: allPhotos,
+          errors: allErrors
+        };
+
         this.uploadProgress.set(100);
         this.isBulkUploading.set(false);
-        this.bulkResult.set(res);
-        this.revokePreviewUrls();
-        this.selectedFiles.set([]);
-        this.hdIndices.set([]);
+        this.bulkResult.set(consolidatedResult);
+        this.clearSelectedFiles(); // Limpia la cola y resetea estado sin recargar la página
         this.loadAlbums(); // Recargar conteos actualizados
-      },
-      error: (err) => {
-        this.isBulkUploading.set(false);
-        const errorMsg = err.error?.error || err.error?.message || err.message || 'Error durante la subida masiva';
-        this.bulkError.set(errorMsg);
+        this.showToast(
+          `¡Subida completada con éxito! ${totalSuccessful} fotos procesadas y añadidas al álbum.`,
+          'success'
+        );
+        return;
       }
-    });
+
+      const batchFiles = filesToUpload.slice(startIdx, startIdx + BATCH_SIZE);
+
+      // Mapear qué índices locales dentro de este micro-lote de 4 fotos corresponden a los HD globales
+      const batchHdIndices: number[] = [];
+      for (let localIdx = 0; localIdx < batchFiles.length; localIdx++) {
+        const globalIdx = startIdx + localIdx;
+        if (globalHdIndices.includes(globalIdx)) {
+          batchHdIndices.push(localIdx);
+        }
+      }
+
+      // Ejecutar subida de este micro-lote y calcular progreso global combinado
+      this.adminService.bulkUpload(
+        albumId,
+        batchFiles,
+        watermarkText,
+        batchHdIndices,
+        (batchPercent: number) => {
+          const currentBatchLoadedFraction = (batchPercent / 100) * batchFiles.length;
+          const globalPercent = Math.min(
+            99,
+            Math.round(((completedFiles + currentBatchLoadedFraction) / totalFiles) * 100)
+          );
+          this.uploadProgress.set(globalPercent);
+        }
+      ).subscribe({
+        next: (batchResponse) => {
+          completedFiles += batchFiles.length;
+          if (batchResponse) {
+            totalReceived += batchResponse.summary?.totalReceived ?? batchFiles.length;
+            totalSuccessful += batchResponse.summary?.successful ?? batchFiles.length;
+            totalFailed += batchResponse.summary?.failed ?? 0;
+            totalDurationMs += batchResponse.summary?.durationMs ?? 0;
+            if (Array.isArray(batchResponse.photos)) {
+              allPhotos.push(...batchResponse.photos);
+            }
+            if (Array.isArray(batchResponse.errors)) {
+              allErrors.push(...batchResponse.errors);
+            }
+          }
+
+          const currentFinishedProgress = Math.round((completedFiles / totalFiles) * 100);
+          this.uploadProgress.set(currentFinishedProgress);
+
+          // Continuar con el siguiente micro-lote secuencial
+          uploadNextBatch(startIdx + BATCH_SIZE);
+        },
+        error: (err) => {
+          this.isBulkUploading.set(false);
+          const safeErrorMsg = this.extractErrorMessage(err, 'Error durante la subida masiva de fotos');
+          this.bulkError.set(safeErrorMsg);
+          this.showToast(safeErrorMsg, 'error');
+        }
+      });
+    };
+
+    // Iniciar primer micro-lote
+    uploadNextBatch(0);
   }
 
   public submitRegisterPhotographer(): void {
@@ -2305,7 +2777,7 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.isRegisteringPhotographer.set(false);
-        this.photographerError.set(err.error?.error || err.message || 'Error al registrar fotógrafo');
+        this.photographerError.set(this.extractErrorMessage(err, 'Error al registrar fotógrafo'));
       }
     });
   }

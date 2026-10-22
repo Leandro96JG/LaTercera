@@ -55,16 +55,23 @@ describe('Google Drive Importer Service (TDD con Mocks HTTP)', () => {
       })
     };
 
+    const prevKey = process.env.GOOGLE_DRIVE_API_KEY;
+    delete process.env.GOOGLE_DRIVE_API_KEY;
     const memoryStorage = new MemoryStorageService();
-    const importer = new GoogleDriveImporterService(mockHttpClient, memoryStorage);
+    let result;
+    try {
+      const importer = new GoogleDriveImporterService(mockHttpClient, memoryStorage);
 
-    const result = await importer.importFromDrive({
-      albumId: 'album_futbol_tesorieri',
-      driveUrl: 'https://drive.google.com/drive/folders/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms',
-      watermarkText: 'LA TERCERA • MUESTRA',
-      concurrencyLimit: 2,
-      markHdFirstN: 1 // La primera foto como HD Master, las otras protegidas normales
-    });
+      result = await importer.importFromDrive({
+        albumId: 'album_futbol_tesorieri',
+        driveUrl: 'https://drive.google.com/drive/folders/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms',
+        watermarkText: 'LA TERCERA • MUESTRA',
+        concurrencyLimit: 2,
+        markHdFirstN: 1 // La primera foto como HD Master, las otras protegidas normales
+      });
+    } finally {
+      if (prevKey !== undefined) process.env.GOOGLE_DRIVE_API_KEY = prevKey;
+    }
 
     // 1. Verificar listado y llamada HTTP
     expect(mockHttpClient.listFiles).toHaveBeenCalledWith(

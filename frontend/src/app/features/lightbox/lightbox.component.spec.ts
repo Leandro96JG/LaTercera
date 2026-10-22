@@ -40,7 +40,7 @@ describe('LightboxComponent (Visor Cinemático Táctil)', () => {
     expect(backdrop).toBeNull();
   });
 
-  it('debe renderizar la foto, el contador y la marca de agua cuando isOpen es verdadero', () => {
+  it('debe renderizar la foto, el contador y no superponer marca de agua HTML cuando isOpen es verdadero', () => {
     fixture.componentRef.setInput('isOpen', true);
     fixture.componentRef.setInput('currentPhoto', mockPhoto);
     fixture.componentRef.setInput('currentIndex', 2);
@@ -50,7 +50,7 @@ describe('LightboxComponent (Visor Cinemático Táctil)', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.textContent).toContain('Foto 3 de 10');
     expect(compiled.textContent).toContain('Muestra HD Original');
-    expect(compiled.textContent).toContain('LA TERCERA • MUESTRA');
+    expect(compiled.textContent).not.toContain('LA TERCERA • MUESTRA');
   });
 
   it('debe emitir close al hacer clic en el botón de cerrar o presionar Escape', () => {

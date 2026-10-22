@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { createServer, Server } from 'http';
-import { app, orderService, albumRepository, orderRepository, mpService } from '../src/index';
+import { app, orderService, albumRepository, orderRepository, mpService, tokenService, adminAuthService } from '../src/index';
 
 describe('Checkout & Orders API Hardening (Zero-Trust & Persistencia)', () => {
   let server: Server;
@@ -79,6 +79,192 @@ describe('Checkout & Orders API Hardening (Zero-Trust & Persistencia)', () => {
       expect(res.status).toBe(400);
       const data = await res.json();
       expect(data.error).toContain('descarga gratuita');
+    });
+
+    it('debe rechazar con 403 Forbidden la compra en un álbum privado si no se envía token de acceso ni PIN', async () => {
+      const privateAlbumId = `album-priv-${Date.now()}`;
+      await albumRepository.create({
+        id: privateAlbumId,
+        title: 'Cumpleaños 15 Privado',
+        category: 'sociales',
+        date: '2026-10-18',
+        photosCount: 15,
+        unitPrice: 2000,
+        fullAlbumPrice: 25000,
+        coverUrl: 'https://images.unsplash.com/photo-1519741497674-611481863552',
+        isPublished: true,
+        isPrivate: true,
+        accessCode: '9876'
+      });
+
+      const res = await fetch(`${baseUrl}/api/checkout/preference`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          albumId: privateAlbumId,
+          photoIds: ['photo-p1'],
+          isFullAlbum: false,
+          customer: { email: 'invitado@test.com' }
+        })
+      });
+
+      expect(res.status).toBe(403);
+      const data = await res.json();
+      expect(data.error).toBe('Este álbum es privado. Debes desbloquearlo con su código PIN antes de realizar la compra.');
+    });
+
+    it('debe permitir la compra en álbum privado enviando token de acceso válido en header x-album-access-token', async () => {
+      const privateAlbumId = `album-priv-header-${Date.now()}`;
+      await albumRepository.create({
+        id: privateAlbumId,
+        title: 'Fiesta Privada VIP',
+        category: 'sociales',
+        date: '2026-10-19',
+        photosCount: 10,
+        unitPrice: 2500,
+        fullAlbumPrice: 30000,
+        coverUrl: 'https://images.unsplash.com/photo-1519741497674-611481863552',
+        isPublished: true,
+        isPrivate: true,
+        accessCode: '5555'
+      });
+
+      const token = tokenService.generateToken('pin_access', 'album_zip', privateAlbumId, 3600);
+
+      const res = await fetch(`${baseUrl}/api/checkout/preference`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-album-access-token': token
+        },
+        body: JSON.stringify({
+          albumId: privateAlbumId,
+          photoIds: ['photo-vip-1'],
+          isFullAlbum: false,
+          customer: { email: 'vip@test.com' }
+        })
+      });
+
+      expect(res.status).toBe(201);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(data.orderId).toBeDefined();
+    });
+
+    it('debe permitir la compra en álbum privado enviando token de acceso válido en req.body.accessToken', async () => {
+      const privateAlbumId = `album-priv-body-${Date.now()}`;
+      await albumRepository.create({
+        id: privateAlbumId,
+        title: 'Gala Privada',
+        category: 'sociales',
+        date: '2026-10-20',
+        photosCount: 8,
+        unitPrice: 3000,
+        fullAlbumPrice: 35000,
+        coverUrl: 'https://images.unsplash.com/photo-1519741497674-611481863552',
+        isPublished: true,
+        isPrivate: true,
+        accessCode: '7777'
+      });
+
+      const token = tokenService.generateToken('pin_access', 'album_zip', privateAlbumId, 3600);
+
+      const res = await fetch(`${baseUrl}/api/checkout/preference`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          albumId: privateAlbumId,
+          photoIds: ['photo-gala-1'],
+          isFullAlbum: false,
+          accessToken: token,
+          customer: { email: 'gala@test.com' }
+        })
+      });
+
+      expect(res.status).toBe(201);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(data.orderId).toBeDefined();
+    });
+
+    it('debe permitir la compra en álbum privado enviando cabecera Bearer de Admin', async () => {
+      const privateAlbumId = `album-priv-admin-${Date.now()}`;
+      await albumRepository.create({
+        id: privateAlbumId,
+        title: 'Sesión Privada Admin',
+        category: 'sociales',
+        date: '2026-10-21',
+        photosCount: 5,
+        unitPrice: 2000,
+        fullAlbumPrice: 20000,
+        coverUrl: 'https://images.unsplash.com/photo-1519741497674-611481863552',
+        isPublished: true,
+        isPrivate: true,
+        accessCode: '1111'
+      });
+
+      const adminToken = adminAuthService.createJwt({
+        id: 'admin-tester',
+        email: 'fotografa@latercera.com.ar',
+        name: 'Jenifer Espeche',
+        role: 'admin',
+        photographerId: 'photo_jenifer'
+      });
+
+      const res = await fetch(`${baseUrl}/api/checkout/preference`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({
+          albumId: privateAlbumId,
+          photoIds: ['photo-adm-1'],
+          isFullAlbum: false,
+          customer: { email: 'admin-buy@test.com' }
+        })
+      });
+
+      expect(res.status).toBe(201);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+    });
+
+    it('debe rechazar con 403 Forbidden si el token de acceso pertenece a otro álbum', async () => {
+      const privateAlbumId = `album-priv-wrong-${Date.now()}`;
+      await albumRepository.create({
+        id: privateAlbumId,
+        title: 'Álbum A Privado',
+        category: 'sociales',
+        date: '2026-10-21',
+        photosCount: 5,
+        unitPrice: 2000,
+        fullAlbumPrice: 20000,
+        coverUrl: 'https://images.unsplash.com/photo-1519741497674-611481863552',
+        isPublished: true,
+        isPrivate: true,
+        accessCode: '2222'
+      });
+
+      const wrongToken = tokenService.generateToken('pin_access', 'album_zip', 'otro-album-distinto', 3600);
+
+      const res = await fetch(`${baseUrl}/api/checkout/preference`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-album-access-token': wrongToken
+        },
+        body: JSON.stringify({
+          albumId: privateAlbumId,
+          photoIds: ['photo-w-1'],
+          isFullAlbum: false,
+          customer: { email: 'attacker@test.com' }
+        })
+      });
+
+      expect(res.status).toBe(403);
+      const data = await res.json();
+      expect(data.error).toBe('Este álbum es privado. Debes desbloquearlo con su código PIN antes de realizar la compra.');
     });
 
     it('debe deduplicar photoIds repetidos antes de calcular totales y generar preferencia', async () => {

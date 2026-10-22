@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable, timer, switchMap, takeWhile, tap } from 'rxjs';
 import {
   CreatePreferenceRequest,
@@ -8,6 +8,7 @@ import {
   RecoverOrdersResponse
 } from '../models/order.model';
 import { ValidateCouponResponse, PricingTierConfig } from '../models/admin.model';
+import { AlbumAccessStore } from '../state/album-access.store';
 import { environment } from '../../../environments/environment';
 
 @Injectable({
@@ -15,12 +16,20 @@ import { environment } from '../../../environments/environment';
 })
 export class PaymentService {
   private readonly http = inject(HttpClient);
+  private readonly albumAccessStore = inject(AlbumAccessStore);
   private readonly apiUrl = environment.apiUrl;
 
   public createPreference(request: CreatePreferenceRequest): Observable<CreatePreferenceResponse> {
+    let headers = new HttpHeaders();
+    const token = request.accessToken || (request.albumId ? this.albumAccessStore.getAccessToken(request.albumId) : undefined);
+    if (token) {
+      headers = headers.set('x-album-access-token', token);
+    }
+
     return this.http.post<CreatePreferenceResponse>(
       `${this.apiUrl}/checkout/preference`,
-      request
+      request,
+      { headers }
     );
   }
 

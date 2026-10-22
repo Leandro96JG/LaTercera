@@ -461,4 +461,23 @@ describe('AdminService - Llamadas HTTP de Administración con JWT', () => {
       expect.objectContaining({ headers: expect.anything() })
     );
   });
+
+  it('debe reordenar fotos de un álbum con PUT /api/admin/albums/:id/photos/reorder', () => {
+    mockHttpClient.put.mockReturnValue(of({
+      success: true,
+      albumId: 'album-1',
+      message: 'Orden de fotos actualizado correctamente'
+    }));
+
+    service.reorderAlbumPhotos('album-1', ['photo-2', 'photo-1']).subscribe((res) => {
+      expect(res.success).toBe(true);
+      expect(res.albumId).toBe('album-1');
+    });
+
+    expect(mockHttpClient.put).toHaveBeenCalledWith(
+      'http://localhost:4000/api/admin/albums/album-1/photos/reorder',
+      { photoIds: ['photo-2', 'photo-1'] },
+      expect.objectContaining({ headers: expect.anything() })
+    );
+  });
 });

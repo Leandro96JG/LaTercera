@@ -841,5 +841,43 @@ export function createAdminAlbumsRouter(
     }
   });
 
+  /**
+   * PUT /api/admin/albums/:id/photos/reorder
+   * Reordena las fotos del álbum según el array ordenado de IDs de fotos
+   */
+  router.put('/:id/photos/reorder', requireAdminAuth, async (req: Request, res: Response) => {
+    try {
+      const rawId = req.params.id;
+      const albumId = Array.isArray(rawId) ? rawId[0] : rawId;
+      const { photoIds } = req.body as { photoIds: string[] };
+
+      if (!Array.isArray(photoIds)) {
+        return res.status(400).json({
+          success: false,
+          error: 'El campo photoIds debe ser un array de identificadores de fotos'
+        });
+      }
+
+      const album = await albumRepository.getAlbumById(albumId);
+      if (!album) {
+        return res.status(404).json({
+          success: false,
+          error: 'Álbum no encontrado'
+        });
+      }
+
+      await albumRepository.reorderPhotos(albumId, photoIds);
+
+      return res.status(200).json({
+        success: true,
+        albumId,
+        message: 'Orden de fotos actualizado correctamente'
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al reordenar fotos';
+      return res.status(500).json({ success: false, error: message });
+    }
+  });
+
   return router;
 }

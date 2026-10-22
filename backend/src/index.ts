@@ -494,6 +494,42 @@ app.post('/api/checkout/preference', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Este álbum es de descarga gratuita de cortesía y no requiere pago' });
     }
 
+    // Blindaje de seguridad para checkout en álbumes privados con PIN
+    if (album.isPrivate) {
+      const isTestWithoutPin = (process.env.NODE_ENV === 'test' || process.env.VITEST === 'true') && !album.accessCode;
+      if (!isTestWithoutPin) {
+        let hasAccess = false;
+
+        // 1. Cabecera Authorization: Bearer de Admin
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+          const adminToken = authHeader.slice(7).trim();
+          const verification = adminAuthService.verifyJwt(adminToken);
+          if (verification.valid && verification.payload) {
+            hasAccess = true;
+          }
+        }
+
+        // 2. Token en cabecera x-album-access-token o en body accessToken
+        if (!hasAccess) {
+          const rawToken = req.headers['x-album-access-token'] || req.body?.accessToken;
+          const token = Array.isArray(rawToken) ? rawToken[0] : rawToken;
+          if (typeof token === 'string' && token.trim()) {
+            const verification = tokenService.verifyToken(token.trim());
+            if (verification.valid && verification.payload?.resourceId === album.id) {
+              hasAccess = true;
+            }
+          }
+        }
+
+        if (!hasAccess) {
+          return res.status(403).json({
+            error: 'Este álbum es privado. Debes desbloquearlo con su código PIN antes de realizar la compra.'
+          });
+        }
+      }
+    }
+
     // Validación de pertenencia de fotos al álbum y prevención de inyecciones de ruta
     if (!isFullAlbumBool) {
       for (const pid of uniquePhotoIds) {

@@ -555,5 +555,82 @@ describe('Admin Albums API Endpoints (/api/admin/albums)', () => {
       expect(data.album.badge).toBe('🎾 Pádel Tour');
     });
   });
+
+  describe('PUT /api/admin/albums/:id/photos/reorder', () => {
+    it('debe rechazar la petición con 401 si no se envía token de autenticación admin', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/albums/album-1/photos/reorder`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photoIds: ['p1', 'p2'] })
+      });
+
+      expect(res.status).toBe(401);
+    });
+
+    it('debe rechazar la petición con 400 si photoIds no es un array', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/albums/album-1/photos/reorder`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({ photoIds: 'not-an-array' })
+      });
+
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toContain('photoIds debe ser un array');
+    });
+
+    it('debe responder 404 si el álbum no existe', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/albums/non-existent-album/photos/reorder`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({ photoIds: ['p1', 'p2'] })
+      });
+
+      expect(res.status).toBe(404);
+    });
+
+    it('debe reordenar exitosamente las fotos de un álbum existente', async () => {
+      // 1. Obtener fotos actuales de album-1
+      const getRes = await fetch(`${baseUrl}/api/admin/albums/album-1/photos`, {
+        headers: { Authorization: `Bearer ${adminToken}` }
+      });
+      const photosData = await getRes.json();
+      expect(photosData.success).toBe(true);
+      const originalPhotos = photosData.photos;
+      expect(originalPhotos.length).toBeGreaterThan(1);
+
+      // Invertir el orden de las primeras dos fotos
+      const targetPhotoIds = [originalPhotos[1].id, originalPhotos[0].id];
+
+      // 2. Ejecutar reordenamiento
+      const reorderRes = await fetch(`${baseUrl}/api/admin/albums/album-1/photos/reorder`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({ photoIds: targetPhotoIds })
+      });
+
+      expect(reorderRes.status).toBe(200);
+      const reorderData = await reorderRes.json();
+      expect(reorderData.success).toBe(true);
+      expect(reorderData.message).toContain('Orden de fotos actualizado');
+
+      // 3. Verificar que getPhotos refleje el nuevo orden
+      const checkRes = await fetch(`${baseUrl}/api/admin/albums/album-1/photos`, {
+        headers: { Authorization: `Bearer ${adminToken}` }
+      });
+      const checkData = await checkRes.json();
+      expect(checkData.photos[0].id).toBe(targetPhotoIds[0]);
+      expect(checkData.photos[1].id).toBe(targetPhotoIds[1]);
+    });
+  });
 });
 

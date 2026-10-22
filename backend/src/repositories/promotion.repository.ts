@@ -571,7 +571,7 @@ export class SupabasePromotionRepository implements IPromotionRepository {
           updateQuery = updateQuery.lt('used_count', res.coupon.maxUses);
         }
 
-        const { data, error } = await updateQuery.select('id, used_count');
+        const { data, error } = await updateQuery.select('code, used_count');
         if (error) {
           console.warn('[SupabasePromotionRepository] Advertencia al persistir used_count en Supabase:', error);
         } else if (res.coupon.maxUses != null && (!data || data.length === 0)) {

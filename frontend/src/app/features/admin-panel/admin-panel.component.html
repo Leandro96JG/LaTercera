@@ -480,6 +480,16 @@
 
                   <button
                     type="button"
+                    (click)="openEditAlbumModal(album)"
+                    class="col-span-1 px-3 py-2.5 sm:py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 text-xs font-bold transition flex items-center justify-center gap-1.5 active:scale-95 shadow-2xs"
+                    title="Editar título, subtítulo, fecha, ubicación y categoría del álbum"
+                  >
+                    <span>✏️</span>
+                    <span>Editar</span>
+                  </button>
+
+                  <button
+                    type="button"
                     (click)="copyWhatsAppShareText(album)"
                     class="col-span-1 px-3 py-2.5 sm:py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition flex items-center justify-center gap-1.5 active:scale-95"
                     title="Copiar texto de difusión para grupos de WhatsApp con enlace directo al álbum"
@@ -491,7 +501,7 @@
                   <button
                     type="button"
                     (click)="openQrModal(album)"
-                    class="col-span-1 px-3 py-2.5 sm:py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 text-xs font-bold transition flex items-center justify-center gap-1.5 active:scale-95"
+                    class="col-span-2 sm:col-span-1 px-3 py-2.5 sm:py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 text-xs font-bold transition flex items-center justify-center gap-1.5 active:scale-95"
                     title="Generar y descargar código QR del evento"
                   >
                     <span>🔳</span>
@@ -2098,14 +2108,23 @@
 
             <div class="max-h-[380px] overflow-y-auto pr-1 border border-zinc-200 rounded-2xl p-3 bg-zinc-50">
               <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                @for (file of selectedFiles(); track file.name; let idx = $index) {
+                @for (file of selectedFiles(); track file.name + '_' + file.size + '_' + file.lastModified; let idx = $index) {
                   <div
-                    class="bg-white rounded-2xl border overflow-hidden flex flex-col justify-between shadow-xs transition group relative"
+                    draggable="true"
+                    (dragstart)="onQueueDragStart($event, idx)"
+                    (dragover)="onQueueDragOver($event, idx)"
+                    (drop)="onQueueDrop($event, idx)"
+                    (dragend)="onQueueDragEnd()"
+                    class="bg-white rounded-2xl border overflow-hidden flex flex-col justify-between shadow-xs transition group relative cursor-grab active:cursor-grabbing"
                     [class]="file.size > MAX_FILE_SIZE_BYTES
                       ? 'border-rose-400 ring-2 ring-rose-300 bg-rose-50/50'
                       : isHdSelected(idx)
                         ? 'border-amber-400 ring-2 ring-amber-300'
                         : 'border-black/[0.06]'"
+                    [class.opacity-40]="draggedQueueIndex() === idx"
+                    [class.border-amber-500]="dragOverQueueIndex() === idx"
+                    [class.ring-2]="dragOverQueueIndex() === idx"
+                    [class.ring-amber-400]="dragOverQueueIndex() === idx"
                   >
                     <!-- Minivista previa -->
                     <div class="relative aspect-square bg-zinc-100 overflow-hidden">
@@ -2113,7 +2132,7 @@
                         <img
                           [src]="filePreviewUrls()[idx]"
                           [alt]="file.name"
-                          class="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                          class="w-full h-full object-cover group-hover:scale-105 transition duration-300 pointer-events-none"
                         />
                       } @else {
                         <div class="w-full h-full flex items-center justify-center text-zinc-300 text-2xl">
@@ -2125,7 +2144,7 @@
                       <button
                         type="button"
                         (click)="removeSelectedFile(idx)"
-                        class="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-zinc-950/70 hover:bg-rose-600 text-white flex items-center justify-center text-xs font-bold transition shadow-sm"
+                        class="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-zinc-950/70 hover:bg-rose-600 text-white flex items-center justify-center text-xs font-bold transition shadow-sm z-10"
                         title="Quitar foto de la lista"
                         aria-label="Quitar foto"
                       >
@@ -2148,7 +2167,7 @@
                       <button
                         type="button"
                         (click)="toggleHdIndex(idx)"
-                        class="absolute bottom-1.5 left-1.5 right-1.5 py-1 px-2 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1 shadow-md transition active:scale-95"
+                        class="absolute bottom-1.5 left-1.5 right-1.5 py-1 px-2 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1 shadow-md transition active:scale-95 z-10"
                         [class]="isHdSelected(idx)
                           ? 'bg-amber-400 text-zinc-950 hover:bg-amber-300'
                           : 'bg-zinc-950/80 hover:bg-zinc-950 text-white'"
@@ -2157,17 +2176,43 @@
                       </button>
                     </div>
 
-                    <!-- Info del archivo -->
-                    <div class="p-2 bg-white border-t border-black/[0.04] text-[10px]">
+                    <!-- Info del archivo y controles táctiles de reordenamiento -->
+                    <div class="p-2 bg-white border-t border-black/[0.04] text-[10px] space-y-1">
                       <p class="font-semibold text-zinc-800 truncate" [title]="file.name">
                         {{ file.name }}
                       </p>
-                      <span
-                        class="font-mono"
-                        [class]="file.size > MAX_FILE_SIZE_BYTES ? 'text-rose-600 font-bold' : 'text-zinc-400'"
-                      >
-                        {{ (file.size / 1024 / 1024).toFixed(2) }} MB
-                      </span>
+                      <div class="flex items-center justify-between">
+                        <span
+                          class="font-mono"
+                          [class]="file.size > MAX_FILE_SIZE_BYTES ? 'text-rose-600 font-bold' : 'text-zinc-400'"
+                        >
+                          {{ (file.size / 1024 / 1024).toFixed(2) }} MB
+                        </span>
+
+                        <!-- Botones de flechas para reordenar en móviles -->
+                        <div class="flex items-center gap-1">
+                          <button
+                            type="button"
+                            (click)="moveQueueItem(idx, idx - 1)"
+                            [disabled]="idx === 0"
+                            class="w-5 h-5 rounded-md bg-zinc-100 hover:bg-zinc-200 text-zinc-700 disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center text-[10px] font-bold transition active:scale-90"
+                            title="Mover foto a la izquierda"
+                            aria-label="Mover foto a la izquierda"
+                          >
+                            ◀
+                          </button>
+                          <button
+                            type="button"
+                            (click)="moveQueueItem(idx, idx + 1)"
+                            [disabled]="idx === selectedFiles().length - 1"
+                            class="w-5 h-5 rounded-md bg-zinc-100 hover:bg-zinc-200 text-zinc-700 disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center text-[10px] font-bold transition active:scale-90"
+                            title="Mover foto a la derecha"
+                            aria-label="Mover foto a la derecha"
+                          >
+                            ▶
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 }
@@ -2636,6 +2681,180 @@
 }
 
 <!-- ======================================================================== -->
+<!-- MODAL BENTO: EDICIÓN DE METADATOS DEL ÁLBUM                               -->
+<!-- ======================================================================== -->
+@if (isEditAlbumModalOpen() && editingAlbum(); as currentEditingAlbum) {
+  <div
+    class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-zinc-950/70 backdrop-blur-sm animate-fadeIn"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="edit-album-modal-title"
+    (click)="closeEditAlbumModal()"
+  >
+    <div
+      class="bg-white rounded-[28px] border border-black/[0.08] shadow-2xl w-full max-w-xl max-h-[85vh] flex flex-col overflow-hidden animate-float-cart-in"
+      (click)="$event.stopPropagation()"
+    >
+      <!-- Cabecera Sticky del Modal -->
+      <div class="p-5 sm:p-6 border-b border-black/[0.06] flex items-center justify-between bg-white shrink-0">
+        <div>
+          <span class="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-[10px] uppercase tracking-wider">
+            ✏️ Editar Álbum
+          </span>
+          <h3 id="edit-album-modal-title" class="font-display font-extrabold text-xl sm:text-2xl text-zinc-900 mt-1 truncate">
+            {{ currentEditingAlbum.title }}
+          </h3>
+          <p class="text-xs text-zinc-500">
+            Modifica título, subtítulo, fecha y categoría sin alterar ni reprocesar sus fotos.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          (click)="closeEditAlbumModal()"
+          class="w-8 h-8 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-500 text-xs font-bold transition flex items-center justify-center active:scale-90"
+          aria-label="Cerrar modal de edición"
+        >
+          ✕
+        </button>
+      </div>
+
+      <!-- Formulario con Cuerpo Desplazable y Footer Fijo -->
+      <form [formGroup]="editAlbumForm" (ngSubmit)="submitUpdateAlbum()" class="flex flex-col flex-1 overflow-hidden">
+        <!-- Cuerpo con Scroll Interno -->
+        <div class="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1">
+          <!-- Alerta de Error en Edición -->
+          @if (editAlbumError()) {
+            <div class="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
+              <span>⚠️</span>
+              <span>{{ editAlbumError() }}</span>
+            </div>
+          }
+
+          <!-- Título -->
+          <div>
+            <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
+              Título del Evento / Partido *
+            </label>
+            <input
+              type="text"
+              formControlName="title"
+              placeholder="Ej: Defensores de la Boca vs Rioja Juniors"
+              class="w-full px-4 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition font-medium"
+            />
+          </div>
+
+          <!-- Categoría y Badge Dinámicos -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                Disciplina / Categoría *
+              </label>
+              <select
+                formControlName="category"
+                (change)="onEditCategoryChange($event)"
+                class="w-full px-4 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-semibold focus:outline-none focus:border-zinc-950 transition"
+              >
+                @for (cat of categories(); track cat.id) {
+                  <option [value]="cat.id">{{ cat.badgeLabel || (cat.icon + ' ' + cat.name) }}</option>
+                }
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                Insignia / Badge
+              </label>
+              <input
+                type="text"
+                formControlName="badge"
+                placeholder="⚽ Fútbol"
+                class="w-full px-4 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
+              />
+            </div>
+          </div>
+
+          <!-- Subtítulo -->
+          <div>
+            <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
+              Subtítulo / Torneo / Jornada
+            </label>
+            <input
+              type="text"
+              formControlName="subtitle"
+              placeholder="Ej: Torneo Clausura • Fecha 5"
+              class="w-full px-4 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
+            />
+          </div>
+
+          <!-- Fecha y Hora del Evento -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                Fecha del Evento
+              </label>
+              <input
+                type="date"
+                formControlName="eventDate"
+                class="w-full px-4 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
+              />
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                Horario del Evento
+              </label>
+              <input
+                type="time"
+                formControlName="eventTime"
+                class="w-full px-4 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
+              />
+            </div>
+          </div>
+
+          <!-- Ubicación / Estadio -->
+          <div>
+            <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
+              Lugar / Estadio / Salón
+            </label>
+            <input
+              type="text"
+              formControlName="location"
+              placeholder="Ej: Estadio Carlos A. Mercado Luna, La Rioja"
+              class="w-full px-4 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
+            />
+          </div>
+        </div>
+
+        <!-- Footer Sticky de Botones -->
+        <div class="p-4 sm:p-5 border-t border-black/[0.06] bg-zinc-50 flex items-center justify-end gap-3 shrink-0">
+          <button
+            type="button"
+            (click)="closeEditAlbumModal()"
+            class="px-4 py-2.5 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-700 font-bold text-xs transition active:scale-95"
+          >
+            Cancelar
+          </button>
+
+          <button
+            type="submit"
+            [disabled]="editAlbumForm.invalid || isUpdatingAlbum()"
+            class="px-5 py-2.5 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white font-display font-extrabold text-xs shadow-md transition active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center gap-2"
+          >
+            @if (isUpdatingAlbum()) {
+              <span class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              <span>Guardando cambios...</span>
+            } @else {
+              <span>💾 Guardar Cambios</span>
+            }
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- ======================================================================== -->
 <!-- MODAL DE CONFIRMACIÓN: PURGA PERMANENTE DE PAPELERA (HARD DELETE)        -->
 <!-- ======================================================================== -->
 @if (isPurgeModalOpen() && albumToPurge()) {
@@ -2720,14 +2939,34 @@
           </p>
         </div>
 
-        <button
-          type="button"
-          (click)="closePhotosModal()"
-          class="w-9 h-9 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 flex items-center justify-center text-sm font-bold transition active:scale-95 shrink-0"
-          aria-label="Cerrar modal de gestión de fotos"
-        >
-          ✕
-        </button>
+        <div class="flex items-center gap-2 shrink-0">
+          @if (isPhotosOrderDirty()) {
+            <button
+              type="button"
+              (click)="savePhotosOrder()"
+              [disabled]="isSavingPhotosOrder()"
+              class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-extrabold text-xs shadow-md transition flex items-center gap-1.5 active:scale-95 animate-pulse"
+              title="Guardar el nuevo orden de fotos en el catálogo"
+            >
+              @if (isSavingPhotosOrder()) {
+                <span class="w-3.5 h-3.5 border-2 border-zinc-950 border-t-transparent rounded-full animate-spin"></span>
+                <span>Guardando...</span>
+              } @else {
+                <span>💾</span>
+                <span>Guardar Orden</span>
+              }
+            </button>
+          }
+
+          <button
+            type="button"
+            (click)="closePhotosModal()"
+            class="w-9 h-9 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 flex items-center justify-center text-sm font-bold transition active:scale-95 shrink-0"
+            aria-label="Cerrar modal de gestión de fotos"
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       <!-- Feedback de acción -->
@@ -2782,11 +3021,20 @@
           }
 
           <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5 sm:gap-4">
-            @for (photo of albumPhotos(); track photo.id) {
+            @for (photo of albumPhotos(); track photo.id; let i = $index) {
               <div
-                class="bg-zinc-50 rounded-2xl border border-black/[0.06] overflow-hidden flex flex-col justify-between shadow-sm hover:shadow-md transition group"
+                draggable="true"
+                (dragstart)="onPhotoDragStart($event, i)"
+                (dragover)="onPhotoDragOver($event, i)"
+                (drop)="onPhotoDrop($event, i)"
+                (dragend)="onPhotoDragEnd()"
+                class="bg-zinc-50 rounded-2xl border border-black/[0.06] overflow-hidden flex flex-col justify-between shadow-sm hover:shadow-md transition group cursor-grab active:cursor-grabbing relative"
                 [class.ring-2]="currentAlbum.coverUrl === photo.previewUrl"
                 [class.ring-amber-500]="currentAlbum.coverUrl === photo.previewUrl"
+                [class.opacity-40]="draggedPhotoIndex() === i"
+                [class.border-amber-500]="dragOverPhotoIndex() === i"
+                [class.ring-2]="dragOverPhotoIndex() === i"
+                [class.ring-amber-400]="dragOverPhotoIndex() === i"
               >
                 <!-- Thumbnail con badges -->
                 <div class="relative aspect-square bg-zinc-200 overflow-hidden">
@@ -2795,7 +3043,7 @@
                     [alt]="photo.filename"
                     loading="lazy"
                     (error)="onPhotoThumbError($event, photo)"
-                    class="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                    class="w-full h-full object-cover group-hover:scale-105 transition duration-300 pointer-events-none"
                   />
 
                   <!-- Badges superiores -->
@@ -2873,6 +3121,31 @@
                       }
                     </button>
                   </div>
+
+                  <!-- Botón 4: Controles táctiles de orden móvil -->
+                  <div class="flex items-center justify-between gap-1 pt-1 border-t border-black/[0.04]">
+                    <button
+                      type="button"
+                      (click)="moveManagedPhoto(i, i - 1)"
+                      [disabled]="i === 0"
+                      class="px-2 py-0.5 rounded-md bg-zinc-100 hover:bg-zinc-200 text-zinc-700 disabled:opacity-25 disabled:pointer-events-none text-[10px] font-bold transition active:scale-90"
+                      title="Mover foto a la izquierda"
+                      aria-label="Mover foto a la izquierda"
+                    >
+                      ◀
+                    </button>
+                    <span class="text-[9px] font-mono text-zinc-400">#{{ i + 1 }}</span>
+                    <button
+                      type="button"
+                      (click)="moveManagedPhoto(i, i + 1)"
+                      [disabled]="i === albumPhotos().length - 1"
+                      class="px-2 py-0.5 rounded-md bg-zinc-100 hover:bg-zinc-200 text-zinc-700 disabled:opacity-25 disabled:pointer-events-none text-[10px] font-bold transition active:scale-90"
+                      title="Mover foto a la derecha"
+                      aria-label="Mover foto a la derecha"
+                    >
+                      ▶
+                    </button>
+                  </div>
                 </div>
               </div>
             }
@@ -2883,15 +3156,33 @@
       <!-- Footer del Modal -->
       <div class="p-3 sm:p-4 border-t border-black/[0.06] bg-zinc-50 flex items-center justify-between gap-3 shrink-0">
         <span class="text-[11px] text-zinc-500 hidden sm:inline">
-          Los cambios en portadas y muestras HD impactan de inmediato en la tienda y en la carpeta 3D.
+          Puedes arrastrar las fotos o usar las flechas ◀ ▶ para cambiar su orden de aparición.
         </span>
-        <button
-          type="button"
-          (click)="closePhotosModal()"
-          class="px-5 py-2 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white font-extrabold text-xs shadow-sm transition active:scale-95 ml-auto"
-        >
-          Cerrar
-        </button>
+        <div class="flex items-center gap-2 ml-auto">
+          @if (isPhotosOrderDirty()) {
+            <button
+              type="button"
+              (click)="savePhotosOrder()"
+              [disabled]="isSavingPhotosOrder()"
+              class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-extrabold text-xs shadow-md transition flex items-center gap-1.5 active:scale-95 animate-pulse"
+            >
+              @if (isSavingPhotosOrder()) {
+                <span class="w-3.5 h-3.5 border-2 border-zinc-950 border-t-transparent rounded-full animate-spin"></span>
+                <span>Guardando...</span>
+              } @else {
+                <span>💾</span>
+                <span>Guardar Orden</span>
+              }
+            </button>
+          }
+          <button
+            type="button"
+            (click)="closePhotosModal()"
+            class="px-5 py-2 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white font-extrabold text-xs shadow-sm transition active:scale-95"
+          >
+            Cerrar
+          </button>
+        </div>
       </div>
     </div>
   </div>

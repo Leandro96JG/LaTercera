@@ -8,6 +8,15 @@ import { AlbumService } from './core/services/album.service';
 import { Album } from './core/models/album.model';
 import { Photo } from './core/models/photo.model';
 
+// Mock IntersectionObserver for Angular @defer (on viewport) in Vitest jsdom environment
+if (typeof (globalThis as any).IntersectionObserver === 'undefined') {
+  (globalThis as any).IntersectionObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
+
 describe('App Root Component - LA TERCERA', () => {
   beforeEach(async () => {
     localStorage.clear();
@@ -529,6 +538,43 @@ describe('App Root Component - LA TERCERA', () => {
     expect(app.isOrderRecoveryOpen()).toBe(true);
     app.closeOrderRecovery();
     expect(app.isOrderRecoveryOpen()).toBe(false);
+  });
+
+  it('debe renderizar el Hero del álbum activo con fondo ambiental glassmorphic y tarjeta de portada 3D', () => {
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+    const albumService = TestBed.inject(AlbumService);
+
+    const testAlbum: Album = {
+      id: 'album-hero-3d',
+      category: 'futbol',
+      title: 'Final de Campeonato 2026',
+      subtitle: 'Cancha Principal',
+      date: '18 Octubre, 2026',
+      badge: '🏆 Final',
+      photosCount: 20,
+      unitPrice: 1500,
+      fullAlbumPrice: 12000,
+      coverUrl: 'https://example.com/cover-hero.webp',
+      isPrivate: false
+    };
+
+    vi.spyOn(albumService, 'getAlbumPhotos').mockReturnValue(of([]));
+
+    app.openAlbum(testAlbum);
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    
+    // Contenedor oscuro glassmorphic y tarjeta 3D
+    const heroCard = compiled.querySelector('.hero-cover-card');
+    expect(heroCard).toBeTruthy();
+    expect(compiled.textContent).toContain('Final de Campeonato 2026');
+    expect(compiled.textContent).toContain('Portada del Evento');
+
+    // Imagen de portada dentro de la tarjeta 3D
+    const coverImg = heroCard?.querySelector('img') as HTMLImageElement;
+    expect(coverImg?.src).toContain('cover-hero.webp');
   });
 });
 

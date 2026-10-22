@@ -63,13 +63,13 @@ export async function processImageWithWatermark(
       <svg width="${hdW}" height="${hdH}" xmlns="http://www.w3.org/2000/svg">
         <!-- Badge superior izquierdo -->
         <rect x="20" y="20" width="220" height="40" rx="10" fill="rgba(0,0,0,0.6)" />
-        <text x="35" y="46" font-family="sans-serif" font-size="14" font-weight="bold" fill="#FDB813">
+        <text x="35" y="46" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="bold" fill="#FDB813">
           ✦ LA TERCERA HD MASTER
         </text>
         <!-- Marca de agua diagonal sutil centrada -->
         <g transform="translate(${Math.round(hdW / 2)}, ${Math.round(hdH / 2)}) rotate(-25)">
-          <text text-anchor="middle" y="0" font-family="sans-serif" font-size="${Math.max(24, Math.round(hdW / 32))}" font-weight="900" fill="rgba(255,255,255,0.18)" letter-spacing="4">
-            LA TERCERA • MUESTRA HD
+          <text text-anchor="middle" y="0" font-family="DejaVu Sans, Arial, sans-serif" font-size="${Math.max(24, Math.round(hdW / 32))}" font-weight="900" fill="rgba(255,255,255,0.32)" stroke="rgba(0,0,0,0.25)" stroke-width="1" letter-spacing="4">
+            ${safeWatermarkText}
           </text>
         </g>
       </svg>
@@ -102,10 +102,10 @@ export async function processImageWithWatermark(
     <svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <pattern id="wmPattern" width="260" height="140" patternUnits="userSpaceOnUse" patternTransform="rotate(-25)">
-          <text x="20" y="50" font-family="sans-serif" font-size="16" font-weight="900" fill="rgba(255,255,255,0.45)" letter-spacing="2">
+          <text x="20" y="50" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="900" fill="rgba(255,255,255,0.45)" letter-spacing="2">
             ${safeWatermarkText}
           </text>
-          <text x="20" y="110" font-family="sans-serif" font-size="12" font-weight="700" fill="rgba(253,184,19,0.35)" letter-spacing="1">
+          <text x="20" y="110" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700" fill="rgba(253,184,19,0.35)" letter-spacing="1">
             PROHIBIDA SU COPIA
           </text>
         </pattern>

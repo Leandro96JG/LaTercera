@@ -10,6 +10,7 @@ export interface CreatePreferenceRequest {
   readonly isFullAlbum: boolean;
   readonly couponCode?: string;
   readonly customer: CustomerInfo;
+  readonly accessToken?: string;
 }
 
 export interface CreatePreferenceResponse {

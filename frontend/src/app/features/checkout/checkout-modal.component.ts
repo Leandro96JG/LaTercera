@@ -2,6 +2,7 @@ import { Component, ChangeDetectionStrategy, inject, signal, input, output, OnIn
 import { ReactiveFormsModule, FormGroup, FormControl, Validators } from '@angular/forms';
 import { CartStore } from '../../core/state/cart.store';
 import { PaymentService } from '../../core/services/payment.service';
+import { AlbumAccessStore } from '../../core/state/album-access.store';
 
 @Component({
   selector: 'app-checkout-modal',
@@ -201,6 +202,7 @@ import { PaymentService } from '../../core/services/payment.service';
 export class CheckoutModalComponent implements OnInit {
   public readonly cartStore = inject(CartStore);
   private readonly paymentService = inject(PaymentService);
+  private readonly albumAccessStore = inject(AlbumAccessStore);
 
   public ngOnInit(): void {
     this.cartStore.refreshPricingConfig();
@@ -281,11 +283,14 @@ export class CheckoutModalComponent implements OnInit {
       return;
     }
 
+    const accessToken = this.albumAccessStore.getAccessToken(albumId);
+
     this.paymentService.createPreference({
       albumId,
       photoIds: this.cartStore.selectedPhotoIds(),
       isFullAlbum: this.cartStore.isFullAlbum(),
       couponCode: this.cartStore.couponCode() ?? undefined,
+      accessToken,
       customer: {
         email: this.form.controls.email.value,
         phone: this.form.controls.phone.value || undefined

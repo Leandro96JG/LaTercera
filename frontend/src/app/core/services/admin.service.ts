@@ -288,6 +288,20 @@ export class AdminService {
   }
 
   /**
+   * Reordena las fotos de un álbum de forma persistente
+   */
+  public reorderAlbumPhotos(
+    albumId: string,
+    photoIds: string[]
+  ): Observable<{ success: boolean; albumId?: string; message?: string }> {
+    return this.http.put<{ success: boolean; albumId?: string; message?: string }>(
+      `${this.baseUrl}/albums/${albumId}/photos/reorder`,
+      { photoIds },
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  /**
    * Obtiene la configuración de descuentos por cantidad y la lista de cupones
    */
   public getPromotions(): Observable<AdminPromotionsResponse> {

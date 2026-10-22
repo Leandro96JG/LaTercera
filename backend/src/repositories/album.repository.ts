@@ -36,6 +36,7 @@ export interface PhotoDTO {
   originalPath: string;
   previewUrl: string;
   isSampleHd: boolean;
+  sortOrder?: number;
   width?: number;
   height?: number;
   sizeBytes?: number;
@@ -48,6 +49,7 @@ export interface PublicPhotoDTO {
   filename: string;
   previewUrl: string;
   isSampleHd: boolean;
+  sortOrder?: number;
   width?: number;
   height?: number;
   sizeBytes?: number;
@@ -142,6 +144,7 @@ export interface IAlbumRepository {
   getPhotoById(albumId: string, photoId: string): Promise<PhotoDTO | null>;
   updatePhoto(albumId: string, photoId: string, updates: Partial<PhotoDTO>): Promise<PhotoDTO | null>;
   deletePhoto(albumId: string, photoId: string): Promise<boolean>;
+  reorderPhotos(albumId: string, orderedPhotoIds: string[]): Promise<boolean>;
   
   // Métodos de conveniencia / retrocompatibilidad
   findAll(category?: string): Promise<AlbumDTO[]>;
@@ -395,10 +398,18 @@ export class MemoryAlbumRepository implements IAlbumRepository {
         list = [];
       }
     }
-    return list.map(p => ({
+    const mapped = list.map(p => ({
       ...p,
       previewUrl: normalizePreviewUrl(p.previewUrl)
     }));
+    return mapped.sort((a, b) => {
+      if (a.sortOrder !== undefined && b.sortOrder !== undefined) {
+        return a.sortOrder - b.sortOrder;
+      }
+      if (a.sortOrder !== undefined) return -1;
+      if (b.sortOrder !== undefined) return 1;
+      return 0;
+    });
   }
 
   async getPhotosByAlbum(albumId: string): Promise<PhotoDTO[]> {
@@ -438,6 +449,34 @@ export class MemoryAlbumRepository implements IAlbumRepository {
         album.coverUrl = filtered[0]?.previewUrl || '';
       }
     }
+    return true;
+  }
+
+  async reorderPhotos(albumId: string, orderedPhotoIds: string[]): Promise<boolean> {
+    const list = await this.getPhotosByAlbumId(albumId);
+    if (!list || list.length === 0) return true;
+
+    const photoMap = new Map(list.map(p => [p.id, p]));
+    const reordered: PhotoDTO[] = [];
+
+    for (let i = 0; i < orderedPhotoIds.length; i++) {
+      const id = orderedPhotoIds[i];
+      const p = photoMap.get(id);
+      if (p) {
+        p.sortOrder = i + 1;
+        reordered.push(p);
+        photoMap.delete(id);
+      }
+    }
+
+    const remaining = Array.from(photoMap.values());
+    for (let i = 0; i < remaining.length; i++) {
+      const p = remaining[i];
+      p.sortOrder = reordered.length + i + 1;
+      reordered.push(p);
+    }
+
+    this.photos.set(albumId, reordered);
     return true;
   }
 
@@ -1293,18 +1332,27 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
       if (error) {
         console.warn('[SupabaseAlbumRepository] Advertencia al consultar tabla photos en Supabase:', error.message || error);
       } else if (data && data.length > 0) {
-        return data.map((r: any) => ({
+        const mapped = data.map((r: any) => ({
           id: r.id,
           albumId: r.album_id,
           filename: r.filename,
           originalPath: r.original_path,
           previewUrl: normalizePreviewUrl(r.preview_url),
           isSampleHd: Boolean(r.is_sample_hd),
+          sortOrder: r.sort_order !== null && r.sort_order !== undefined ? Number(r.sort_order) : undefined,
           width: r.width ? Number(r.width) : undefined,
           height: r.height ? Number(r.height) : undefined,
           sizeBytes: r.size_bytes ? Number(r.size_bytes) : undefined,
           createdAt: r.created_at
         }));
+        return mapped.sort((a, b) => {
+          if (a.sortOrder !== undefined && b.sortOrder !== undefined) {
+            return a.sortOrder - b.sortOrder;
+          }
+          if (a.sortOrder !== undefined) return -1;
+          if (b.sortOrder !== undefined) return 1;
+          return 0;
+        });
       }
     } catch (err: unknown) {
       console.warn('[SupabaseAlbumRepository] Error consultando tabla photos en Supabase:', err);
@@ -1461,6 +1509,50 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
       }
     } catch {
       // Ignorar fallback
+    }
+
+    return true;
+  }
+
+  async reorderPhotos(albumId: string, orderedPhotoIds: string[]): Promise<boolean> {
+    // 1. Reordenar en localFallback
+    await this.localFallback.reorderPhotos(albumId, orderedPhotoIds);
+
+    // 2. Reordenar en localPhotosMap
+    const cached = this.localPhotosMap.get(albumId);
+    if (cached && cached.length > 0) {
+      const photoMap = new Map(cached.map(p => [p.id, p]));
+      const reordered: PhotoDTO[] = [];
+      for (let i = 0; i < orderedPhotoIds.length; i++) {
+        const id = orderedPhotoIds[i];
+        const p = photoMap.get(id);
+        if (p) {
+          p.sortOrder = i + 1;
+          reordered.push(p);
+          photoMap.delete(id);
+        }
+      }
+      const remaining = Array.from(photoMap.values());
+      for (let i = 0; i < remaining.length; i++) {
+        const p = remaining[i];
+        p.sortOrder = reordered.length + i + 1;
+        reordered.push(p);
+      }
+      this.localPhotosMap.set(albumId, reordered);
+    }
+
+    // 3. Persistir en Supabase si está configurado
+    try {
+      const updatePromises = orderedPhotoIds.map((photoId, index) =>
+        this.supabase
+          .from('photos')
+          .update({ sort_order: index + 1 })
+          .eq('id', photoId)
+          .eq('album_id', albumId)
+      );
+      await Promise.allSettled(updatePromises);
+    } catch (err: unknown) {
+      console.warn('[SupabaseAlbumRepository] Advertencia al persistir sort_order en Supabase:', err);
     }
 
     return true;

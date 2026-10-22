@@ -6,7 +6,7 @@ import { of, throwError, Subject } from 'rxjs';
 import { AdminPanelComponent } from './admin-panel.component';
 import { AdminService } from '../../core/services/admin.service';
 import { AdminAuthStore } from '../../core/state/admin-auth.store';
-import { AlbumCategory } from '../../core/models/album.model';
+import { Album, AlbumCategory } from '../../core/models/album.model';
 import { CategoryDTO } from '../../core/models/category.model';
 
 describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () => {
@@ -31,6 +31,7 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
     getAlbumPhotos: ReturnType<typeof vi.fn>;
     updateAlbumPhoto: ReturnType<typeof vi.fn>;
     deleteAlbumPhoto: ReturnType<typeof vi.fn>;
+    reorderAlbumPhotos: ReturnType<typeof vi.fn>;
     getPromotions: ReturnType<typeof vi.fn>;
     updatePricingConfig: ReturnType<typeof vi.fn>;
     createCoupon: ReturnType<typeof vi.fn>;
@@ -156,6 +157,11 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
         success: true,
         photoId: 'photo-1',
         message: 'Foto eliminada correctamente'
+      })),
+      reorderAlbumPhotos: vi.fn().mockReturnValue(of({
+        success: true,
+        albumId: 'album-1',
+        message: 'Orden de fotos actualizado correctamente'
       })),
       getPromotions: vi.fn().mockReturnValue(of({
         success: true,
@@ -1554,6 +1560,385 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
       vi.advanceTimersByTime(3000);
       expect(component.confirmingDeleteCategoryId()).toBeNull();
       vi.useRealTimers();
+    });
+  });
+
+  describe('Optimización de Memoria RAM, Subida en Micro-Lotes y Erradicación de [object Object]', () => {
+    describe('extractErrorMessage', () => {
+      it('debe devolver mensaje específico para status 413 (Payload Too Large)', () => {
+        const error = { status: 413 };
+        expect(component.extractErrorMessage(error)).toBe('El lote supera el límite de tamaño permitido.');
+      });
+
+      it('debe devolver mensaje específico para status 0 (Timeout o Fallo de Red)', () => {
+        const error = { status: 0 };
+        expect(component.extractErrorMessage(error)).toBe('Error de red o tiempo de espera agotado al subir las fotos.');
+      });
+
+      it('debe extraer err.error.error si es string', () => {
+        const error = { error: { error: 'Error específico de base de datos' } };
+        expect(component.extractErrorMessage(error)).toBe('Error específico de base de datos');
+      });
+
+      it('debe extraer err.error.message si es string', () => {
+        const error = { error: { message: 'Falta configurar credenciales' } };
+        expect(component.extractErrorMessage(error)).toBe('Falta configurar credenciales');
+      });
+
+      it('debe extraer err.error directo si es string', () => {
+        const error = { error: 'Mensaje de error plano en el body' };
+        expect(component.extractErrorMessage(error)).toBe('Mensaje de error plano en el body');
+      });
+
+      it('debe serializar de forma legible un objeto de error evitando "[object Object]"', () => {
+        const error = { error: { code: 'INVALID_PARAM', details: 'Faltan parámetros' } };
+        const msg = component.extractErrorMessage(error);
+        expect(msg).not.toBe('[object Object]');
+        expect(msg).toContain('INVALID_PARAM');
+      });
+
+      it('debe retornar defaultMsg si err es nulo o vacío', () => {
+        expect(component.extractErrorMessage(null, 'Error por defecto')).toBe('Error por defecto');
+      });
+    });
+
+    describe('generateThumbnailUrl', () => {
+      it('debe generar una URL de previsualización sin arrojar excepciones', async () => {
+        const file = new File(['mock-bytes'], 'test-thumb.jpg', { type: 'image/jpeg' });
+        const url = await (component as any).generateThumbnailUrl(file);
+        expect(typeof url).toBe('string');
+      });
+    });
+
+    describe('Subida por Micro-Lotes Secuenciales (Chunked Upload)', () => {
+      it('debe dividir 9 archivos en 3 micro-lotes de máximo 4 fotos, mapear hdIndices locales y consolidar resumen', () => {
+        const mockFiles: File[] = [];
+        for (let i = 0; i < 9; i++) {
+          mockFiles.push(new File([`data-${i}`], `foto_${i}.jpg`, { type: 'image/jpeg' }));
+        }
+
+        component.selectedFiles.set(mockFiles);
+        // Índices HD globales: foto 0 (lote 0, idx local 0) y foto 5 (lote 1, idx local 1 pues 5 - 4 = 1)
+        component.hdIndices.set([0, 5]);
+
+        const calls: Array<{ filesCount: number; hdIndices: number[] }> = [];
+
+        mockAdminService.bulkUpload.mockImplementation((_albumId, files, _wm, hdIndices, onProgress) => {
+          calls.push({ filesCount: files.length, hdIndices: [...hdIndices] });
+          onProgress?.(100);
+          return of({
+            success: true,
+            albumId: 'album-1',
+            summary: {
+              totalReceived: files.length,
+              successful: files.length,
+              failed: 0,
+              durationMs: 250
+            },
+            photos: files.map((f: File, idx: number) => ({
+              id: `p-${f.name}`,
+              originalName: f.name,
+              storagePath: `storage/${f.name}`,
+              previewUrl: `preview/${f.name}`,
+              width: 800,
+              height: 600,
+              format: 'webp',
+              isHD: hdIndices.includes(idx)
+            })),
+            errors: []
+          });
+        });
+
+        component.submitBulkUpload();
+
+        // 9 archivos / 4 = 3 lotes (4, 4, 1)
+        expect(calls.length).toBe(3);
+        expect(calls[0].filesCount).toBe(4);
+        expect(calls[0].hdIndices).toEqual([0]);
+
+        expect(calls[1].filesCount).toBe(4);
+        expect(calls[1].hdIndices).toEqual([1]); // 5 - 4 = 1
+
+        expect(calls[2].filesCount).toBe(1);
+        expect(calls[2].hdIndices).toEqual([]); // Ningún índice HD global en el lote 2
+
+        // Verificaciones de estado final
+        expect(component.uploadProgress()).toBe(100);
+        expect(component.isBulkUploading()).toBe(false);
+        expect(component.selectedFiles().length).toBe(0);
+        expect(component.bulkResult()?.summary.totalReceived).toBe(9);
+        expect(component.bulkResult()?.summary.successful).toBe(9);
+      });
+
+      it('debe manejar errores en micro-lotes sin asignar [object Object] a bulkError', () => {
+        const mockFiles = [
+          new File(['1'], 'f1.jpg', { type: 'image/jpeg' }),
+          new File(['2'], 'f2.jpg', { type: 'image/jpeg' })
+        ];
+        component.selectedFiles.set(mockFiles);
+
+        mockAdminService.bulkUpload.mockReturnValue(
+          throwError(() => ({
+            status: 413,
+            error: { message: 'Límite excedido' }
+          }))
+        );
+
+        component.submitBulkUpload();
+
+        expect(component.isBulkUploading()).toBe(false);
+        expect(component.bulkError()).toBe('El lote supera el límite de tamaño permitido.');
+        expect(component.bulkError()).not.toContain('[object Object]');
+      });
+    });
+
+    describe('Drag & Drop y Reordenamiento de Cola de Subida Masiva', () => {
+      it('debe reordenar archivos y previewUrls manteniendo las fotos marcadas como HD', () => {
+        const fileA = new File(['a'], 'foto_a.jpg', { type: 'image/jpeg' });
+        const fileB = new File(['b'], 'foto_b.jpg', { type: 'image/jpeg' });
+        const fileC = new File(['c'], 'foto_c.jpg', { type: 'image/jpeg' });
+
+        component.selectedFiles.set([fileA, fileB, fileC]);
+        component.filePreviewUrls.set(['blob:url_a', 'blob:url_b', 'blob:url_c']);
+        // Marcamos foto_b (índice 1) como HD
+        component.hdIndices.set([1]);
+
+        // Mover foto_b (índice 1) a la primera posición (índice 0)
+        component.moveQueueItem(1, 0);
+
+        // Ahora el orden debe ser [fileB, fileA, fileC]
+        expect(component.selectedFiles()[0].name).toBe('foto_b.jpg');
+        expect(component.selectedFiles()[1].name).toBe('foto_a.jpg');
+        expect(component.selectedFiles()[2].name).toBe('foto_c.jpg');
+
+        expect(component.filePreviewUrls()).toEqual(['blob:url_b', 'blob:url_a', 'blob:url_c']);
+
+        // fileB sigue marcado como HD, ahora en el índice 0
+        expect(component.hdIndices()).toEqual([0]);
+      });
+
+      it('debe ignorar índices fuera de rango en moveQueueItem', () => {
+        const fileA = new File(['a'], 'foto_a.jpg', { type: 'image/jpeg' });
+        const fileB = new File(['b'], 'foto_b.jpg', { type: 'image/jpeg' });
+        component.selectedFiles.set([fileA, fileB]);
+        component.filePreviewUrls.set(['blob:a', 'blob:b']);
+
+        component.moveQueueItem(0, -1);
+        expect(component.selectedFiles()[0].name).toBe('foto_a.jpg');
+
+        component.moveQueueItem(0, 5);
+        expect(component.selectedFiles()[0].name).toBe('foto_a.jpg');
+
+        component.moveQueueItem(0, 0);
+        expect(component.selectedFiles()[0].name).toBe('foto_a.jpg');
+      });
+
+      it('debe responder a eventos de Drag & Drop en la cola de subida', () => {
+        const fileA = new File(['a'], 'foto_a.jpg', { type: 'image/jpeg' });
+        const fileB = new File(['b'], 'foto_b.jpg', { type: 'image/jpeg' });
+        component.selectedFiles.set([fileA, fileB]);
+        component.filePreviewUrls.set(['blob:a', 'blob:b']);
+
+        const mockDragEvent = {
+          preventDefault: vi.fn(),
+          dataTransfer: {
+            effectAllowed: '',
+            dropEffect: '',
+            setData: vi.fn(),
+            getData: vi.fn()
+          }
+        } as unknown as DragEvent;
+
+        component.onQueueDragStart(mockDragEvent, 0);
+        expect(component.draggedQueueIndex()).toBe(0);
+
+        component.onQueueDragOver(mockDragEvent, 1);
+        expect(component.dragOverQueueIndex()).toBe(1);
+
+        component.onQueueDrop(mockDragEvent, 1);
+        // Debe haberse movido a la posición 1
+        expect(component.selectedFiles()[0].name).toBe('foto_b.jpg');
+        expect(component.selectedFiles()[1].name).toBe('foto_a.jpg');
+        expect(component.draggedQueueIndex()).toBeNull();
+        expect(component.dragOverQueueIndex()).toBeNull();
+
+        component.onQueueDragEnd();
+        expect(component.draggedQueueIndex()).toBeNull();
+      });
+    });
+
+    describe('Reordenamiento Persistente en Modal Gestionar Fotos del Álbum', () => {
+      beforeEach(() => {
+        component.selectedAlbumForPhotos.set(initialMockAlbum);
+        component.albumPhotos.set([
+          {
+            id: 'p1',
+            albumId: 'album-1',
+            filename: 'foto_1.jpg',
+            originalPath: '',
+            previewUrl: 'http://localhost:4000/p1.webp',
+            isSampleHd: false
+          },
+          {
+            id: 'p2',
+            albumId: 'album-1',
+            filename: 'foto_2.jpg',
+            originalPath: '',
+            previewUrl: 'http://localhost:4000/p2.webp',
+            isSampleHd: true
+          },
+          {
+            id: 'p3',
+            albumId: 'album-1',
+            filename: 'foto_3.jpg',
+            originalPath: '',
+            previewUrl: 'http://localhost:4000/p3.webp',
+            isSampleHd: false
+          }
+        ]);
+        component.isPhotosOrderDirty.set(false);
+      });
+
+      it('debe reordenar fotos y marcar isPhotosOrderDirty en true con moveManagedPhoto', () => {
+        expect(component.isPhotosOrderDirty()).toBe(false);
+
+        // Mover p3 (índice 2) a la primera posición (índice 0)
+        component.moveManagedPhoto(2, 0);
+
+        expect(component.isPhotosOrderDirty()).toBe(true);
+        const photos = component.albumPhotos();
+        expect(photos[0].id).toBe('p3');
+        expect(photos[1].id).toBe('p1');
+        expect(photos[2].id).toBe('p2');
+      });
+
+      it('debe gestionar eventos drag & drop en fotos del álbum', () => {
+        const mockDragEvent = {
+          preventDefault: vi.fn(),
+          dataTransfer: {
+            effectAllowed: '',
+            dropEffect: '',
+            setData: vi.fn()
+          }
+        } as unknown as DragEvent;
+
+        component.onPhotoDragStart(mockDragEvent, 1);
+        expect(component.draggedPhotoIndex()).toBe(1);
+
+        component.onPhotoDragOver(mockDragEvent, 0);
+        expect(component.dragOverPhotoIndex()).toBe(0);
+
+        component.onPhotoDrop(mockDragEvent, 0);
+        expect(component.albumPhotos()[0].id).toBe('p2');
+        expect(component.isPhotosOrderDirty()).toBe(true);
+        expect(component.draggedPhotoIndex()).toBeNull();
+
+        component.onPhotoDragEnd();
+        expect(component.draggedPhotoIndex()).toBeNull();
+      });
+
+      it('debe guardar el nuevo orden con savePhotosOrder invocando reorderAlbumPhotos', () => {
+        component.moveManagedPhoto(1, 0);
+        expect(component.isPhotosOrderDirty()).toBe(true);
+
+        mockAdminService.reorderAlbumPhotos.mockReturnValue(of({
+          success: true,
+          albumId: 'album-1',
+          message: 'Orden de fotos actualizado correctamente'
+        }));
+
+        component.savePhotosOrder();
+
+        expect(mockAdminService.reorderAlbumPhotos).toHaveBeenCalledWith('album-1', ['p2', 'p1', 'p3']);
+        expect(component.isSavingPhotosOrder()).toBe(false);
+        expect(component.isPhotosOrderDirty()).toBe(false);
+        expect(component.photosModalFeedback()?.success).toBe(true);
+      });
+
+      it('debe resetear isPhotosOrderDirty al cerrar el modal de fotos', () => {
+        component.moveManagedPhoto(1, 0);
+        expect(component.isPhotosOrderDirty()).toBe(true);
+
+        component.closePhotosModal();
+
+        expect(component.isPhotosModalOpen()).toBe(false);
+        expect(component.isPhotosOrderDirty()).toBe(false);
+      });
+    });
+
+    describe('Modal de Edición de Metadatos del Álbum (Sin reprocesar fotos)', () => {
+      it('debe precargar los datos del álbum en editAlbumForm con openEditAlbumModal', () => {
+        component.openEditAlbumModal(initialMockAlbum);
+
+        expect(component.isEditAlbumModalOpen()).toBe(true);
+        expect(component.editingAlbum()?.id).toBe('album-1');
+        expect(component.editAlbumForm.get('title')?.value).toBe('Atlético Tesorieri vs Andino SC');
+        expect(component.editAlbumForm.get('category')?.value).toBe('futbol');
+        expect(component.editAlbumForm.get('badge')?.value).toBe('⚽ Fútbol');
+      });
+
+      it('debe cerrar el modal de edición y limpiar el formulario con closeEditAlbumModal', () => {
+        component.openEditAlbumModal(initialMockAlbum);
+        component.closeEditAlbumModal();
+
+        expect(component.isEditAlbumModalOpen()).toBe(false);
+        expect(component.editingAlbum()).toBeNull();
+      });
+
+      it('debe actualizar el badge al cambiar la categoría en onEditCategoryChange', () => {
+        component.categories.set([
+          { id: 'basquet', name: 'Básquet', icon: '🏀', badgeLabel: '🏀 Básquet', order: 1, isActive: true }
+        ]);
+
+        const mockEvent = {
+          target: { value: 'basquet' }
+        } as unknown as Event;
+
+        component.onEditCategoryChange(mockEvent);
+
+        expect(component.editAlbumForm.get('badge')?.value).toBe('🏀 Básquet');
+      });
+
+      it('debe guardar cambios del álbum con submitUpdateAlbum e impactar reactivamente en albums()', () => {
+        component.albums.set([initialMockAlbum]);
+        component.openEditAlbumModal(initialMockAlbum);
+
+        component.editAlbumForm.patchValue({
+          title: 'Clásico Riojano 2026 - Edición Especial',
+          subtitle: 'Gran Final del Torneo',
+          location: 'Cancha Oficial'
+        });
+
+        const updatedAlbumMock: Album = {
+          ...initialMockAlbum,
+          title: 'Clásico Riojano 2026 - Edición Especial',
+          subtitle: 'Gran Final del Torneo',
+          location: 'Cancha Oficial'
+        };
+
+        mockAdminService.updateAlbum.mockReturnValue(of({
+          success: true,
+          album: updatedAlbumMock,
+          message: 'Álbum actualizado con éxito'
+        }));
+
+        component.submitUpdateAlbum();
+
+        expect(mockAdminService.updateAlbum).toHaveBeenCalledWith(
+          'album-1',
+          expect.objectContaining({
+            title: 'Clásico Riojano 2026 - Edición Especial',
+            subtitle: 'Gran Final del Torneo',
+            location: 'Cancha Oficial'
+          })
+        );
+
+        expect(component.isEditAlbumModalOpen()).toBe(false);
+        const savedAlbum = component.albums().find(a => a.id === 'album-1');
+        expect(savedAlbum?.title).toBe('Clásico Riojano 2026 - Edición Especial');
+        expect(savedAlbum?.subtitle).toBe('Gran Final del Torneo');
+        expect(component.toast()?.type).toBe('success');
+      });
     });
   });
 });

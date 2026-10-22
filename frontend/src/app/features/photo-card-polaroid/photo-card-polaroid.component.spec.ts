@@ -160,14 +160,14 @@ describe('PhotoCardPolaroidComponent', () => {
     expect(compiled.textContent).toContain('Muestra HD');
   });
 
-  it('debe mostrar la marca de agua centrada LA TERCERA • MUESTRA', () => {
+  it('no debe superponer la marca de agua HTML en el DOM porque viene grabada en los píxeles del WebP', () => {
     fixture.componentRef.setInput('photo', mockPhoto);
     fixture.componentRef.setInput('index', 0);
     fixture.componentRef.setInput('unitPrice', 1200);
     fixture.detectChanges();
 
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.textContent).toContain('LA TERCERA • MUESTRA');
+    expect(compiled.textContent).not.toContain('LA TERCERA • MUESTRA');
   });
 
   it('debe activar hasError y renderizar el placeholder estético de La Tercera si la imagen falla al cargar', () => {

@@ -253,60 +253,112 @@
         </span>
       </div>
 
-      <!-- Hero del Álbum Activo -->
+      <!-- Hero del Álbum Activo con Fondo Ambiental Glassmorphism y Portada 3D -->
       <div
         [style.view-transition-name]="'album-cover-' + album.id"
-        class="bg-white rounded-[32px] p-6 sm:p-8 border border-black/[0.05] shadow-bento flex flex-col md:flex-row md:items-center justify-between gap-6"
+        class="relative overflow-hidden rounded-[32px] bg-zinc-950 text-white p-6 sm:p-10 shadow-2xl border border-white/10"
       >
-        <div>
-          <div class="flex flex-wrap items-center gap-2 mb-2">
-            <span class="px-3 py-1 rounded-full bg-zinc-950 text-white text-[11px] font-bold uppercase tracking-wider">
-              {{ album.badge }}
-            </span>
-            <span class="text-xs text-zinc-400 font-medium">{{ album.date }}</span>
-
-            @if (album.isFreeDownload) {
-              <span class="px-3 py-1 rounded-full bg-amber-400 text-zinc-950 text-[11px] font-extrabold flex items-center gap-1 shadow-sm animate-pulse">
-                <span>🎁</span> <span>Cortesía Gratuita • Máxima Calidad</span>
-              </span>
-            }
-
-            @if (album.isPrivate) {
-              <span class="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 text-[11px] font-bold flex items-center gap-1">
-                <span>🔓</span> <span>Desbloqueado con PIN</span>
-              </span>
-            }
-          </div>
-          <h2 class="font-display font-extrabold text-2xl sm:text-3xl text-zinc-900 tracking-tight">
-            {{ album.title }}
-          </h2>
-          <p class="text-xs sm:text-sm text-zinc-500 mt-1 max-w-xl">
-            @if (album.isFreeDownload) {
-              Álbum liberado de cortesía en resolución 4K original por Jenifer Espeche. Puedes descargar el álbum completo en ZIP gratis o elegir fotos individuales.
-            } @else {
-              Toca las fotos para ampliarlas en el visor cinemático o márcalas para descargarlas en calidad original 4K sin marcas de agua.
-            }
-          </p>
+        <!-- Fondo Ambiental Difuminado (Ambient Glassmorphism) -->
+        <div class="absolute inset-0 z-0 pointer-events-none overflow-hidden select-none" aria-hidden="true">
+          @if (album.coverUrl) {
+            <img
+              [src]="album.coverUrl"
+              [alt]="album.title"
+              class="w-full h-full object-cover scale-125 blur-2xl opacity-35 saturate-150 transition duration-700 pointer-events-none"
+              loading="lazy"
+              decoding="async"
+            />
+          }
+          <div class="absolute inset-0 bg-gradient-to-r from-zinc-950 via-zinc-950/85 to-zinc-950/40"></div>
         </div>
 
-        <div class="flex flex-wrap items-center gap-3">
-          @if (album.isFreeDownload) {
-            <button
-              (click)="downloadCourtesyZip(album)"
-              class="px-5 py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-zinc-950 font-extrabold text-xs shadow-md shadow-amber-500/20 transition active:scale-95 flex items-center gap-2"
-              title="Descargar todas las fotos originales en un archivo ZIP sin costo"
-            >
-              <span>🎁 Descargar Álbum Completo Gratis (Original HD ZIP)</span>
-              <span>⚡</span>
-            </button>
-          } @else {
-            <button
-              (click)="buyFullAlbum()"
-              class="px-5 py-3 rounded-2xl bg-zinc-950 hover:bg-zinc-800 text-white font-bold text-xs shadow-md transition active:scale-95 flex items-center gap-2"
-            >
-              <span>Comprar Álbum Completo (${{ album.fullAlbumPrice.toLocaleString('es-AR') }})</span>
-              <span>⚡</span>
-            </button>
+        <!-- Contenido Frontal del Hero -->
+        <div class="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-8 w-full">
+          <!-- Textos e Información -->
+          <div class="flex-1 w-full">
+            <div class="flex flex-wrap items-center gap-2 mb-3">
+              <span class="px-3 py-1 rounded-full bg-white/10 text-white text-[11px] font-bold uppercase tracking-wider border border-white/15 backdrop-blur-sm">
+                {{ album.badge }}
+              </span>
+              <span class="text-xs text-zinc-300 font-medium">{{ album.date }}</span>
+
+              @if (album.isFreeDownload) {
+                <span class="px-3 py-1 rounded-full bg-amber-400 text-zinc-950 text-[11px] font-extrabold flex items-center gap-1 shadow-sm animate-pulse">
+                  <span>🎁</span> <span>Cortesía Gratuita • Máxima Calidad</span>
+                </span>
+              }
+
+              @if (album.isPrivate) {
+                <span class="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold flex items-center gap-1 backdrop-blur-sm">
+                  <span>🔓</span> <span>Desbloqueado con PIN</span>
+                </span>
+              }
+            </div>
+
+            <h2 class="font-display font-extrabold text-2xl sm:text-3xl lg:text-4xl text-white tracking-tight">
+              {{ album.title }}
+            </h2>
+
+            @if (album.subtitle) {
+              <p class="text-xs sm:text-sm text-zinc-300 font-medium mt-1">
+                {{ album.subtitle }}
+              </p>
+            }
+
+            <p class="text-xs sm:text-sm text-zinc-300/90 mt-2 max-w-xl leading-relaxed">
+              @if (album.isFreeDownload) {
+                Álbum liberado de cortesía en resolución 4K original por Jenifer Espeche. Puedes descargar el álbum completo en ZIP gratis o elegir fotos individuales.
+              } @else {
+                Toca las fotos para ampliarlas en el visor cinemático o márcalas para descargarlas en calidad original 4K sin marcas de agua.
+              }
+            </p>
+
+            <div class="flex flex-wrap items-center gap-3 mt-6">
+              @if (album.isFreeDownload) {
+                <button
+                  (click)="downloadCourtesyZip(album)"
+                  class="px-5 py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-zinc-950 font-extrabold text-xs shadow-md shadow-amber-500/20 transition active:scale-95 flex items-center gap-2"
+                  title="Descargar todas las fotos originales en un archivo ZIP sin costo"
+                >
+                  <span>🎁 Descargar Álbum Completo Gratis (Original HD ZIP)</span>
+                  <span>⚡</span>
+                </button>
+              } @else {
+                <button
+                  (click)="buyFullAlbum()"
+                  class="px-5 py-3 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-950 font-bold text-xs shadow-md transition active:scale-95 flex items-center gap-2"
+                >
+                  <span>Comprar Álbum Completo (${{ album.fullAlbumPrice.toLocaleString('es-AR') }})</span>
+                  <span>⚡</span>
+                </button>
+              }
+            </div>
+          </div>
+
+          <!-- Tarjeta de Portada 3D Interactiva -->
+          @if (album.coverUrl) {
+            <div class="hero-cover-wrapper relative shrink-0 w-full sm:w-72 md:w-80 group/cover">
+              <div
+                class="hero-cover-card aspect-[4/3] rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20 transition-all duration-500 ease-out bg-zinc-900 relative"
+              >
+                <img
+                  [src]="album.coverUrl"
+                  [alt]="album.title"
+                  class="w-full h-full object-cover transition-transform duration-700 ease-out group-hover/cover:scale-105"
+                  loading="eager"
+                  decoding="async"
+                />
+                <!-- Brillo especular y gradiente de sombra interior -->
+                <div class="hero-cover-shine absolute inset-0 pointer-events-none"></div>
+                <div class="absolute inset-0 bg-gradient-to-tr from-black/40 via-transparent to-white/10 pointer-events-none"></div>
+
+                <!-- Insignia flotante 3D -->
+                <div class="absolute bottom-2.5 left-2.5 px-2.5 py-1 rounded-lg bg-zinc-950/80 backdrop-blur-md text-[10px] font-bold text-amber-400 border border-white/15 shadow-md flex items-center gap-1.5 pointer-events-none">
+                  <span>📌</span>
+                  <span class="tracking-wide">Portada del Evento</span>
+                </div>
+              </div>
+            </div>
           }
         </div>
       </div>

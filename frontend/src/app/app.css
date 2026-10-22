@@ -24,3 +24,50 @@
   transform: perspective(1000px) rotateY(0deg) rotateX(0deg) scale(1.05) translateZ(28px) !important;
   z-index: 30;
 }
+
+/* ======================================================== */
+/* HERO DEL ÁLBUM ACTIVO: TARJETA 3D INTERACTIVA GPU       */
+/* ======================================================== */
+
+.hero-cover-wrapper {
+  perspective: 1000px;
+}
+
+.hero-cover-card {
+  transform-style: preserve-3d;
+  will-change: transform, box-shadow;
+  transform: perspective(1000px) rotateY(-8deg) rotateX(4deg);
+  box-shadow: -12px 16px 36px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.15);
+  transition: transform 500ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 500ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hero-cover-shine {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0) 55%);
+  opacity: 0.6;
+  transition: opacity 500ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .hero-cover-wrapper:hover .hero-cover-card {
+    transform: perspective(1000px) rotateY(0deg) rotateX(0deg) scale(1.03);
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.25);
+  }
+
+  .hero-cover-wrapper:hover .hero-cover-shine {
+    opacity: 0.85;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .photo-deck-card,
+  .photo-deck-card:hover,
+  .hero-cover-card,
+  .hero-cover-wrapper:hover .hero-cover-card {
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .hero-cover-shine {
+    transition: none !important;
+  }
+}
