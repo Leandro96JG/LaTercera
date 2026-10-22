@@ -2,7 +2,7 @@
 
 > **REGLA DE CONTEXTO:** Este archivo debe mantenerse ultraligero (<95 líneas).
 > Para invariantes de negocio y seguridad, consultar [docs/BUSINESS_LOGIC.md](file:///e:/code/IA/fotos/docs/BUSINESS_LOGIC.md).
-> Para el historial completo de decisiones (ADR-001 al ADR-063), consultar [docs/ADR_HISTORY.md](file:///e:/code/IA/fotos/docs/ADR_HISTORY.md).
+> Para el historial completo de decisiones (ADR-001 al ADR-064), consultar [docs/ADR_HISTORY.md](file:///e:/code/IA/fotos/docs/ADR_HISTORY.md).
 
 ---
 
@@ -48,6 +48,7 @@
 ## 4. Estado Actual y Últimos Hitos (ADRs Recientes)
 - **Suite de Pruebas Automatizadas:** **463 tests pasando al 100%** (224 backend con Vitest + 239 frontend con Angular TestBed/Vitest).
 - **Últimos ADRs Consolidados:**
+  - **ADR-064:** Paquete tipográfico `font-dejavu` en Alpine Dockerfile, desbloqueo de `PUT /photos/reorder` en Railway y sanitización HTML en errores.
   - **ADR-063:** Hero Ambient Glassmorphic 3D en álbum activo, tarjeta de portada interactiva con hover GPU y eliminación definitiva de marca de agua HTML superpuesta.
   - **ADR-062:** Optimización extrema de RAM con miniaturas Canvas WebP 320px, subida por micro-lotes secuenciales de 4 fotos y erradicación de `[object Object]`.
   - **ADR-061:** Soporte de fuentes `DejaVu Sans` en Sharp Docker Alpine, validación obligatoria de token PIN en checkout de álbumes privados y corrección SQL de clave primaria en cupones.

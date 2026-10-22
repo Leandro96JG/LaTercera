@@ -2323,9 +2323,17 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
       if (msg.trim().length > 0) return msg.trim();
     }
 
-    // 3. err?.error es string directo
+    // 3. err?.error es string directo (puede ser HTML si es error de Express/Nginx)
     if (typeof innerError === 'string' && innerError.trim().length > 0) {
-      return innerError.trim();
+      const trimmed = innerError.trim();
+      if (trimmed.startsWith('<!DOCTYPE') || trimmed.includes('<html')) {
+        const preMatch = trimmed.match(/<pre[^>]*>([\s\S]*?)<\/pre>/i);
+        if (preMatch && preMatch[1]) {
+          return preMatch[1].trim();
+        }
+        return `Error del servidor (${errorObj['status'] || 500})`;
+      }
+      return trimmed;
     }
 
     // 4. err?.error es un objeto: intentar serializarlo de forma legible

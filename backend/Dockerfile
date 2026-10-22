@@ -8,7 +8,9 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Dependencias nativas del sistema requeridas para módulos C++, Sharp y renderizado tipográfico SVG en Alpine Linux
-RUN apk add --no-cache python3 make g++ libc6-compat fontconfig ttf-dejavu && fc-cache -fv
+RUN apk add --no-cache python3 make g++ libc6-compat fontconfig && \
+    (apk add --no-cache font-dejavu || apk add --no-cache ttf-dejavu || true) && \
+    fc-cache -fv
 
 # Copiar manifiestos de dependencias para aprovechar la caché de capas de Docker
 COPY package*.json ./
@@ -34,7 +36,9 @@ FROM node:22-alpine AS runner
 WORKDIR /app
 
 # Instalar compatibilidad de librerías del sistema y fuentes tipográficas reales para librsvg / Sharp en Alpine
-RUN apk add --no-cache libc6-compat fontconfig ttf-dejavu && fc-cache -fv
+RUN apk add --no-cache libc6-compat fontconfig && \
+    (apk add --no-cache font-dejavu || apk add --no-cache ttf-dejavu || true) && \
+    fc-cache -fv
 
 # Configurar variables de entorno de producción
 ENV NODE_ENV=production

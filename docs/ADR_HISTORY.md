@@ -1,6 +1,6 @@
-﻿# Historial de Decisiones Arquitectónicas (ADR) - LA TERCERA
+# Historial de Decisiones Arquitectónicas (ADR) - LA TERCERA
 
-> **Archivo Histórico de Decisiones de Arquitectura e Implementación (ADR-001 al ADR-063)**
+> **Archivo Histórico de Decisiones de Arquitectura e Implementación (ADR-001 al ADR-064)**
 > Este archivo preserva la trazabilidad técnica completa, diagnósticos, soluciones y evidencias de verificación de cada iteración del sistema LA TERCERA (Jenifer "Yuyo" Espeche - La Rioja, Argentina).
 > Para consultar las invariantes activas e inmutables del negocio, ver [docs/BUSINESS_LOGIC.md](file:///e:/code/IA/fotos/docs/BUSINESS_LOGIC.md). Para el estado vivo del proyecto, ver [MEMORY.md](file:///e:/code/IA/fotos/MEMORY.md).
 
@@ -111,6 +111,25 @@
 - [x] Optimización Extrema de RAM en Previsualizaciones (Canvas WebP 320px), Subida por Micro-Lotes Secuenciales de 4 Fotos (Chunked Upload) y Erradicación Definitiva de `[object Object]` con **446 tests unitarios pasando al 100%** (220 backend + 226 frontend).
 - [x] Reordenamiento Drag & Drop de Fotografías (Cola de Subida y Galería Persistente) y Modal Bento de Edición de Metadatos de Álbumes con **462 tests unitarios pasando al 100%** (224 backend + 238 frontend).
 - [x] Rediseño 3D Ambient Glassmorphic del Hero del Álbum Activo, Tarjeta de Portada 3D Interactiva con Hover GPU y Eliminación de Marca de Agua HTML Superpuesta con **463 tests unitarios pasando al 100%** (224 backend + 239 frontend).
+- [x] Resolución de Paquete Tipográfico en Docker Alpine (font-dejavu), Desbloqueo del Endpoint PUT /photos/reorder en Producción Railway y Sanitización de Errores HTML con **463 tests unitarios pasando al 100%** (224 backend + 239 frontend).
+
+### ADR-064: Resolución de Paquete Tipográfico en Docker Alpine (font-dejavu), Desbloqueo del Endpoint PUT /photos/reorder en Producción y Sanitización de Errores HTML
+- **Motivación y Diagnóstico:**
+  1. *Fallo de Despliegue en Railway por Paquete Inexistente en Alpine Linux:* En ADR-061 se agregó `ttf-dejavu` a `backend/Dockerfile`. En imágenes basadas en `node:22-alpine` (Alpine Linux 3.20/3.21), el paquete fue renombrado formalmente a `font-dejavu`. La ejecución de `apk add --no-cache ... ttf-dejavu` fallaba la construcción de la imagen en Railway, provocando que Railway mantuviera en ejecución el contenedor de un despliegue anterior donde el endpoint `PUT /api/admin/albums/:id/photos/reorder` aún no existía.
+  2. *Error 404 al Guardar el Reordenamiento de Fotos:* Al arrastrar fotos en el panel administrativo y pulsar "Guardar orden", el frontend llamaba a `PUT /api/admin/albums/los-pi-2026/photos/reorder`. Al recibir la petición el contenedor previo de Railway, Express respondía con su página HTML 404 por defecto (`Cannot PUT /api/admin/albums/los-pi-2026/photos/reorder`).
+  3. *Presentación de HTML Crudo en Modal:* El método `extractErrorMessage` del frontend asignaba directamente el cuerpo de respuesta en formato HTML si el backend o un proxy respondía con error antes de retornar JSON estructurado.
+- **Solución Técnica Implementada:**
+  1. **Blindaje de Fuentes en `backend/Dockerfile`:**
+     - Se actualizó la directiva de instalación tanto en la etapa `builder` como en `runner` a: `(apk add --no-cache font-dejavu || apk add --no-cache ttf-dejavu || true) && fc-cache -fv`, garantizando que la imagen Docker compile sin interrupciones tanto en versiones modernas de Alpine con `font-dejavu` como en versiones legadas con `ttf-dejavu`.
+  2. **Refuerzo Defensivo en `backend/src/routes/admin-albums.routes.ts`:**
+     - Limpieza y sanitización de `albumId` (`rawAlbumId.trim()`).
+     - Verificación defensiva contra `albumRepository.getAlbumById(albumId)` con fallback a `getPhotosByAlbumId(albumId)` para evitar 404s espurios si el álbum tiene fotos persistidas en el catálogo.
+  3. **Sanitización de Errores HTML en `frontend/src/app/features/admin-panel/admin-panel.component.ts`:**
+     - En `extractErrorMessage`, si `err.error` es una cadena con marcas `<!DOCTYPE` o `<html`, se extrae limpiamente el mensaje dentro de la etiqueta `<pre>` o se retorna el estado HTTP legible, erradicando código HTML crudo en la interfaz.
+- **Evidencia y Validación:**
+  1. **463 tests unitarios aprobados al 100%:** 224 tests de backend (Vitest) y 239 tests de frontend (Angular TestBed/Vitest).
+  2. `tsc` en backend y `ng build` en frontend completados con código 0 y 0 errores.
+
 
 ### ADR-063: Rediseño 3D Ambient Glassmorphic del Hero de Álbum Activo, Tarjeta de Portada 3D Interactiva y Supresión de Marca de Agua HTML Superpuesta
 - **Motivación y Diagnóstico:**

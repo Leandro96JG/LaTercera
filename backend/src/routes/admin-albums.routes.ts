@@ -848,8 +848,16 @@ export function createAdminAlbumsRouter(
   router.put('/:id/photos/reorder', requireAdminAuth, async (req: Request, res: Response) => {
     try {
       const rawId = req.params.id;
-      const albumId = Array.isArray(rawId) ? rawId[0] : rawId;
+      const rawAlbumId = Array.isArray(rawId) ? rawId[0] : rawId;
+      const albumId = typeof rawAlbumId === 'string' ? rawAlbumId.trim() : '';
       const { photoIds } = req.body as { photoIds: string[] };
+
+      if (!albumId) {
+        return res.status(400).json({
+          success: false,
+          error: 'ID de álbum no proporcionado o inválido'
+        });
+      }
 
       if (!Array.isArray(photoIds)) {
         return res.status(400).json({
@@ -860,10 +868,13 @@ export function createAdminAlbumsRouter(
 
       const album = await albumRepository.getAlbumById(albumId);
       if (!album) {
-        return res.status(404).json({
-          success: false,
-          error: 'Álbum no encontrado'
-        });
+        const existingPhotos = await albumRepository.getPhotosByAlbumId(albumId);
+        if (existingPhotos.length === 0) {
+          return res.status(404).json({
+            success: false,
+            error: 'Álbum no encontrado'
+          });
+        }
       }
 
       await albumRepository.reorderPhotos(albumId, photoIds);
