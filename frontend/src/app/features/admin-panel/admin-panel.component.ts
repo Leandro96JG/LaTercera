@@ -409,7 +409,7 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     photosSold: 43,
     albumsSold: 3,
     revenueARS: 64200,
-    storageUsedGB: 1.8,
+    storageUsedGB: 0,
     storageLimitGB: 10,
     activeAlbumsCount: 4,
     lastUpdated: new Date().toISOString()
