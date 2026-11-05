@@ -32,7 +32,7 @@ import { CartStore } from '../../core/state/cart.store';
             <!-- Cabecera del Drawer -->
             <div class="flex items-center justify-between pb-4 border-b border-white/10 shrink-0">
               <div class="flex items-center gap-3">
-                <span class="w-8 h-8 rounded-full bg-white text-zinc-950 font-display font-extrabold text-sm flex items-center justify-center">
+                <span class="w-8 h-8 rounded-full bg-white text-zinc-950 font-display font-extrabold text-sm flex items-center justify-center shrink-0">
                   {{ cartStore.totalItemsCount() }}
                 </span>
                 <div>
@@ -54,7 +54,7 @@ import { CartStore } from '../../core/state/cart.store';
                   <button
                     type="button"
                     (click)="clearCart()"
-                    class="px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-zinc-300 text-[11px] font-semibold transition"
+                    class="min-h-[36px] px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-zinc-300 text-xs font-semibold transition active:scale-95 focus-visible:ring-2 focus-visible:ring-white"
                     title="Vaciar selección"
                   >
                     Vaciar
@@ -63,10 +63,13 @@ import { CartStore } from '../../core/state/cart.store';
                 <button
                   type="button"
                   (click)="closeExpanded()"
-                  class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition flex items-center justify-center active:scale-90"
+                  class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white transition flex items-center justify-center active:scale-90 focus-visible:ring-2 focus-visible:ring-white shrink-0"
                   aria-label="Cerrar detalle del carrito"
                 >
-                  ✕
+                  <svg class="w-4 h-4 text-white shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
                 </button>
               </div>
             </div>
@@ -77,8 +80,11 @@ import { CartStore } from '../../core/state/cart.store';
                 <!-- Tarjeta Destacada de Álbum Completo -->
                 <div class="p-5 rounded-2xl bg-gradient-to-br from-amber-500/20 via-zinc-900 to-zinc-900 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div class="space-y-1">
-                    <span class="px-2.5 py-0.5 rounded-full bg-amber-400 text-zinc-950 text-[10px] font-extrabold uppercase tracking-wider">
-                      ★ Máximo Ahorro
+                    <span class="px-2.5 py-0.5 rounded-full bg-amber-400 text-zinc-950 text-[10px] font-extrabold uppercase tracking-wider inline-flex items-center gap-1">
+                      <svg class="w-2.5 h-2.5 text-zinc-950 fill-current shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 2l2.4 7.2h7.6l-6.1 4.5 2.3 7.3-6.2-4.6-6.2 4.6 2.3-7.3-6.1-4.5h7.6z"/>
+                      </svg>
+                      <span>Máximo Ahorro</span>
                     </span>
                     <h4 class="font-display font-extrabold text-base text-amber-200">
                       Todas las fotografías del evento
@@ -103,10 +109,15 @@ import { CartStore } from '../../core/state/cart.store';
                   <button
                     type="button"
                     (click)="removeFullAlbum()"
-                    class="px-3.5 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-xs font-bold transition flex items-center gap-1.5 active:scale-95"
+                    class="min-h-[40px] px-3.5 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-xs font-bold transition flex items-center gap-1.5 active:scale-95 focus-visible:ring-2 focus-visible:ring-rose-400"
                     title="Quitar álbum completo del carrito"
                   >
-                    <span>🗑️ Quitar Álbum</span>
+                    <svg class="w-3.5 h-3.5 text-rose-300 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M3 6h18"/>
+                      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                    </svg>
+                    <span>Quitar Álbum</span>
                   </button>
                 </div>
               } @else {
@@ -115,7 +126,11 @@ import { CartStore } from '../../core/state/cart.store';
                   <div class="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-500/20 via-zinc-900 to-zinc-900 border border-amber-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
                     <div class="space-y-0.5">
                       <span class="text-xs font-black text-amber-300 flex items-center gap-1.5">
-                        <span>💡</span>
+                        <svg class="w-3.5 h-3.5 text-amber-300 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/>
+                          <path d="M9 18h6"/>
+                          <path d="M10 22h4"/>
+                        </svg>
                         <span>¡Te conviene el Pack Álbum Completo!</span>
                       </span>
                       <p class="text-[11px] text-zinc-300">
@@ -125,9 +140,12 @@ import { CartStore } from '../../core/state/cart.store';
                     <button
                       type="button"
                       (click)="cartStore.switchToFullAlbum()"
-                      class="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black text-xs uppercase tracking-wider transition active:scale-95 shrink-0 shadow-md"
+                      class="min-h-[40px] px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black text-xs uppercase tracking-wider transition active:scale-95 shrink-0 shadow-md flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-amber-300"
                     >
-                      Cambiar a Pack ⚡
+                      <svg class="w-3 h-3 text-zinc-950 fill-current shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                      </svg>
+                      <span>Cambiar a Pack</span>
                     </button>
                   </div>
                 }
@@ -167,10 +185,14 @@ import { CartStore } from '../../core/state/cart.store';
                       <button
                         type="button"
                         (click)="removePhoto(photo.id)"
-                        class="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-rose-500/20 text-zinc-400 hover:text-rose-300 text-xs font-semibold transition flex items-center gap-1 active:scale-95 shrink-0"
+                        class="min-h-[36px] px-3 py-1.5 rounded-xl bg-white/5 hover:bg-rose-500/20 text-zinc-400 hover:text-rose-300 text-xs font-semibold transition flex items-center gap-1.5 active:scale-95 shrink-0 focus-visible:ring-2 focus-visible:ring-rose-400"
                         title="Quitar esta foto"
+                        aria-label="Quitar foto de la selección"
                       >
-                        <span>✕</span>
+                        <svg class="w-3.5 h-3.5 text-zinc-400 group-hover:text-rose-300 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <line x1="18" y1="6" x2="6" y2="18"/>
+                          <line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
                         <span class="hidden sm:inline">Quitar</span>
                       </button>
                     </div>
@@ -185,7 +207,10 @@ import { CartStore } from '../../core/state/cart.store';
               @if (cartStore.pricing().totalDiscount > 0) {
                 <div class="flex items-center justify-between text-xs text-emerald-400 bg-emerald-500/10 px-3 py-2 rounded-xl border border-emerald-500/20">
                   <span class="font-semibold flex items-center gap-1.5">
-                    <span>🎉</span>
+                    <svg class="w-3.5 h-3.5 text-emerald-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+                      <line x1="7" y1="7" x2="7.01" y2="7"/>
+                    </svg>
                     <span>
                       @if (cartStore.pricing().couponCode) {
                         Cupón {{ cartStore.pricing().couponCode }} aplicado
@@ -201,7 +226,11 @@ import { CartStore } from '../../core/state/cart.store';
               } @else if (!cartStore.isFullAlbum() && cartStore.tierConfig().enableTierDiscounts) {
                 <div class="flex items-center justify-between text-[11px] text-zinc-400 bg-white/5 px-3 py-2 rounded-xl border border-white/10">
                   <span class="flex items-center gap-1.5">
-                    <span>💡</span>
+                    <svg class="w-3 h-3 text-amber-300 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="12" r="10"/>
+                      <line x1="12" y1="16" x2="12" y2="12"/>
+                      <line x1="12" y1="8" x2="12.01" y2="8"/>
+                    </svg>
                     <span>Beneficio activo:</span>
                   </span>
                   <span class="font-semibold text-amber-300">
@@ -210,7 +239,7 @@ import { CartStore } from '../../core/state/cart.store';
                 </div>
               }
 
-              <!-- Subtotal y Botón Pagar -->
+              <!-- Subtotal y Botón Pagar con Ergonomía Táctil (44px) -->
               <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
                 <div>
                   <span class="text-xs text-zinc-400 block">Total a pagar</span>
@@ -223,17 +252,19 @@ import { CartStore } from '../../core/state/cart.store';
                   <button
                     type="button"
                     (click)="closeExpanded()"
-                    class="flex-1 sm:flex-none px-4 py-3 rounded-full bg-white/10 hover:bg-white/20 text-zinc-200 text-xs font-bold transition"
+                    class="flex-1 sm:flex-none min-h-[44px] px-5 py-3 rounded-full bg-white/10 hover:bg-white/20 text-zinc-200 text-xs font-bold transition active:scale-98 focus-visible:ring-2 focus-visible:ring-white"
                   >
                     Seguir viendo
                   </button>
                   <button
                     type="button"
                     (click)="onCheckout()"
-                    class="flex-1 sm:flex-none px-6 py-3 rounded-full bg-white text-zinc-950 hover:bg-zinc-200 font-display font-extrabold text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-lg active:scale-95 group"
+                    class="flex-1 sm:flex-none min-h-[44px] px-6 py-3 rounded-full bg-white text-zinc-950 hover:bg-zinc-200 font-display font-extrabold text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-lg active:scale-98 focus-visible:ring-2 focus-visible:ring-white group"
                   >
                     <span>Pagar con Mercado Pago</span>
-                    <span class="transition-transform group-hover:translate-x-1">→</span>
+                    <svg class="w-4 h-4 text-zinc-950 shrink-0 group-hover:translate-x-1 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="m9 18 6-6-6-6"/>
+                    </svg>
                   </button>
                 </div>
               </div>
@@ -254,29 +285,36 @@ import { CartStore } from '../../core/state/cart.store';
           @if (cartStore.shouldRecommendFullAlbum()) {
             <div class="pointer-events-auto mb-2.5 w-full max-w-[calc(100vw-1.5rem)] sm:max-w-md bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 text-zinc-950 px-3 py-2 sm:px-4 sm:py-2.5 rounded-2xl shadow-xl flex items-center justify-between gap-2 text-[11px] sm:text-xs font-bold border border-amber-500/30 animate-float-cart-in box-border">
               <div class="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
-                <span class="shrink-0">💡</span>
+                <svg class="w-4 h-4 text-zinc-950 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/>
+                  <path d="M9 18h6"/>
+                  <path d="M10 22h4"/>
+                </svg>
                 <span class="truncate block">Llevas <strong>{{ cartStore.selectedPhotosArray().length }} fotos</strong>: ¡Te conviene el <strong>Pack</strong>!</span>
               </div>
               <button
                 type="button"
                 (click)="cartStore.switchToFullAlbum()"
-                class="shrink-0 whitespace-nowrap px-2.5 py-1.5 rounded-xl bg-zinc-950 text-white hover:bg-zinc-800 text-[10px] sm:text-[11px] font-black uppercase transition active:scale-95"
+                class="min-h-[36px] shrink-0 whitespace-nowrap px-3 py-1.5 rounded-xl bg-zinc-950 text-white hover:bg-zinc-800 text-[10px] sm:text-[11px] font-black uppercase transition active:scale-95 flex items-center gap-1"
               >
-                Pasar a Pack ⚡
+                <svg class="w-3 h-3 text-amber-400 fill-current shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                </svg>
+                <span>Pasar a Pack</span>
               </button>
             </div>
           }
 
-          <div class="pointer-events-auto w-auto max-w-[calc(100vw-1.5rem)] sm:max-w-fit bg-zinc-950/95 text-white rounded-full p-1.5 pl-3 sm:px-5 sm:py-3 shadow-2xl border border-white/20 flex items-center justify-between gap-2 sm:gap-5 backdrop-blur-xl box-border overflow-hidden animate-float-cart-in">
+          <div class="pointer-events-auto w-auto max-w-[calc(100vw-1.5rem)] sm:max-w-fit bg-zinc-950/95 text-white rounded-full p-1.5 pl-3 sm:px-5 sm:py-2.5 shadow-2xl border border-white/20 flex items-center justify-between gap-2 sm:gap-5 backdrop-blur-xl box-border overflow-hidden animate-float-cart-in">
             <!-- Zona Clickeable para Expandir Selección -->
             <button
               type="button"
               (click)="toggleExpanded()"
-              class="flex items-center gap-1.5 sm:gap-3 text-left hover:opacity-85 transition pl-1 sm:pl-0 group min-w-0 shrink"
+              class="flex items-center gap-1.5 sm:gap-3 text-left hover:opacity-85 transition pl-1 sm:pl-0 group min-w-0 shrink min-h-[44px] focus-visible:ring-2 focus-visible:ring-white rounded-full"
               title="Haz clic para ver las fotos en tu carrito"
             >
               <!-- Contador Circular -->
-              <span class="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-white text-zinc-950 text-[11px] sm:text-xs font-bold flex items-center justify-center animate-counter-pop group-hover:scale-105 transition-transform shrink-0">
+              <span class="w-6 h-6 rounded-full bg-white text-zinc-950 text-xs font-bold flex items-center justify-center animate-counter-pop group-hover:scale-105 transition-transform shrink-0">
                 {{ cartStore.totalItemsCount() }}
               </span>
 
@@ -298,7 +336,7 @@ import { CartStore } from '../../core/state/cart.store';
             <button
               type="button"
               (click)="toggleExpanded()"
-              class="text-left hover:opacity-85 transition shrink-0"
+              class="text-left hover:opacity-85 transition shrink-0 min-h-[44px] flex flex-col justify-center focus-visible:ring-2 focus-visible:ring-white rounded-xl"
             >
               <span class="font-display font-extrabold text-xs sm:text-base text-white tracking-tight sm:tracking-wide">
                 &dollar;{{ cartStore.pricing().finalTotal.toLocaleString('es-AR') }}<span class="hidden sm:inline"> ARS</span>
@@ -310,13 +348,16 @@ import { CartStore } from '../../core/state/cart.store';
               }
             </button>
 
-            <!-- Botón Comprar con Micro-interacción Directa -->
+            <!-- Botón Comprar con Micro-interacción Directa (44px) -->
             <button
+              type="button"
               (click)="checkout.emit()"
-              class="px-3 sm:px-5 py-1.5 sm:py-2 rounded-full bg-white text-zinc-950 hover:bg-zinc-200 font-bold text-xs sm:text-sm transition flex items-center gap-1 sm:gap-1.5 shadow-md active:scale-95 group shrink-0"
+              class="min-h-[44px] px-4 sm:px-5 py-2 rounded-full bg-white text-zinc-950 hover:bg-zinc-200 font-bold text-xs sm:text-sm transition flex items-center gap-1.5 shadow-md active:scale-95 group shrink-0 focus-visible:ring-2 focus-visible:ring-white"
             >
               <span>Comprar</span>
-              <span class="transition-transform group-hover:translate-x-1">→</span>
+              <svg class="w-3.5 h-3.5 text-zinc-950 shrink-0 group-hover:translate-x-1 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m9 18 6-6-6-6"/>
+              </svg>
             </button>
           </div>
         </aside>

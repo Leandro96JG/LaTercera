@@ -24,7 +24,7 @@ import { AlbumService } from '../../core/services/album.service';
   template: `
     @if (isOpen() && currentPhoto()) {
       <div
-        class="fixed inset-0 z-50 bg-black/90 backdrop-blur-2xl flex flex-col justify-between p-3 sm:p-6 select-none transition-opacity duration-300 animate-fadeIn"
+        class="fixed inset-0 z-50 bg-black/95 backdrop-blur-2xl flex flex-col justify-between p-3 sm:p-6 select-none transition-opacity duration-300 animate-fadeIn"
         (click)="close.emit()"
         (touchstart)="onTouchStart($event)"
         (touchmove)="onTouchMove($event)"
@@ -37,12 +37,14 @@ import { AlbumService } from '../../core/services/album.service';
           (click)="$event.stopPropagation()"
         >
           <div class="flex items-center gap-3">
-            <span class="text-xs text-zinc-400 font-mono font-medium">
+            <span class="text-xs text-zinc-300 font-mono font-medium">
               Foto {{ currentIndex() + 1 }} de {{ totalCount() }}
             </span>
             @if (currentPhoto()?.isSampleHD) {
-              <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold flex items-center gap-1 shadow-sm">
-                <span>✦</span>
+              <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold flex items-center gap-1.5 shadow-sm">
+                <svg class="w-2.5 h-2.5 text-emerald-300 fill-current shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 2l2.4 7.2h7.6l-6.1 4.5 2.3 7.3-6.2-4.6-6.2 4.6 2.3-7.3-6.1-4.5h7.6z"/>
+                </svg>
                 <span>Muestra HD Original</span>
               </span>
             }
@@ -53,10 +55,13 @@ import { AlbumService } from '../../core/services/album.service';
             <button
               type="button"
               (click)="toggleZoom($event)"
-              class="px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white font-medium text-xs flex items-center gap-1.5 transition active:scale-95 border border-white/10"
+              class="min-h-[40px] px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white font-medium text-xs flex items-center gap-1.5 transition active:scale-95 border border-white/10 focus-visible:ring-2 focus-visible:ring-white"
               [attr.aria-label]="zoomScale() > 1 ? 'Alejar foto a 1x' : 'Ampliar muestra a 2.2x'"
             >
-              <span>🔍</span>
+              <svg class="w-3.5 h-3.5 text-white shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" x2="16.65" y1="21" y2="16.65"/>
+              </svg>
               <span class="font-mono text-[11px]">{{ zoomScale() > 1 ? '1x' : '2x' }}</span>
             </button>
 
@@ -66,13 +71,20 @@ import { AlbumService } from '../../core/services/album.service';
                 type="button"
                 (click)="toggleSelect.emit(currentPhoto()!)"
                 [class]="isSelected()
-                  ? 'px-4 py-2 rounded-full bg-emerald-500 text-zinc-950 font-black text-xs flex items-center gap-1.5 transition-all shadow-lg active:scale-95 animate-check-pop'
-                  : 'px-4 py-2 rounded-full bg-white text-zinc-950 font-bold text-xs flex items-center gap-1.5 transition-all shadow-md hover:bg-zinc-200 active:scale-95'"
+                  ? 'min-h-[40px] px-4 py-2 rounded-full bg-emerald-500 text-zinc-950 font-black text-xs flex items-center gap-1.5 transition-all shadow-lg active:scale-95 animate-check-pop focus-visible:ring-2 focus-visible:ring-emerald-400'
+                  : 'min-h-[40px] px-4 py-2 rounded-full bg-white text-zinc-950 font-bold text-xs flex items-center gap-1.5 transition-all shadow-md hover:bg-zinc-200 active:scale-95 focus-visible:ring-2 focus-visible:ring-white'"
                 [attr.aria-label]="isSelected() ? 'Quitar del carrito' : 'Sumar al carrito'"
               >
                 @if (isSelected()) {
+                  <svg class="w-3.5 h-3.5 text-zinc-950 stroke-[3] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
                   <span>✓ Seleccionada</span>
                 } @else {
+                  <svg class="w-3.5 h-3.5 text-zinc-950 stroke-[2.5] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="12" y1="5" x2="12" y2="19"/>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                  </svg>
                   <span>+ Seleccionar</span>
                 }
               </button>
@@ -80,22 +92,30 @@ import { AlbumService } from '../../core/services/album.service';
               <a
                 [href]="freeDownloadUrl()"
                 [download]="'LA_TERCERA_' + (currentPhoto()?.id || 'foto') + '.jpg'"
-                class="px-4 py-2 rounded-full bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black text-xs flex items-center gap-1.5 transition-all shadow-lg active:scale-95"
+                class="min-h-[40px] px-4 py-2 rounded-full bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black text-xs flex items-center gap-1.5 transition-all shadow-lg active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-400"
                 [attr.aria-label]="'Descargar foto HD gratis'"
                 title="Descargar foto HD gratis"
               >
-                <span>⬇️ Descargar HD</span>
+                <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                <span>Descargar HD</span>
               </a>
             }
 
-            <!-- Botón Cerrar -->
+            <!-- Botón Cerrar (Accesible y con icono SVG) -->
             <button
               type="button"
               (click)="close.emit()"
-              class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition active:scale-90"
+              class="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition active:scale-90 focus-visible:ring-2 focus-visible:ring-white shrink-0"
               aria-label="Cerrar visor cinemático"
             >
-              ✕
+              <svg class="w-4 h-4 text-white shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
             </button>
           </div>
         </header>
@@ -109,10 +129,12 @@ import { AlbumService } from '../../core/services/album.service';
           <button
             type="button"
             (click)="prev.emit()"
-            class="hidden sm:flex absolute left-3 z-30 w-12 h-12 rounded-full bg-black/60 hover:bg-white hover:text-zinc-950 text-white items-center justify-center transition shadow-2xl active:scale-90 border border-white/10"
+            class="hidden sm:flex absolute left-3 z-30 w-12 h-12 rounded-full bg-black/60 hover:bg-white hover:text-zinc-950 text-white items-center justify-center transition shadow-2xl active:scale-90 border border-white/10 backdrop-blur-md focus-visible:ring-2 focus-visible:ring-white"
             aria-label="Ver foto anterior"
           >
-            ←
+            <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m15 18-6-6 6-6"/>
+            </svg>
           </button>
 
           <!-- Contenedor Transformable de la Imagen con Desplazamiento Táctil en Vivo y Doble Clic Zoom -->
@@ -136,17 +158,19 @@ import { AlbumService } from '../../core/services/album.service';
           <button
             type="button"
             (click)="next.emit()"
-            class="hidden sm:flex absolute right-3 z-30 w-12 h-12 rounded-full bg-black/60 hover:bg-white hover:text-zinc-950 text-white items-center justify-center transition shadow-2xl active:scale-90 border border-white/10"
+            class="hidden sm:flex absolute right-3 z-30 w-12 h-12 rounded-full bg-black/60 hover:bg-white hover:text-zinc-950 text-white items-center justify-center transition shadow-2xl active:scale-90 border border-white/10 backdrop-blur-md focus-visible:ring-2 focus-visible:ring-white"
             aria-label="Ver foto siguiente"
           >
-            →
+            <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m9 18 6-6-6-6"/>
+            </svg>
           </button>
         </main>
 
         <!-- PIE DEL VISOR: INSTRUCCIONES MÓVIL Y TECLADO -->
-        <footer class="text-center text-[11px] text-zinc-500 font-medium py-1">
-          <span class="sm:hidden">Doble toque o 🔍 para zoom • Desliza para cambiar de foto o hacia abajo para cerrar</span>
-          <span class="hidden sm:inline">Doble clic o 🔍 para zoom 2x • Flechas ← / → para navegar • Escape para salir</span>
+        <footer class="text-center text-[11px] text-zinc-400 font-medium py-1">
+          <span class="sm:hidden">Doble toque para zoom · Desliza para cambiar de foto o hacia abajo para cerrar</span>
+          <span class="hidden sm:inline">Doble clic para zoom 2x · Flechas ← / → para navegar · Escape para salir</span>
         </footer>
       </div>
     }

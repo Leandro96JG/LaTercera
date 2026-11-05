@@ -225,4 +225,16 @@ describe('AlbumCard3dComponent', () => {
 
     expect(component.staggerDelay()).toBe((3 * 45) + 'ms');
   });
+
+  it('debe renderizar el badge de PRIVADO con icono vectorial SVG en álbumes bloqueados', () => {
+    fixture.componentRef.setInput('album', mockPrivateAlbum);
+    fixture.componentRef.setInput('isUnlocked', false);
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).toContain('PRIVADO');
+    expect(compiled.textContent).toContain('Ingresar PIN');
+    const lockSvg = compiled.querySelector('.cover-flap svg');
+    expect(lockSvg).not.toBeNull();
+  });
 });

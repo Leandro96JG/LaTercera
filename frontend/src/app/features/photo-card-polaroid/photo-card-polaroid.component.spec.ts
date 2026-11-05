@@ -228,4 +228,15 @@ describe('PhotoCardPolaroidComponent', () => {
     expect(downloadLink).not.toBeNull();
     expect(downloadLink.getAttribute('href')).toContain('/api/downloads/free/album-teso/photo/photo-101');
   });
+
+  it('debe contar con botón de selección con clase min-h-[44px] para ergonomía táctil en móviles', () => {
+    fixture.componentRef.setInput('photo', mockPhoto);
+    fixture.componentRef.setInput('index', 0);
+    fixture.componentRef.setInput('unitPrice', 1200);
+    fixture.componentRef.setInput('isSelected', false);
+    fixture.detectChanges();
+
+    const selectButton = fixture.nativeElement.querySelector('button') as HTMLButtonElement;
+    expect(selectButton.classList.contains('min-h-[44px]')).toBe(true);
+  });
 });

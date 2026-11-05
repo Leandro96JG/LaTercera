@@ -57,7 +57,7 @@ import { Album } from '../../core/models/album.model';
           </div>
 
           <!-- Anillas Metálicas de Encuadernación (3 Anillas Físicas) -->
-          <div class="flex flex-col gap-5 sm:gap-6 my-auto">
+          <div class="flex flex-col gap-5 sm:gap-6 my-auto" aria-hidden="true">
             <!-- Anilla 1 -->
             <div class="relative w-4 h-2.5 rounded-r-full border-2 border-l-0 border-zinc-400 bg-gradient-to-r from-zinc-700 to-zinc-300 shadow-md">
               <div class="absolute -left-1 top-0.5 w-1 h-1 rounded-full bg-zinc-950"></div>
@@ -72,7 +72,7 @@ import { Album } from '../../core/models/album.model';
             </div>
           </div>
 
-          <!-- Categoría en Vertical Monospace -->
+          <!-- Categoría en Vertical con Tipografía Nítida -->
           <span class="text-[9px] font-mono tracking-widest text-zinc-400 uppercase -rotate-90 whitespace-nowrap font-bold select-none my-2 drop-shadow">
             {{ album().category }}
           </span>
@@ -87,13 +87,13 @@ import { Album } from '../../core/models/album.model';
         <!-- INTERIOR DERECHO: EFECTO DE HOJAS / FOTOS APILADAS       -->
         <!-- ======================================================== -->
         <div class="absolute inset-0 left-9 sm:left-11 rounded-r-[30px] overflow-hidden bg-zinc-950 p-2.5 sm:p-3 pointer-events-none">
-          <!-- Hoja Apilada 1 (Fondo inclinado +2.5deg simulando papel fotográfico) -->
+          <!-- Hoja Apilada 1 -->
           <div
             class="stacked-sheet sheet-1 absolute inset-3 rounded-2xl bg-zinc-800/80 border border-zinc-700/60 shadow-md transform-gpu transition-transform duration-500 ease-out origin-bottom-left"
             [class.sheet-open]="isOpenState()"
           ></div>
 
-          <!-- Hoja Apilada 2 (Hoja intermedia inclinada -1.5deg) -->
+          <!-- Hoja Apilada 2 -->
           <div
             class="stacked-sheet sheet-2 absolute inset-2.5 rounded-2xl bg-zinc-900 border border-zinc-700/80 shadow-lg transform-gpu transition-transform duration-500 ease-out origin-bottom-left"
             [class.sheet-open]="isOpenState()"
@@ -111,8 +111,8 @@ import { Album } from '../../core/models/album.model';
             <!-- Gradiente de profundidad interior -->
             <div class="absolute inset-0 bg-gradient-to-t from-zinc-950/90 via-zinc-950/25 to-transparent"></div>
 
-            <!-- Indicador sutil de fotos apiladas en esquina interior -->
-            <div class="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-mono text-zinc-300">
+            <!-- Contador de fotos en esquina interior -->
+            <div class="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-mono text-zinc-300">
               {{ album().photosCount }} hojas
             </div>
           </div>
@@ -134,32 +134,43 @@ import { Album } from '../../core/models/album.model';
             [class.opacity-0]="!isHovered() && !isTouchActive()"
           ></div>
 
-          <!-- Cabecera de la Tapa -->
+          <!-- Cabecera de la Tapa: Badges con Iconografía Vectorial Neta -->
           <div class="relative z-10 flex items-start justify-between gap-2">
             <div class="flex flex-wrap items-center gap-1.5">
-              <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-zinc-800 text-zinc-200 border border-zinc-700/60 shadow-sm">
+              <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-zinc-800 text-zinc-200 border border-zinc-700/60 shadow-xs">
                 {{ album().badge || album().category }}
               </span>
 
               @if (album().isFreeDownload) {
-                <span class="px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-400 text-zinc-950 shadow-sm animate-pulse flex items-center gap-1">
-                  <span>🎁</span> <span>GRATIS HD</span>
+                <span class="px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-400 text-zinc-950 shadow-xs flex items-center gap-1">
+                  <svg class="w-3 h-3 text-zinc-950 fill-current shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 2l2.4 7.2h7.6l-6.1 4.5 2.3 7.3-6.2-4.6-6.2 4.6 2.3-7.3-6.1-4.5h7.6z"/>
+                  </svg>
+                  <span>GRATIS HD</span>
                 </span>
               }
 
               @if (album().isPrivate && !isUnlocked()) {
-                <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-500/20 border border-red-500/40 text-red-400 flex items-center gap-1">
-                  <span>🔒</span> <span>PRIVADO</span>
+                <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-500/20 border border-rose-500/40 text-rose-300 flex items-center gap-1">
+                  <svg class="w-3 h-3 text-rose-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                  <span>PRIVADO</span>
                 </span>
               } @else if (album().isPrivate && isUnlocked()) {
-                <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center gap-1">
-                  <span>🔓</span> <span>DESBLOQUEADO</span>
+                <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 flex items-center gap-1">
+                  <svg class="w-3 h-3 text-emerald-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+                  </svg>
+                  <span>DESBLOQUEADO</span>
                 </span>
               }
             </div>
 
             <div class="text-right">
-              <span class="px-2 py-0.5 rounded-md bg-zinc-950/80 text-[11px] font-mono text-zinc-400 border border-zinc-800/80">
+              <span class="px-2.5 py-1 rounded-lg bg-zinc-950/80 text-[11px] font-mono text-zinc-300 border border-zinc-800/80">
                 {{ album().photosCount }} fotos
               </span>
             </div>
@@ -176,9 +187,24 @@ import { Album } from '../../core/models/album.model';
               </p>
             }
             <div class="flex items-center gap-2 mt-2 text-[11px] text-zinc-400 font-medium">
-              <span>📅 {{ album().eventDate || album().date }}</span>
+              <span class="flex items-center gap-1">
+                <svg class="w-3 h-3 text-zinc-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect width="18" height="18" x="3" y="4" rx="2" ry="2"/>
+                  <line x1="16" x2="16" y1="2" y2="6"/>
+                  <line x1="8" x2="8" y1="2" y2="6"/>
+                  <line x1="3" x2="21" y1="10" y2="10"/>
+                </svg>
+                <span>{{ album().eventDate || album().date }}</span>
+              </span>
               @if (album().eventTime) {
-                <span>• ⏰ {{ album().eventTime }} hs</span>
+                <span class="text-zinc-600">•</span>
+                <span class="flex items-center gap-1">
+                  <svg class="w-3 h-3 text-zinc-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12 6 12 12 16 14"/>
+                  </svg>
+                  <span>{{ album().eventTime }} hs</span>
+                </span>
               }
             </div>
           </div>
@@ -204,14 +230,19 @@ import { Album } from '../../core/models/album.model';
               }
             </div>
 
-            <!-- Botón de apertura indicativo -->
+            <!-- Botón de apertura con microinteracción (Sin flechas genéricas) -->
             <div class="flex items-center gap-1.5 text-[11px] font-bold text-zinc-300 group-hover:text-amber-400 transition-colors">
               @if (album().isPrivate && !isUnlocked()) {
                 <span>Ingresar PIN</span>
-                <span class="text-xs">🔒</span>
+                <svg class="w-3.5 h-3.5 text-rose-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
               } @else {
-                <span>Abrir carpeta</span>
-                <span class="transform transition-transform duration-300 group-hover:translate-x-1.5">→</span>
+                <span>Abrir álbum</span>
+                <svg class="w-3.5 h-3.5 text-zinc-400 group-hover:text-amber-400 group-hover:translate-x-1 transition-all shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="m9 18 6-6-6-6"/>
+                </svg>
               }
             </div>
           </div>
