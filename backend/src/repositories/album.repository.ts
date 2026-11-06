@@ -1,5 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
 
 export interface AlbumDTO {
   id: string;
@@ -626,10 +628,47 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
   private localFreeDownloadMap = new Map<string, boolean>();
   private localPrivacyMap = new Map<string, { isPrivate: boolean; accessCode: string | null }>();
   private localPhotosMap = new Map<string, PhotoDTO[]>();
+  private localWatermarkMap = new Map<string, { text?: string; logoUrl?: string | null }>();
   private localFallback = new MemoryAlbumRepository();
+  private watermarkFilePath = path.join(__dirname, '../../data/album-watermarks.json');
 
   constructor(supabase: SupabaseClient) {
     this.supabase = supabase;
+    this.loadWatermarksFromFile();
+  }
+
+  private loadWatermarksFromFile(): void {
+    try {
+      if (fs.existsSync(this.watermarkFilePath)) {
+        const raw = fs.readFileSync(this.watermarkFilePath, 'utf-8');
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          for (const [id, data] of Object.entries(parsed)) {
+            if (data && typeof data === 'object') {
+              this.localWatermarkMap.set(id, data as { text?: string; logoUrl?: string | null });
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[SupabaseAlbumRepository] No se pudo leer album-watermarks.json:', err);
+    }
+  }
+
+  private saveWatermarksToFile(): void {
+    try {
+      const dir = path.dirname(this.watermarkFilePath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      const obj: Record<string, { text?: string; logoUrl?: string | null }> = {};
+      for (const [id, data] of this.localWatermarkMap.entries()) {
+        obj[id] = data;
+      }
+      fs.writeFileSync(this.watermarkFilePath, JSON.stringify(obj, null, 2), 'utf-8');
+    } catch (err) {
+      console.warn('[SupabaseAlbumRepository] No se pudo guardar album-watermarks.json:', err);
+    }
   }
 
   private mapRowToAlbum(row: SupabaseAlbumRow): AlbumDTO {
@@ -643,6 +682,7 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
     const localDeletedAt = this.localTrashTimestamps.get(row.id);
     const localFree = this.localFreeDownloadMap.get(row.id);
     const localPrivacy = this.localPrivacyMap.get(row.id);
+    const localWatermark = this.localWatermarkMap.get(row.id);
 
     return {
       id: row.id,
@@ -661,8 +701,8 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
       badge: row.badge || undefined,
       isPublished: isTrashed ? false : (row.is_published ?? true),
       isHeroFeatured: row.is_hero_featured ?? false,
-      watermarkText: row.watermark_text || undefined,
-      watermarkLogoUrl: row.watermark_logo_url || null,
+      watermarkText: row.watermark_text || localWatermark?.text || undefined,
+      watermarkLogoUrl: row.watermark_logo_url || localWatermark?.logoUrl || null,
       deletedAt: row.deleted_at || (isTrashed ? localDeletedAt : null),
       isFreeDownload: localFree !== undefined ? localFree : (row.is_free_download ?? false),
       freeDownloadUnlockedAt: row.free_download_unlocked_at || (localFree ? new Date().toISOString() : null),
@@ -792,6 +832,13 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
         accessCode: album.accessCode || null
       });
     }
+    if (album.watermarkText !== undefined || album.watermarkLogoUrl !== undefined) {
+      this.localWatermarkMap.set(album.id, {
+        text: album.watermarkText,
+        logoUrl: album.watermarkLogoUrl
+      });
+      this.saveWatermarksToFile();
+    }
 
     return this.mapRowToAlbum(data);
   }
@@ -916,6 +963,14 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
         accessCode: updates.accessCode !== undefined ? updates.accessCode : existingPriv.accessCode
       });
     }
+    if (updates.watermarkText !== undefined || updates.watermarkLogoUrl !== undefined) {
+      const existingWm = this.localWatermarkMap.get(id) || {};
+      this.localWatermarkMap.set(id, {
+        text: updates.watermarkText !== undefined ? updates.watermarkText : existingWm.text,
+        logoUrl: updates.watermarkLogoUrl !== undefined ? updates.watermarkLogoUrl : existingWm.logoUrl
+      });
+      this.saveWatermarksToFile();
+    }
 
     return this.mapRowToAlbum(data as SupabaseAlbumRow);
   }
@@ -1000,6 +1055,8 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
     this.localFreeDownloadMap.delete(id);
     this.localPrivacyMap.delete(id);
     this.localPhotosMap.delete(id);
+    this.localWatermarkMap.delete(id);
+    this.saveWatermarksToFile();
     await this.localFallback.permanentDeleteAlbum(id).catch(() => {});
 
     // 1. Snapshot del título del álbum en órdenes asociadas antes de desvincular

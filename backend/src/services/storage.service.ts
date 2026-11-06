@@ -39,6 +39,11 @@ export interface IStorageService {
     ext: string
   ): Promise<Buffer | null>;
 
+  getPreviewBuffer?(
+    albumId: string,
+    photoId: string
+  ): Promise<Buffer | null>;
+
   createSignedDownloadUrl?(
     albumId: string,
     photoId: string,
@@ -191,6 +196,30 @@ export class SupabaseStorageService implements IStorageService {
 
     const arrayBuffer = await data.arrayBuffer();
     return Buffer.from(arrayBuffer);
+  }
+
+  public async getPreviewBuffer(
+    albumId: string,
+    photoId: string
+  ): Promise<Buffer | null> {
+    const cleanAlbum = sanitizeId(albumId);
+    const cleanPhoto = sanitizeId(photoId);
+    const objectPath = `${cleanAlbum}/${cleanPhoto}.webp`;
+
+    try {
+      const { data, error } = await this.supabase.storage
+        .from(SupabaseStorageService.BUCKET_PREVIEWS)
+        .download(objectPath);
+
+      if (error || !data) {
+        return null;
+      }
+
+      const arrayBuffer = await data.arrayBuffer();
+      return Buffer.from(arrayBuffer);
+    } catch {
+      return null;
+    }
   }
 
   public async createSignedDownloadUrl(
@@ -357,6 +386,20 @@ export class LocalDiskStorageService implements IStorageService {
     }
   }
 
+  public async getPreviewBuffer(
+    albumId: string,
+    photoId: string
+  ): Promise<Buffer | null> {
+    const cleanAlbum = sanitizeId(albumId);
+    const cleanPhoto = sanitizeId(photoId);
+    const filePath = path.join(this.baseStorageDir, 'previews', cleanAlbum, `${cleanPhoto}.webp`);
+    try {
+      return await fs.readFile(filePath);
+    } catch {
+      return null;
+    }
+  }
+
   public async createSignedDownloadUrl(
     albumId: string,
     photoId: string,
@@ -440,6 +483,14 @@ export class MemoryStorageService implements IStorageService {
     const cleanExt = ext.replace(/^\./, '');
     const key = `${albumId}/${photoId}.${cleanExt}`;
     return this.originals.get(key) || null;
+  }
+
+  public async getPreviewBuffer(
+    albumId: string,
+    photoId: string
+  ): Promise<Buffer | null> {
+    const key = `${albumId}/${photoId}.webp`;
+    return this.previews.get(key) || null;
   }
 
   public async createSignedDownloadUrl(

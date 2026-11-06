@@ -178,9 +178,10 @@ export class GoogleDriveImporterService {
     let preparedLogo: Buffer | undefined;
     if (options.watermarkLogoBuffer) {
       try {
-        preparedLogo = await prepareWatermarkLogo(options.watermarkLogoBuffer, 400, 0.35);
+        preparedLogo = await prepareWatermarkLogo(options.watermarkLogoBuffer, 400, 0.40);
       } catch (err) {
-        console.warn('[GoogleDriveImporterService] No se pudo pre-procesar logo de marca de agua:', err);
+        console.warn('[GoogleDriveImporterService] No se pudo pre-procesar logo de marca de agua, usando buffer original:', err);
+        preparedLogo = options.watermarkLogoBuffer;
       }
     }
 

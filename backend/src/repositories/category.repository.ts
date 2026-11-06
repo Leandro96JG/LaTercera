@@ -333,6 +333,32 @@ export class SupabaseCategoryRepository implements ICategoryRepository {
     order?: number;
     isActive?: boolean;
   }): Promise<CategoryDTO> {
+    const rawId = input.id ? slugifyCategory(input.id) : slugifyCategory(input.name);
+    const id = rawId || 'cat-' + Date.now();
+
+    // 1. Validar si ya existe en Supabase
+    try {
+      const { data: existingDb } = await this.supabase
+        .from('categories')
+        .select('id')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (existingDb) {
+        throw new Error(`La categoría con ID '${id}' ya existe`);
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message.includes('ya existe')) {
+        throw err;
+      }
+    }
+
+    // 2. Si existía previamente en la memoria de localFallback pero no en Supabase,
+    // liberamos la clave en localFallback para permitir su creación limpia
+    if (await this.localFallback.getCategoryById(id)) {
+      await this.localFallback.deleteCategory(id).catch(() => {});
+    }
+
     const createdLocal = await this.localFallback.createCategory(input);
 
     try {

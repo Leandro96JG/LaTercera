@@ -44,7 +44,7 @@ export function escapeXml(unsafe: string): string {
 export async function prepareWatermarkLogo(
   logoBuffer: Buffer,
   maxDimension: number = 400,
-  opacity: number = 0.35
+  opacity: number = 0.40
 ): Promise<Buffer> {
   const safeOpacity = Math.max(0.05, Math.min(1, opacity));
   return await sharp(logoBuffer)
@@ -87,6 +87,25 @@ export async function processImageWithWatermark(
     const hdH = hdInfo.height;
 
     const compositeLayers: sharp.OverlayOptions[] = [];
+
+    // Si se especificó logoBuffer, estampar logo central proporcional a la muestra HD
+    if (options.logoBuffer) {
+      const minHdDim = Math.min(hdW, hdH);
+      const maxLogoSize = Math.max(80, Math.round(minHdDim * 0.40));
+      const { data: centeredHdLogo, info: lInfo } = await sharp(options.logoBuffer)
+        .resize({ width: maxLogoSize, height: maxLogoSize, fit: 'inside' })
+        .toBuffer({ resolveWithObject: true });
+
+      const topCenter = Math.max(0, Math.round((hdH - lInfo.height) / 2));
+      const leftCenter = Math.max(0, Math.round((hdW - lInfo.width) / 2));
+
+      compositeLayers.push({
+        input: centeredHdLogo,
+        top: topCenter,
+        left: leftCenter,
+        blend: 'over'
+      });
+    }
 
     // Badge superior izquierdo + marca sutil diagonal centrada
     const svgHdWatermark = Buffer.from(`

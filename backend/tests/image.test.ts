@@ -193,4 +193,38 @@ describe('Image Service - Procesamiento y Marca de Agua con Sharp', () => {
     expect(metadata.format).toBe('webp');
     expect(metadata.width).toBeLessThanOrEqual(1400);
   });
+
+  it('debe estampar el logo PNG en muestras HD protegidas (isHD: true + logoBuffer)', async () => {
+    const testImageBuffer = await sharp({
+      create: {
+        width: 1600,
+        height: 1200,
+        channels: 3,
+        background: { r: 50, g: 100, b: 150 }
+      }
+    }).jpeg().toBuffer();
+
+    const mockLogo = await sharp({
+      create: {
+        width: 250,
+        height: 250,
+        channels: 4,
+        background: { r: 253, g: 184, b: 19, alpha: 0.9 }
+      }
+    }).png().toBuffer();
+
+    const preparedLogo = await prepareWatermarkLogo(mockLogo, 300, 0.40);
+
+    const result = await processImageWithWatermark(testImageBuffer, {
+      isHD: true,
+      logoBuffer: preparedLogo,
+      watermarkText: 'COPA CIUDAD • HD'
+    });
+
+    expect(result.previewBuffer).toBeDefined();
+    expect(result.format).toBe('webp');
+    const meta = await sharp(result.previewBuffer).metadata();
+    expect(meta.format).toBe('webp');
+    expect(meta.width).toBeLessThanOrEqual(1400);
+  });
 });

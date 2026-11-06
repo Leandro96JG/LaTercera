@@ -94,9 +94,10 @@ export class BulkUploadService {
     let preparedLogo: Buffer | undefined;
     if (options.watermarkLogoBuffer) {
       try {
-        preparedLogo = await prepareWatermarkLogo(options.watermarkLogoBuffer, 400, 0.35);
+        preparedLogo = await prepareWatermarkLogo(options.watermarkLogoBuffer, 400, 0.40);
       } catch (err) {
-        console.warn('[BulkUploadService] No se pudo pre-procesar logo de marca de agua:', err);
+        console.warn('[BulkUploadService] No se pudo pre-procesar logo de marca de agua, usando buffer original:', err);
+        preparedLogo = options.watermarkLogoBuffer;
       }
     }
 

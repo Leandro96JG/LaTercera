@@ -501,10 +501,23 @@ export function createAdminAlbumsRouter(
           return Buffer.from(raw, 'base64');
         }
         if (targetUrl.startsWith('http://') || targetUrl.startsWith('https://')) {
-          const fetchRes = await fetch(targetUrl, { signal: AbortSignal.timeout(5000) });
-          if (fetchRes.ok) {
-            const arrayBuf = await fetchRes.arrayBuffer();
-            return Buffer.from(arrayBuf);
+          try {
+            const fetchRes = await fetch(targetUrl, { signal: AbortSignal.timeout(5000) });
+            if (fetchRes.ok) {
+              const arrayBuf = await fetchRes.arrayBuffer();
+              return Buffer.from(arrayBuf);
+            }
+          } catch (netErr) {
+            console.warn(`[AdminAlbums] Error fetch red para '${targetUrl}', probando fallback local:`, netErr);
+          }
+        }
+        // Fallback directo desde storage si targetUrl apunta a branding
+        const brandingMatch = targetUrl.match(/branding\/([^/?#]+)/);
+        if (brandingMatch) {
+          const photoId = brandingMatch[1].replace(/\.webp$/i, '');
+          const storageBuf = await storageService.getPreviewBuffer?.('branding', photoId);
+          if (storageBuf) {
+            return storageBuf;
           }
         }
       } catch (fetchErr) {

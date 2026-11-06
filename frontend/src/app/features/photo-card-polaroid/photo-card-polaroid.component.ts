@@ -149,15 +149,15 @@ import { AlbumService } from '../../core/services/album.service';
 
       <!-- PIE DE TARJETA POLAROID: NÚMERO, PRECIO Y BOTÓN ELECCIÓN -->
       <div class="relative z-40 flex items-center justify-between pt-3 px-1 mt-1 gap-2">
-        <div class="min-w-0 flex-1">
-          <span class="text-[11px] font-bold text-zinc-900 block truncate">
+        <div class="shrink-0 min-w-0 pr-1">
+          <span class="text-xs font-bold text-zinc-900 block truncate">
             Foto #{{ index() + 1 }}
           </span>
-          <span class="text-[10px] text-zinc-500 font-medium block truncate">
+          <span class="text-[10px] block truncate">
             @if (isFreeDownload()) {
-              4K Original • Incluida Gratis
+              <span class="font-bold text-emerald-600">Descarga Gratis</span>
             } @else {
-              4K Original • \${{ unitPrice().toLocaleString('es-AR') }} ARS
+              <span class="text-zinc-500 font-semibold">\${{ unitPrice().toLocaleString('es-AR') }} ARS</span>
             }
           </span>
         </div>
@@ -192,10 +192,10 @@ import { AlbumService } from '../../core/services/album.service';
               type="button"
               (click)="onSelectClicked($event)"
               [class]="isSelected()
-                ? 'relative z-50 pointer-events-auto cursor-pointer min-h-[44px] px-3 py-2 rounded-2xl bg-emerald-500 text-zinc-950 font-extrabold text-xs flex items-center gap-1 shadow-md transition-all active:scale-95 animate-check-pop focus-visible:ring-2 focus-visible:ring-emerald-400 shrink-0'
-                : 'relative z-50 pointer-events-auto cursor-pointer min-h-[44px] px-3 py-2 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 font-bold text-xs flex items-center gap-1 transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-zinc-950 shrink-0'"
-              [attr.aria-label]="isSelected() ? 'Quitar de lista gratuita' : 'Elegir para lote gratuito'"
-              title="Seleccionar para descarga gratuita"
+                ? 'relative z-50 pointer-events-auto cursor-pointer min-h-[40px] px-2.5 py-1.5 rounded-xl bg-emerald-500 text-zinc-950 font-extrabold text-xs flex items-center gap-1 shadow-md transition-all active:scale-95 animate-check-pop focus-visible:ring-2 focus-visible:ring-emerald-400 shrink-0'
+                : 'relative z-50 pointer-events-auto cursor-pointer min-h-[40px] px-2.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 font-bold text-xs flex items-center gap-1 transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-zinc-950 shrink-0'"
+              [attr.aria-label]="isSelected() ? 'Quitar de lote gratuito' : 'Elegir para lote gratuito'"
+              title="Seleccionar para descarga en lote"
             >
               @if (isSelected()) {
                 <svg class="w-3.5 h-3.5 text-zinc-950 stroke-[3] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -211,11 +211,12 @@ import { AlbumService } from '../../core/services/album.service';
               }
             </button>
 
+            <!-- Botón Descargar HD individual directo -->
             <a
               [href]="freeDownloadUrl()"
-              [download]="'LA_TERCERA_' + photo().id + '.jpg'"
+              [download]="'La_Tercera_Foto_' + (index() + 1) + '.jpg'"
               (click)="$event.stopPropagation()"
-              class="relative z-50 pointer-events-auto cursor-pointer min-h-[44px] px-3.5 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-xs transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-500 shrink-0"
+              class="relative z-50 pointer-events-auto cursor-pointer min-h-[40px] px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-xs transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-500 shrink-0"
               [attr.aria-label]="'Descargar foto ' + (index() + 1) + ' en máxima calidad HD'"
               title="Descargar foto HD gratis"
             >
@@ -226,18 +227,6 @@ import { AlbumService } from '../../core/services/album.service';
               </svg>
               <span>Descargar HD</span>
             </a>
-            <button
-              type="button"
-              (click)="onViewClicked($event)"
-              class="relative z-50 pointer-events-auto cursor-pointer min-h-[44px] min-w-[44px] p-2.5 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 font-bold text-xs flex items-center justify-center transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-zinc-950 shrink-0"
-              [attr.aria-label]="'Ver foto ' + (index() + 1) + ' en máxima calidad'"
-              title="Ver en pantalla completa"
-            >
-              <svg class="w-4 h-4 text-zinc-700 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <circle cx="11" cy="11" r="8"/>
-                <line x1="21" x2="16.65" y1="21" y2="16.65"/>
-              </svg>
-            </button>
           </div>
         }
       </div>
