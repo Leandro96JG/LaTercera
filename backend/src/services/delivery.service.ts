@@ -7,6 +7,12 @@ import { DownloadTokenService } from './token.service';
 import { IStorageService } from './storage.service';
 import { IAlbumRepository } from '../repositories/album.repository';
 import { OrderDeliveryInfo, PhotoDownloadItem } from '../contracts/delivery.contract';
+import {
+  sanitizeAlbumTitle,
+  buildAlbumPhotoTitle,
+  buildCleanDownloadFilename,
+  buildCleanZipFilename
+} from './mime-validator.service';
 
 export interface DeliveryInfoResult {
   valid: boolean;
@@ -138,11 +144,13 @@ export class DeliveryService {
       }
     }
 
-    const photos: PhotoDownloadItem[] = photoIds.map((pId) => {
+    const photos: PhotoDownloadItem[] = photoIds.map((pId, idx) => {
       const cleanPhoto = this.sanitizeId(pId);
+      const seq = idx + 1;
+      const cleanFilename = `${buildAlbumPhotoTitle(albumMeta.title, seq)}.jpg`;
       return {
         id: cleanPhoto,
-        filename: `LA_TERCERA_${this.sanitizeId(order.albumId)}_${cleanPhoto}.jpg`,
+        filename: cleanFilename,
         previewUrl: this.storageService.getPreviewUrl(order.albumId, cleanPhoto),
         downloadUrl: `${cleanBaseUrl}/api/downloads/${token}/file?photoId=${encodeURIComponent(cleanPhoto)}`
       };
@@ -360,12 +368,34 @@ export class DeliveryService {
       detectedExt = found.extension;
     }
 
+    let albumTitle = `Álbum #${cleanAlbumId}`;
+    if (this.albumRepository) {
+      try {
+        const album = await this.albumRepository.getAlbumById(order.albumId);
+        if (album?.title) {
+          albumTitle = album.title;
+        }
+      } catch {}
+    } else if (KNOWN_ALBUMS[order.albumId]) {
+      albumTitle = KNOWN_ALBUMS[order.albumId].title;
+    }
+
+    let photoIndex = order.photoIds.findIndex(id => this.sanitizeId(id) === cleanPhotoId);
+    if (photoIndex < 0 && order.isFullAlbum && this.albumRepository) {
+      try {
+        const albumPhotos = await this.albumRepository.getPhotosByAlbumId(order.albumId);
+        photoIndex = albumPhotos.findIndex(p => this.sanitizeId(p.id) === cleanPhotoId);
+      } catch {}
+    }
+    const seq = (photoIndex >= 0 ? photoIndex : 0) + 1;
+    const cleanFilename = buildCleanDownloadFilename(albumTitle, seq, detectedExt);
+
     return {
       success: true,
       albumId: cleanAlbumId,
       photoId: cleanPhotoId,
       extension: detectedExt,
-      filename: `LA_TERCERA_${cleanAlbumId}_${cleanPhotoId}${detectedExt}`
+      filename: cleanFilename
     };
   }
 
@@ -386,7 +416,20 @@ export class DeliveryService {
     }
 
     const cleanAlbumId = this.sanitizeId(order.albumId);
-    const zipFilename = `LA_TERCERA_${cleanAlbumId}_FOTOS_HD.zip`;
+    let albumTitle = `Álbum #${cleanAlbumId}`;
+    if (this.albumRepository) {
+      try {
+        const album = await this.albumRepository.getAlbumById(order.albumId);
+        if (album?.title) {
+          albumTitle = album.title;
+        }
+      } catch {}
+    } else if (KNOWN_ALBUMS[order.albumId]) {
+      albumTitle = KNOWN_ALBUMS[order.albumId].title;
+    }
+
+    const isPartial = !order.isFullAlbum;
+    const zipFilename = buildCleanZipFilename(albumTitle, isPartial);
 
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`);
@@ -434,7 +477,9 @@ export class DeliveryService {
       }
     }
 
-    for (const pId of photosToPack) {
+    const cleanAlbum = sanitizeAlbumTitle(albumTitle);
+    for (let i = 0; i < photosToPack.length; i++) {
+      const pId = photosToPack[i];
       const cleanPhoto = this.sanitizeId(pId);
       const photoMeta = photoMap.get(cleanPhoto);
       const preferredExt = photoMeta
@@ -446,7 +491,9 @@ export class DeliveryService {
         continue;
       }
 
-      const photoName = `LA_TERCERA_${cleanAlbumId}_${cleanPhoto}${photoData.extension}`;
+      const seq = i + 1;
+      const paddedSeq = String(seq).padStart(3, '0');
+      const photoName = `${cleanAlbum}_${paddedSeq}${photoData.extension}`;
       archive.append(photoData.buffer, { name: photoName });
     }
 
@@ -463,11 +510,8 @@ export class DeliveryService {
     selectedPhotoIds?: string[]
   ): Promise<void> {
     const cleanAlbumId = this.sanitizeId(albumId);
-    const safeTitle = albumTitle.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 30);
     const isSelective = Array.isArray(selectedPhotoIds) && selectedPhotoIds.length > 0;
-    const zipFilename = isSelective
-      ? `LA_TERCERA_${cleanAlbumId}_SELECCION_${selectedPhotoIds.length}_FOTOS_HD.zip`
-      : `LA_TERCERA_${cleanAlbumId}_${safeTitle}_HD.zip`;
+    const zipFilename = buildCleanZipFilename(albumTitle, isSelective);
 
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`);
@@ -516,7 +560,9 @@ export class DeliveryService {
       photosToPack = photosToPack.filter(p => selectedSet.has(p));
     }
 
-    for (const pId of photosToPack) {
+    const cleanAlbum = sanitizeAlbumTitle(albumTitle);
+    for (let i = 0; i < photosToPack.length; i++) {
+      const pId = photosToPack[i];
       const cleanPhoto = this.sanitizeId(pId);
       const photoMeta = photoMap.get(cleanPhoto);
       const preferredExt = photoMeta
@@ -528,7 +574,9 @@ export class DeliveryService {
         continue;
       }
 
-      const photoName = `LA_TERCERA_${cleanAlbumId}_${cleanPhoto}${photoData.extension}`;
+      const seq = i + 1;
+      const paddedSeq = String(seq).padStart(3, '0');
+      const photoName = `${cleanAlbum}_${paddedSeq}${photoData.extension}`;
       archive.append(photoData.buffer, { name: photoName });
     }
 

@@ -336,7 +336,7 @@
                 <!-- Botón de Tutorial Linterna Onboarding -->
                 <button
                   type="button"
-                  (click)="openSpotlightTutorial()"
+                  (click)="openSpotlightTutorial(true)"
                   class="px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/15 backdrop-blur-sm transition active:scale-95 flex items-center gap-2"
                   title="Ver cómo funciona la linterna de muestras"
                 >
@@ -462,7 +462,8 @@
                   [albumId]="album.id"
                   [isSelected]="isPhotoSelected(item.photo.id)"
                   [isPurchased]="albumAccessStore.isPhotoPurchased(item.photo.id)"
-                  [isMobileSpotlightActive]="isMobileSpotlightActive()"
+                  [isMobileFlashlightActive]="isMobileFlashlightActive()"
+                  [isMobileSpotlightActive]="isMobileFlashlightActive()"
                   (toggleSelect)="togglePhoto($event)"
                   (openViewer)="openLightbox($event.photo, $event.index)"
                 />
@@ -637,6 +638,59 @@
   />
 }
 
+<!-- Botón Flotante (FAB) Modo Linterna en Celular (Álbumes Pagos) -->
+@if (currentView() === 'album' && currentAlbum() && !currentAlbum()!.isFreeDownload && !isLightboxOpen()) {
+  <aside
+    class="sm:hidden fixed right-4 z-40 flex items-center gap-2 transition-all duration-300"
+    [class.bottom-24]="cartStore.hasItems()"
+    [class.bottom-6]="!cartStore.hasItems()"
+    aria-label="Controles táctiles de linterna"
+  >
+    <!-- Botón de Ayuda Tutorial Rápido "?" -->
+    <button
+      type="button"
+      (click)="openSpotlightTutorial(true)"
+      class="w-11 h-11 rounded-full bg-zinc-900/90 text-amber-300 border border-white/20 shadow-lg flex items-center justify-center font-bold text-sm backdrop-blur-md hover:bg-zinc-800 active:scale-95 transition-all focus-visible:ring-2 focus-visible:ring-amber-400 shrink-0"
+      aria-label="Ver tutorial de linterna"
+      title="¿Cómo iluminar las fotos?"
+    >
+      ?
+    </button>
+
+    <!-- Botón Toggle Linterna Principal -->
+    <button
+      type="button"
+      (click)="toggleMobileSpotlight()"
+      [class]="isMobileFlashlightActive()
+        ? 'bg-amber-400 text-zinc-950 font-extrabold border-2 border-amber-200 shadow-[0_0_25px_rgba(253,184,19,0.65)] scale-105 rounded-full px-4 py-3 flex items-center gap-2 transition-all duration-300 active:scale-95 animate-flashlight-pulse focus-visible:ring-2 focus-visible:ring-zinc-950'
+        : 'bg-zinc-900/90 text-zinc-300 border border-white/15 shadow-lg rounded-full px-4 py-3 flex items-center gap-2 backdrop-blur-md active:scale-95 transition-all duration-300 focus-visible:ring-2 focus-visible:ring-amber-400'"
+      [attr.aria-pressed]="isMobileFlashlightActive()"
+      aria-label="Alternar linterna móvil táctil"
+    >
+      @if (isMobileFlashlightActive()) {
+        <!-- Ícono Linterna Encendida con Haz de Luz Animado (SVG) -->
+        <span class="relative flex items-center justify-center shrink-0">
+          <svg class="w-4 h-4 text-zinc-950 animate-flashlight-beam" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 6 6 18"/>
+            <path d="m8 4 12 12"/>
+            <path d="m2 14 4-4"/>
+            <path d="m9 21 3-3"/>
+            <path d="m14 10 7 7"/>
+            <path d="M17 3v4"/>
+            <path d="M21 7h-4"/>
+          </svg>
+          <span class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-950 animate-ping"></span>
+        </span>
+        <span class="text-xs tracking-tight">🔦 Linterna ON</span>
+      } @else {
+        <!-- Ícono Linterna Apagada con Punto Gris -->
+        <span class="w-2 h-2 rounded-full bg-zinc-500 shrink-0"></span>
+        <span class="text-xs tracking-tight">🔦 Linterna OFF</span>
+      }
+    </button>
+  </aside>
+}
+
 <!-- Lightbox Cinemático -->
 <app-lightbox
   [isOpen]="isLightboxOpen()"
@@ -647,7 +701,8 @@
   [isFreeDownload]="currentAlbum()?.isFreeDownload || false"
   [albumId]="currentAlbum()?.id || ''"
   [isPurchased]="currentLightboxPhoto() ? albumAccessStore.isPhotoPurchased(currentLightboxPhoto()!.id) : false"
-  [isMobileSpotlightActive]="isMobileSpotlightActive()"
+  [isMobileFlashlightActive]="isMobileFlashlightActive()"
+  [isMobileSpotlightActive]="isMobileFlashlightActive()"
   (close)="closeLightbox()"
   (next)="nextLightboxPhoto()"
   (prev)="prevLightboxPhoto()"
@@ -657,6 +712,7 @@
 <!-- Onboarding Tutorial Bento Glassmorphism para Efecto Linterna -->
 <app-spotlight-tutorial
   [isOpen]="isSpotlightTutorialOpen()"
+  [forceManualOpen]="isSpotlightTutorialManual()"
   (close)="closeSpotlightTutorial()"
   (closeTutorial)="closeSpotlightTutorial()"
 />

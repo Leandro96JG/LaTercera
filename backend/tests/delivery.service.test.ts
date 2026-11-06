@@ -355,16 +355,16 @@ describe('DeliveryService (TDD)', () => {
     await streamPromise;
 
     expect(headers['Content-Type']).toBe('application/zip');
-    expect(headers['Content-Disposition']).toContain('LA_TERCERA_album-mix_FOTOS_HD.zip');
+    expect(headers['Content-Disposition']).toContain('La_Tercera_Torneo_Multiformato_La_Rioja_Seleccion.zip');
 
     const zipBuffer = Buffer.concat(chunks);
     expect(zipBuffer.length).toBeGreaterThan(0);
 
     const zipString = zipBuffer.toString('latin1');
-    // Verificar que los nombres de archivo dentro del ZIP preservaron las extensiones reales
-    expect(zipString).toContain('LA_TERCERA_album-mix_foto-png.png');
-    expect(zipString).toContain('LA_TERCERA_album-mix_foto-jpg.jpg');
-    expect(zipString).toContain('LA_TERCERA_album-mix_foto-webp.webp');
+    // Verificar que los nombres de archivo dentro del ZIP preservaron nombres limpios y las extensiones reales
+    expect(zipString).toContain('Torneo_Multiformato_La_Rioja_001.png');
+    expect(zipString).toContain('Torneo_Multiformato_La_Rioja_002.jpg');
+    expect(zipString).toContain('Torneo_Multiformato_La_Rioja_003.webp');
 
     // Verificar que NO se incluyó ningún placeholder de texto plano
     expect(zipString).not.toContain('LA_TERCERA_HD_IMAGE_');
@@ -408,8 +408,8 @@ describe('DeliveryService (TDD)', () => {
     const zipBuffer = Buffer.concat(chunks);
     const zipString = zipBuffer.toString('latin1');
 
-    // Debe contener el archivo como .jpg
-    expect(zipString).toContain('LA_TERCERA_album-1_foto-sin-archivo-fisico.jpg');
+    // Debe contener el archivo como .jpg con nombre comercial limpio
+    expect(zipString).toContain('Atletico_Tesorieri_vs_Andino_SC_001.jpg');
     // Nunca debe contener texto plano que corrompa la estructura
     expect(zipString).not.toContain('LA_TERCERA_HD_IMAGE_');
   });

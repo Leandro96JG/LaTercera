@@ -306,5 +306,23 @@ describe('LightboxComponent (Visor Cinemático Táctil)', () => {
 
     expect(fixture.nativeElement.querySelector('.spotlight-rim')).not.toBeNull();
   });
+
+  it('debe renderizar la insignia secuencial comercial (#001, #003) en la foto del lightbox', () => {
+    fixture.componentRef.setInput('isOpen', true);
+    fixture.componentRef.setInput('currentPhoto', mockPhoto);
+    fixture.componentRef.setInput('currentIndex', 2); // 3ra foto
+    fixture.detectChanges();
+
+    expect(component.formattedSequenceNumber()).toBe('#003');
+    const badge = fixture.nativeElement.querySelector('.text-amber-300.font-mono');
+    expect(badge).toBeTruthy();
+    expect(badge.textContent?.trim()).toBe('#003');
+
+    // Cambiar a índice 0
+    fixture.componentRef.setInput('currentIndex', 0);
+    fixture.detectChanges();
+    expect(component.formattedSequenceNumber()).toBe('#001');
+    expect(badge.textContent?.trim()).toBe('#001');
+  });
 });
 

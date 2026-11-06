@@ -23,6 +23,7 @@ import { createDownloadsRouter } from './routes/downloads.routes';
 import { createRequireAdminAuth } from './middleware/admin-auth.middleware';
 import { getPrimaryFrontendUrl } from './config/env';
 import { EmailNotificationService } from './services/email.service';
+import { buildAlbumPhotoTitle } from './services/mime-validator.service';
 
 import {
   createOrderRepository,
@@ -399,16 +400,23 @@ app.get('/api/albums/:id/photos', async (req: Request, res: Response) => {
 
     const photos = await albumRepository.getPhotosByAlbumId(albumId);
     // Proyección Zero-Trust: omitimos original_path para visitantes y clientes públicos
-    const publicPhotos = photos.map(p => ({
-      id: p.id,
-      albumId: p.albumId,
-      filename: p.filename,
-      previewUrl: p.previewUrl,
-      isSampleHd: p.isSampleHd,
-      width: p.width,
-      height: p.height,
-      sizeBytes: p.sizeBytes
-    }));
+    const publicPhotos = photos.map((p, index) => {
+      let cleanFilename = p.filename;
+      // Fallback para fotos viejas con códigos o nombres de cámara
+      if (!cleanFilename || /^(photo_|img_|dsc_|dji_|[0-9a-fA-F-]{16,})/i.test(cleanFilename)) {
+        cleanFilename = buildAlbumPhotoTitle(album.title, index + 1);
+      }
+      return {
+        id: p.id,
+        albumId: p.albumId,
+        filename: cleanFilename,
+        previewUrl: p.previewUrl,
+        isSampleHd: p.isSampleHd,
+        width: p.width,
+        height: p.height,
+        sizeBytes: p.sizeBytes
+      };
+    });
 
     return res.json({
       success: true,

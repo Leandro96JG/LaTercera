@@ -57,16 +57,22 @@ export class AlbumService {
     return this.http.get<AlbumPhotosApiResponse>(`${this.apiUrl}/${albumId}/photos`, { headers }).pipe(
       map(res => {
         if (!res || !res.photos || res.photos.length === 0) return [];
-        return res.photos.map(p => ({
-          id: p.id,
-          albumId: p.albumId,
-          title: p.filename || `Foto ${p.id}`,
-          previewUrl: p.previewUrl,
-          originalWidth: p.width || 4000,
-          originalHeight: p.height || 3000,
-          isSampleHD: Boolean(p.isSampleHd),
-          fileSizeMb: p.sizeBytes ? +(p.sizeBytes / (1024 * 1024)).toFixed(2) : undefined
-        }));
+        return res.photos.map((p, index) => {
+          let cleanTitle = p.filename;
+          if (!cleanTitle || /^(photo_|img_|dsc_|dji_|[0-9a-fA-F-]{16,})/i.test(cleanTitle)) {
+            cleanTitle = `Foto #${String(index + 1).padStart(3, '0')}`;
+          }
+          return {
+            id: p.id,
+            albumId: p.albumId,
+            title: cleanTitle,
+            previewUrl: p.previewUrl,
+            originalWidth: p.width || 4000,
+            originalHeight: p.height || 3000,
+            isSampleHD: Boolean(p.isSampleHd),
+            fileSizeMb: p.sizeBytes ? +(p.sizeBytes / (1024 * 1024)).toFixed(2) : undefined
+          };
+        });
       })
     );
   }

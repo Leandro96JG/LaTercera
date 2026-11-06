@@ -107,7 +107,10 @@ export class App implements OnInit, OnDestroy {
 
   // Efecto Linterna y Onboarding Tutorial
   public readonly isSpotlightTutorialOpen = signal<boolean>(false);
-  public readonly isMobileSpotlightActive = signal<boolean>(false);
+  public readonly isSpotlightTutorialManual = signal<boolean>(false);
+  public readonly isMobileFlashlightActive = signal<boolean>(false);
+  public readonly isMobileSpotlightActive = this.isMobileFlashlightActive;
+  public readonly isMobileFlashlightEnabled = computed<boolean>(() => this.isMobileFlashlightActive());
 
   // Estado de carga de álbumes públicos
   public readonly isLoadingPublicAlbums = signal<boolean>(true);
@@ -384,16 +387,22 @@ export class App implements OnInit, OnDestroy {
     return p ? this.isPhotoSelected(p.id) : false;
   });
 
-  public openSpotlightTutorial(): void {
+  public openSpotlightTutorial(isManual = true): void {
+    this.isSpotlightTutorialManual.set(isManual);
     this.isSpotlightTutorialOpen.set(true);
   }
 
   public closeSpotlightTutorial(): void {
     this.isSpotlightTutorialOpen.set(false);
+    this.isSpotlightTutorialManual.set(false);
   }
 
   public toggleMobileSpotlight(): void {
-    this.isMobileSpotlightActive.update(v => !v);
+    this.isMobileFlashlightActive.update(v => !v);
+  }
+
+  public toggleMobileFlashlight(): void {
+    this.toggleMobileSpotlight();
   }
 
   public dismissSplash(): void {
@@ -701,18 +710,13 @@ export class App implements OnInit, OnDestroy {
       this.currentView.set('album');
 
       // Tutorial Onboarding automático si es álbum pago y el usuario nunca lo vio
-      if (!album.isFreeDownload) {
-        if (typeof localStorage !== 'undefined') {
-          try {
-            const seen = localStorage.getItem('la_tercera_spotlight_tutorial_v1');
-            if (!seen) {
-              this.isSpotlightTutorialOpen.set(true);
-            }
-          } catch {}
-        }
+      if (!album.isFreeDownload && typeof localStorage !== 'undefined' && localStorage.getItem('la_tercera_spotlight_tutorial_v1') !== 'true') {
+        this.isSpotlightTutorialManual.set(false);
+        this.isSpotlightTutorialOpen.set(true);
       } else {
         this.isSpotlightTutorialOpen.set(false);
-        this.isMobileSpotlightActive.set(false);
+        this.isSpotlightTutorialManual.set(false);
+        this.isMobileFlashlightActive.set(false);
       }
     });
 

@@ -283,4 +283,159 @@ describe('PhotoCardPolaroidComponent', () => {
     expect(layer.classList.contains('is-spot-active')).toBe(true);
     expect(fixture.nativeElement.querySelector('.spotlight-rim')).not.toBeNull();
   });
+
+  it('debe aplicar touch-action: none y clases táctiles cuando isMobileFlashlightActive es true', () => {
+    fixture.componentRef.setInput('photo', mockPhoto);
+    fixture.componentRef.setInput('index', 0);
+    fixture.componentRef.setInput('unitPrice', 1200);
+    fixture.componentRef.setInput('isMobileFlashlightActive', true);
+    fixture.detectChanges();
+
+    const container = fixture.nativeElement.querySelector('[role="button"]') as HTMLElement;
+    expect(container.classList.contains('touch-none')).toBe(true);
+    expect(container.style.touchAction).toBe('none');
+  });
+
+  it('touchmove debe mantener activa la linterna (isHovering() === true) y actualizar coordenadas sin apagarse con linterna móvil ON', async () => {
+    fixture.componentRef.setInput('photo', mockPhoto);
+    fixture.componentRef.setInput('index', 0);
+    fixture.componentRef.setInput('unitPrice', 1200);
+    fixture.componentRef.setInput('isMobileFlashlightActive', true);
+    component.onImageLoaded();
+    fixture.detectChanges();
+
+    const container = fixture.nativeElement.querySelector('[role="button"]') as HTMLElement;
+    // Mock getBoundingClientRect
+    container.getBoundingClientRect = () => ({
+      left: 100,
+      top: 200,
+      width: 300,
+      height: 200,
+      right: 400,
+      bottom: 400,
+      x: 100,
+      y: 200,
+      toJSON: () => {}
+    });
+
+    // 1. Simular TouchStart
+    const touchStartEvt = {
+      currentTarget: container,
+      touches: [{ clientX: 180, clientY: 280 }],
+      cancelable: true,
+      preventDefault: () => {}
+    } as unknown as TouchEvent;
+
+    component.onTouchStart(touchStartEvt);
+    expect(component.isHovering()).toBe(true);
+    expect(component.isSpotActive()).toBe(true);
+
+    // 2. Simular TouchMove (deslizar el dedo)
+    let prevented = false;
+    const touchMoveEvt = {
+      currentTarget: container,
+      touches: [{ clientX: 220, clientY: 310 }],
+      cancelable: true,
+      preventDefault: () => { prevented = true; }
+    } as unknown as TouchEvent;
+
+    component.onTouchMove(touchMoveEvt);
+    expect(prevented).toBe(true);
+    expect(component.isHovering()).toBe(true);
+    expect(component.isSpotActive()).toBe(true);
+
+    // Esperar frame para actualización de spotX y spotY
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    fixture.detectChanges();
+
+    // X = 220 - 100 = 120
+    // Y = 310 - 200 - 40 = 70 (-40px de offset sobre la yema del dedo)
+    expect(component.spotX()).toBe(120);
+    expect(component.spotY()).toBe(70);
+  });
+
+  it('no debe activar la linterna con toques táctiles si el modo linterna móvil está apagado', () => {
+    fixture.componentRef.setInput('photo', mockPhoto);
+    fixture.componentRef.setInput('index', 0);
+    fixture.componentRef.setInput('unitPrice', 1200);
+    fixture.componentRef.setInput('isMobileFlashlightActive', false);
+    component.onImageLoaded();
+    fixture.detectChanges();
+
+    const container = fixture.nativeElement.querySelector('[role="button"]') as HTMLElement;
+    const touchEvt = {
+      currentTarget: container,
+      touches: [{ clientX: 150, clientY: 250 }],
+      cancelable: true,
+      preventDefault: () => {}
+    } as unknown as TouchEvent;
+
+    component.onTouchStart(touchEvt);
+    expect(component.isHovering()).toBe(false);
+    expect(component.isSpotActive()).toBe(false);
+
+    component.onTouchMove(touchEvt);
+    expect(component.isHovering()).toBe(false);
+    expect(component.isSpotActive()).toBe(false);
+  });
+
+  it('en Desktop con mouse debe activarse automáticamente con pointerenter y pointermove sin requerir linterna móvil', async () => {
+    fixture.componentRef.setInput('photo', mockPhoto);
+    fixture.componentRef.setInput('index', 0);
+    fixture.componentRef.setInput('unitPrice', 1200);
+    fixture.componentRef.setInput('isMobileFlashlightActive', false);
+    component.onImageLoaded();
+    fixture.detectChanges();
+
+    const container = fixture.nativeElement.querySelector('[role="button"]') as HTMLElement;
+    container.getBoundingClientRect = () => ({
+      left: 50,
+      top: 50,
+      width: 200,
+      height: 200,
+      right: 250,
+      bottom: 250,
+      x: 50,
+      y: 50,
+      toJSON: () => {}
+    });
+
+    const pointerEvt = {
+      currentTarget: container,
+      clientX: 120,
+      clientY: 130,
+      pointerType: 'mouse'
+    } as unknown as PointerEvent;
+
+    component.onCardPointerEnter(pointerEvt);
+    expect(component.isHovering()).toBe(true);
+    expect(component.isSpotActive()).toBe(true);
+
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    expect(component.spotX()).toBe(70); // 120 - 50
+    expect(component.spotY()).toBe(80); // 130 - 50
+
+    component.onCardPointerLeave();
+    expect(component.isHovering()).toBe(false);
+    expect(component.isSpotActive()).toBe(false);
+  });
+
+  it('debe renderizar la insignia secuencial comercial (#001, #002) en la esquina superior con z-20', () => {
+    fixture.componentRef.setInput('photo', mockPhoto);
+    fixture.componentRef.setInput('index', 0);
+    fixture.componentRef.setInput('unitPrice', 1200);
+    fixture.detectChanges();
+
+    expect(component.formattedSequenceNumber()).toBe('#001');
+
+    const badge = fixture.nativeElement.querySelector('.font-mono.text-\\[11px\\]');
+    expect(badge).toBeTruthy();
+    expect(badge.textContent?.trim()).toBe('#001');
+
+    // Cambiamos el índice para verificar reactividad (#042)
+    fixture.componentRef.setInput('index', 41);
+    fixture.detectChanges();
+    expect(component.formattedSequenceNumber()).toBe('#042');
+    expect(badge.textContent?.trim()).toBe('#042');
+  });
 });

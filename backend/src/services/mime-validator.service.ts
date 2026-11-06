@@ -80,3 +80,58 @@ export function validateImageBufferHeader(buffer: Buffer): { valid: boolean; det
 
   return { valid: false };
 }
+
+/**
+ * Sanitiza el título del álbum removiendo acentos/tildes y caracteres especiales,
+ * transformando espacios y separadores en guiones bajos limpios para nombres de archivo seguros.
+ */
+export function sanitizeAlbumTitle(albumTitle?: string): string {
+  if (!albumTitle || typeof albumTitle !== 'string') return 'Fotos';
+  const withoutAccents = albumTitle
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+  const cleaned = withoutAccents
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '');
+  return cleaned || 'Fotos';
+}
+
+/**
+ * Formatea una insignia secuencial de 3 dígitos con prefijo numeral (ej. "#001", "#024")
+ */
+export function formatSequenceBadge(seq: number): string {
+  const safeSeq = Math.max(1, Math.floor(Number(seq) || 1));
+  return `#${String(safeSeq).padStart(3, '0')}`;
+}
+
+/**
+ * Genera el título comercial limpio de la fotografía combinando el nombre del álbum y su número correlativo
+ * Ejemplo: "Torneo Apertura 2026 • #001"
+ */
+export function buildAlbumPhotoTitle(albumTitle: string, seq: number): string {
+  const title = (albumTitle || 'Álbum Fotográfico').trim();
+  return `${title} • ${formatSequenceBadge(seq)}`;
+}
+
+/**
+ * Genera el nombre comercial limpio para la descarga individual de una foto
+ * Ejemplo: "La_Tercera_Torneo_Apertura_2026_001.jpg"
+ */
+export function buildCleanDownloadFilename(albumTitle: string, seq: number, ext: string = '.jpg'): string {
+  const cleanAlbum = sanitizeAlbumTitle(albumTitle);
+  const safeSeq = Math.max(1, Math.floor(Number(seq) || 1));
+  const paddedSeq = String(safeSeq).padStart(3, '0');
+  const cleanExt = ext.startsWith('.') ? ext.toLowerCase() : `.${ext.toLowerCase()}`;
+  return `La_Tercera_${cleanAlbum}_${paddedSeq}${cleanExt}`;
+}
+
+/**
+ * Genera el nombre limpio para el archivo comprimido .ZIP
+ * Ejemplo: "La_Tercera_Torneo_Apertura_2026.zip" o "La_Tercera_Torneo_Apertura_2026_Seleccion.zip"
+ */
+export function buildCleanZipFilename(albumTitle: string, isPartial: boolean = false): string {
+  const cleanAlbum = sanitizeAlbumTitle(albumTitle);
+  return `La_Tercera_${cleanAlbum}${isPartial ? '_Seleccion' : ''}.zip`;
+}

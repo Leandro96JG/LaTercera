@@ -633,8 +633,45 @@ describe('App Root Component - LA TERCERA', () => {
     expect(app.isSpotlightTutorialOpen()).toBe(false);
     app.openSpotlightTutorial();
     expect(app.isSpotlightTutorialOpen()).toBe(true);
+    expect(app.isSpotlightTutorialManual()).toBe(true);
     app.closeSpotlightTutorial();
     expect(app.isSpotlightTutorialOpen()).toBe(false);
+    expect(app.isSpotlightTutorialManual()).toBe(false);
+  });
+
+  it('no debe abrir el tutorial automáticamente al seleccionar un álbum si ya fue visto en localStorage', () => {
+    localStorage.setItem('la_tercera_spotlight_tutorial_v1', 'true');
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+
+    const mockPaidAlbum: any = {
+      id: 'album-pago',
+      title: 'Torneo Apertura 2026',
+      isFreeDownload: false,
+      fullAlbumPrice: 12000,
+      unitPrice: 1500
+    };
+
+    app.openAlbum(mockPaidAlbum);
+    expect(app.isSpotlightTutorialOpen()).toBe(false);
+  });
+
+  it('debe abrir el tutorial automáticamente al seleccionar un álbum pago si nunca fue visto en localStorage', () => {
+    localStorage.clear();
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+
+    const mockPaidAlbum: any = {
+      id: 'album-pago',
+      title: 'Torneo Apertura 2026',
+      isFreeDownload: false,
+      fullAlbumPrice: 12000,
+      unitPrice: 1500
+    };
+
+    app.openAlbum(mockPaidAlbum);
+    expect(app.isSpotlightTutorialOpen()).toBe(true);
+    expect(app.isSpotlightTutorialManual()).toBe(false);
   });
 });
 

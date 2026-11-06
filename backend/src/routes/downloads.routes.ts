@@ -7,6 +7,7 @@ import { IAlbumRepository } from '../repositories/album.repository';
 import { createAlbumRepository } from '../repositories';
 import { DownloadTokenService } from '../services/token.service';
 import { AdminAuthService } from '../services/admin-auth.service';
+import { buildCleanDownloadFilename } from '../services/mime-validator.service';
 
 export function createDownloadsRouter(
   deliveryService: DeliveryService,
@@ -392,9 +393,17 @@ export function createDownloadsRouter(
         '.jpeg': 'image/jpeg'
       };
       const contentType = mimeMap[detectedExt] || 'image/jpeg';
-      const downloadFilename = photoFilename
-        ? (photoFilename.startsWith('LA_TERCERA_') ? photoFilename : `LA_TERCERA_${photoFilename}`)
-        : `LA_TERCERA_${cleanAlbumId}_${cleanPhotoId}${detectedExt}`;
+
+      let photoIndex = -1;
+      try {
+        const albumPhotos = await albumRepository.getPhotosByAlbumId(album.id);
+        if (albumPhotos && albumPhotos.length > 0) {
+          photoIndex = albumPhotos.findIndex(p => deliveryService.sanitizeId(p.id) === cleanPhotoId);
+        }
+      } catch {}
+
+      const seq = (photoIndex >= 0 ? photoIndex : 0) + 1;
+      const downloadFilename = buildCleanDownloadFilename(album.title, seq, detectedExt);
 
       res.setHeader('Content-Type', contentType);
       res.setHeader('Content-Disposition', `attachment; filename="${downloadFilename}"`);

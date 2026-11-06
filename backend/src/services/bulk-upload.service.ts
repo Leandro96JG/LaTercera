@@ -4,7 +4,8 @@ import {
   isAllowedImageMimeType,
   isAllowedImageExtension,
   sanitizeFilename,
-  validateImageBufferHeader
+  validateImageBufferHeader,
+  buildAlbumPhotoTitle
 } from './mime-validator.service';
 import { runConcurrentBatch, BatchProgress } from './concurrency.service';
 import { processImageWithWatermark, prepareWatermarkLogo } from './image.service';
@@ -19,6 +20,8 @@ export interface UploadedFileItem {
 
 export interface BulkUploadOptions {
   albumId: string;
+  albumTitle?: string;
+  existingCount?: number;
   files: UploadedFileItem[];
   watermarkText?: string;
   /** Buffer del logo opcional para marca de agua en lote (se pre-procesa una sola vez para todo el lote) */
@@ -31,6 +34,7 @@ export interface BulkUploadOptions {
 export interface ProcessedUploadPhotoItem {
   id: string;
   originalName: string;
+  title?: string;
   storagePath: string;
   previewUrl: string;
   width: number;
@@ -150,9 +154,15 @@ export class BulkUploadService {
           processed.previewBuffer
         );
 
+        const seq = (options.existingCount ?? 0) + index + 1;
+        const photoTitle = options.albumTitle
+          ? buildAlbumPhotoTitle(options.albumTitle, seq)
+          : undefined;
+
         return {
           id: photoId,
           originalName: file.originalname,
+          title: photoTitle,
           storagePath: originalSaved.relativePath,
           previewUrl: previewSaved.publicUrl || this.storageService.getPreviewUrl(albumId, photoId),
           width: processed.width,

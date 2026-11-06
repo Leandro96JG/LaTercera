@@ -8,6 +8,7 @@ import {
 } from '../services/drive-importer.service';
 import { BulkUploadService } from '../services/bulk-upload.service';
 import { createStorageService } from '../services/storage.service';
+import { buildAlbumPhotoTitle } from '../services/mime-validator.service';
 import {
   AdminDriveImportRequest,
   AdminDriveImportResponse,
@@ -553,25 +554,38 @@ export function createAdminAlbumsRouter(
         apiKey
       });
 
-      // Persistir fotos importadas en la tabla photos y actualizar álbum
+      // Persistir fotos importadas en la tabla photos y actualizar álbum con títulos comerciales limpios
       if (result.photos.length > 0) {
         try {
-          const photosToPersist: PhotoDTO[] = result.photos.map(p => ({
-            id: p.id,
-            albumId,
-            filename: p.originalName,
-            originalPath: p.storagePath,
-            previewUrl: p.previewUrl,
-            isSampleHd: p.isHD,
-            width: p.width,
-            height: p.height,
-            sizeBytes: p.originalSize
-          }));
+          const currentAlbum = await albumRepository.getAlbumById(albumId);
+          const albumTitle = currentAlbum?.title || 'Álbum Fotográfico';
+          let existingCount = currentAlbum?.photosCount || 0;
+          try {
+            const existingPhotos = await albumRepository.getPhotosByAlbumId(albumId);
+            if (existingPhotos && existingPhotos.length > 0) {
+              existingCount = existingPhotos.length;
+            }
+          } catch {}
+
+          const photosToPersist: PhotoDTO[] = result.photos.map((p, idx) => {
+            const seq = existingCount + idx + 1;
+            const photoTitle = buildAlbumPhotoTitle(albumTitle, seq);
+            return {
+              id: p.id,
+              albumId,
+              filename: photoTitle,
+              originalPath: p.storagePath,
+              previewUrl: p.previewUrl,
+              isSampleHd: p.isHD,
+              width: p.width,
+              height: p.height,
+              sizeBytes: p.originalSize
+            };
+          });
           await albumRepository.addPhotosToAlbum(albumId, photosToPersist);
 
-          const currentAlbum = await albumRepository.getAlbumById(albumId);
           if (currentAlbum) {
-            const newCount = (currentAlbum.photosCount || 0) + result.photos.length;
+            const newCount = existingCount + result.photos.length;
             const updates: Partial<AlbumDTO> = { photosCount: newCount };
             if (!currentAlbum.coverUrl && result.photos[0]?.previewUrl) {
               updates.coverUrl = result.photos[0].previewUrl;
@@ -733,8 +747,20 @@ export function createAdminAlbumsRouter(
         albumId
       });
 
+      const currentAlbum = await albumRepository.getAlbumById(albumId);
+      const albumTitle = currentAlbum?.title || 'Álbum Fotográfico';
+      let existingCount = currentAlbum?.photosCount || 0;
+      try {
+        const existingPhotos = await albumRepository.getPhotosByAlbumId(albumId);
+        if (existingPhotos && existingPhotos.length > 0) {
+          existingCount = existingPhotos.length;
+        }
+      } catch {}
+
       const result = await bulkUploadService.processBulkUpload({
         albumId,
+        albumTitle,
+        existingCount,
         files: uploadItems,
         watermarkText,
         watermarkLogoBuffer,
@@ -742,25 +768,28 @@ export function createAdminAlbumsRouter(
         hdPhotoIndices
       });
 
-      // Persistir fotos procesadas en la tabla photos y actualizar álbum
+      // Persistir fotos procesadas en la tabla photos y actualizar álbum con títulos comerciales limpios
       if (result.photos.length > 0) {
         try {
-          const photosToPersist: PhotoDTO[] = result.photos.map(p => ({
-            id: p.id,
-            albumId,
-            filename: p.originalName,
-            originalPath: p.storagePath,
-            previewUrl: p.previewUrl,
-            isSampleHd: p.isHD,
-            width: p.width,
-            height: p.height,
-            sizeBytes: p.originalSize
-          }));
+          const photosToPersist: PhotoDTO[] = result.photos.map((p, idx) => {
+            const seq = existingCount + idx + 1;
+            const photoTitle = p.title || buildAlbumPhotoTitle(albumTitle, seq);
+            return {
+              id: p.id,
+              albumId,
+              filename: photoTitle,
+              originalPath: p.storagePath,
+              previewUrl: p.previewUrl,
+              isSampleHd: p.isHD,
+              width: p.width,
+              height: p.height,
+              sizeBytes: p.originalSize
+            };
+          });
           await albumRepository.addPhotosToAlbum(albumId, photosToPersist);
 
-          const currentAlbum = await albumRepository.getAlbumById(albumId);
           if (currentAlbum) {
-            const newCount = (currentAlbum.photosCount || 0) + result.photos.length;
+            const newCount = existingCount + result.photos.length;
             const updates: Partial<AlbumDTO> = { photosCount: newCount };
             if (!currentAlbum.coverUrl && result.photos[0]?.previewUrl) {
               updates.coverUrl = result.photos[0].previewUrl;

@@ -169,17 +169,42 @@ import { CommonModule } from '@angular/common';
 export class SpotlightTutorialComponent {
   public static readonly STORAGE_KEY = 'la_tercera_spotlight_tutorial_v1';
 
+  public static hasSeenTutorial(): boolean {
+    if (typeof localStorage === 'undefined') return false;
+    try {
+      return localStorage.getItem(SpotlightTutorialComponent.STORAGE_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  }
+
   public readonly isOpen = input<boolean>(false);
-  public readonly isDismissedInternally = signal<boolean>(false);
+  public readonly forceManualOpen = input<boolean>(false);
+  public readonly isDismissedInternally = signal<boolean>(SpotlightTutorialComponent.hasSeenTutorial());
 
   public readonly close = output<void>();
   public readonly closeTutorial = output<void>();
 
   constructor() {
     effect(() => {
-      if (this.isOpen()) {
+      const open = this.isOpen();
+      const forceManual = this.forceManualOpen();
+
+      if (open) {
+        if (!forceManual && SpotlightTutorialComponent.hasSeenTutorial()) {
+          untracked(() => {
+            this.isDismissedInternally.set(true);
+          });
+          return;
+        }
+
         untracked(() => {
           this.isDismissedInternally.set(false);
+          if (typeof localStorage !== 'undefined') {
+            try {
+              localStorage.setItem(SpotlightTutorialComponent.STORAGE_KEY, 'true');
+            } catch {}
+          }
         });
       }
     });

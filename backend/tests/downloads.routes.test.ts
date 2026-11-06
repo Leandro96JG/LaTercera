@@ -121,7 +121,7 @@ describe('Downloads API Routes (TDD)', () => {
     await handler(req, res);
 
     expect(headers['Content-Type']).toBe('image/jpeg');
-    expect(headers['Content-Disposition']).toContain('LA_TERCERA_album-1_photo-hd-real.jpg');
+    expect(headers['Content-Disposition']).toContain('La_Tercera_Atletico_Tesorieri_vs_Andino_SC_001.jpg');
     expect(Buffer.isBuffer(sentBuffer)).toBe(true);
     expect(sentBuffer.equals(realBuffer)).toBe(true);
   });
@@ -257,7 +257,7 @@ describe('Downloads API Routes (TDD)', () => {
 
       await handler(req, res);
       expect(headers['Content-Type']).toBe('image/jpeg');
-      expect(headers['Content-Disposition']).toContain('attachment; filename="LA_TERCERA_alb-gratis_foto-libre.jpg"');
+      expect(headers['Content-Disposition']).toContain('attachment; filename="La_Tercera_Album_Cortesia_Fin_de_Ano_001.jpg"');
       expect(Buffer.isBuffer(sentBuffer)).toBe(true);
       expect(sentBuffer.equals(realBuffer)).toBe(true);
     });

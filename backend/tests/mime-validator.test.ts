@@ -4,7 +4,12 @@ import {
   isAllowedImageMimeType,
   isAllowedImageExtension,
   sanitizeFilename,
-  validateImageBufferHeader
+  validateImageBufferHeader,
+  sanitizeAlbumTitle,
+  formatSequenceBadge,
+  buildAlbumPhotoTitle,
+  buildCleanDownloadFilename,
+  buildCleanZipFilename
 } from '../src/services/mime-validator.service';
 
 describe('MIME Validator & Image Integrity Service', () => {
@@ -59,5 +64,39 @@ describe('MIME Validator & Image Integrity Service', () => {
     // Archivo no imagen (ej: buffer de texto)
     const fakeBuffer = Buffer.from('Esto no es una imagen');
     expect(validateImageBufferHeader(fakeBuffer)).toEqual({ valid: false });
+  });
+
+  describe('Clean Album & Sequential Commercial Naming', () => {
+    it('debe formatear insignias secuenciales con 3 dígitos (#001)', () => {
+      expect(formatSequenceBadge(1)).toBe('#001');
+      expect(formatSequenceBadge(42)).toBe('#042');
+      expect(formatSequenceBadge(150)).toBe('#150');
+      expect(formatSequenceBadge(0)).toBe('#001');
+    });
+
+    it('debe sanitizar títulos de álbumes eliminando acentos y caracteres especiales', () => {
+      expect(sanitizeAlbumTitle('Atlético Tesorieri vs. Andino S.C.')).toBe('Atletico_Tesorieri_vs_Andino_S_C');
+      expect(sanitizeAlbumTitle('¡Gran Final de Básquet 2026!')).toBe('Gran_Final_de_Basquet_2026');
+      expect(sanitizeAlbumTitle('')).toBe('Fotos');
+    });
+
+    it('debe construir títulos limpios para fotos combinando nombre de álbum y número secuencial', () => {
+      expect(buildAlbumPhotoTitle('Torneo Apertura 2026', 1)).toBe('Torneo Apertura 2026 • #001');
+      expect(buildAlbumPhotoTitle('Copa Ciudad', 15)).toBe('Copa Ciudad • #015');
+    });
+
+    it('debe construir nombres de archivo de descarga comercialmente limpios', () => {
+      expect(buildCleanDownloadFilename('Torneo Apertura 2026', 1, '.jpg'))
+        .toBe('La_Tercera_Torneo_Apertura_2026_001.jpg');
+      expect(buildCleanDownloadFilename('Atlético & Andino', 5, 'png'))
+        .toBe('La_Tercera_Atletico_Andino_005.png');
+    });
+
+    it('debe construir nombres de archivo .ZIP limpios diferenciando álbum completo y selección', () => {
+      expect(buildCleanZipFilename('Torneo Apertura 2026', false))
+        .toBe('La_Tercera_Torneo_Apertura_2026.zip');
+      expect(buildCleanZipFilename('Torneo Apertura 2026', true))
+        .toBe('La_Tercera_Torneo_Apertura_2026_Seleccion.zip');
+    });
   });
 });

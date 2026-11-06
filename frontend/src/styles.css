@@ -140,6 +140,33 @@ body {
   }
 }
 
+/* 10. Resplandor y Haz de Luz del Botón Flotante Linterna Móvil (FAB) */
+.animate-flashlight-pulse {
+  animation: flashlightPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+@keyframes flashlightPulse {
+  0%, 100% {
+    box-shadow: 0 0 25px rgba(253, 184, 19, 0.65), 0 0 50px rgba(253, 184, 19, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 35px rgba(253, 184, 19, 0.9), 0 0 70px rgba(253, 184, 19, 0.5);
+  }
+}
+
+.animate-flashlight-beam {
+  animation: flashlightBeamFlicker 1.8s ease-in-out infinite;
+}
+@keyframes flashlightBeamFlicker {
+  0%, 100% {
+    opacity: 0.9;
+    filter: drop-shadow(0 0 6px rgba(253, 184, 19, 0.8));
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 12px rgba(253, 184, 19, 1));
+  }
+}
+
 /* Accesibilidad: Reducción de Movimiento */
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after {

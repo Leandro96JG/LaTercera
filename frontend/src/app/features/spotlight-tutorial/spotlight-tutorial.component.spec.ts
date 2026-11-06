@@ -53,4 +53,49 @@ describe('SpotlightTutorialComponent', () => {
     expect(closed).toBe(true);
     expect(localStorage.getItem(SpotlightTutorialComponent.STORAGE_KEY)).toBe('true');
   });
+
+  it('debe reportar hasSeenTutorial() correctamente según el estado de localStorage', () => {
+    localStorage.clear();
+    expect(SpotlightTutorialComponent.hasSeenTutorial()).toBe(false);
+
+    localStorage.setItem(SpotlightTutorialComponent.STORAGE_KEY, 'true');
+    expect(SpotlightTutorialComponent.hasSeenTutorial()).toBe(true);
+
+    localStorage.setItem(SpotlightTutorialComponent.STORAGE_KEY, 'false');
+    expect(SpotlightTutorialComponent.hasSeenTutorial()).toBe(false);
+  });
+
+  it('no debe renderizarse automáticamente cuando isOpen es true si ya fue visto previamente en localStorage', () => {
+    localStorage.setItem(SpotlightTutorialComponent.STORAGE_KEY, 'true');
+
+    fixture.componentRef.setInput('forceManualOpen', false);
+    fixture.componentRef.setInput('isOpen', true);
+    fixture.detectChanges();
+
+    expect(component.isDismissedInternally()).toBe(true);
+    const dialog = fixture.nativeElement.querySelector('[role="dialog"]');
+    expect(dialog).toBeNull();
+  });
+
+  it('debe forzar la apertura cuando forceManualOpen es true incluso si ya fue visto previamente', () => {
+    localStorage.setItem(SpotlightTutorialComponent.STORAGE_KEY, 'true');
+
+    fixture.componentRef.setInput('forceManualOpen', true);
+    fixture.componentRef.setInput('isOpen', true);
+    fixture.detectChanges();
+
+    expect(component.isDismissedInternally()).toBe(false);
+    const dialog = fixture.nativeElement.querySelector('[role="dialog"]');
+    expect(dialog).not.toBeNull();
+  });
+
+  it('debe persistir en localStorage inmediatamente tan pronto como se abre por primera vez', () => {
+    localStorage.clear();
+    expect(localStorage.getItem(SpotlightTutorialComponent.STORAGE_KEY)).toBeNull();
+
+    fixture.componentRef.setInput('isOpen', true);
+    fixture.detectChanges();
+
+    expect(localStorage.getItem(SpotlightTutorialComponent.STORAGE_KEY)).toBe('true');
+  });
 });

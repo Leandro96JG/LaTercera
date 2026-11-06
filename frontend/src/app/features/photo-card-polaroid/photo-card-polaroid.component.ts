@@ -45,11 +45,15 @@ import { AlbumService } from '../../core/services/album.service';
         (pointerenter)="onCardPointerEnter($event)"
         (pointerleave)="onCardPointerLeave()"
         (pointermove)="onCardPointerMove($event)"
-        (touchstart)="onCardTouchStart($event)"
-        (touchmove)="onCardTouchMove($event)"
-        (touchend)="onCardTouchEnd()"
-        (touchcancel)="onCardTouchEnd()"
+        (touchstart)="onTouchStart($event)"
+        (touchmove)="onTouchMove($event)"
+        (touchend)="onTouchEnd()"
+        (touchcancel)="onTouchEnd()"
         class="relative w-full aspect-[4/3] rounded-[20px] overflow-hidden bg-zinc-950 cursor-pointer select-none"
+        [class.touch-none]="isMobileFlashlightEnabled()"
+        [style.touch-action]="isMobileFlashlightEnabled() ? 'none' : 'auto'"
+        [style.user-select]="'none'"
+        [style.-webkit-user-select]="'none'"
         [style.--spot-x]="spotX() + 'px'"
         [style.--spot-y]="spotY() + 'px'"
         [style.--spot-size]="'165px'"
@@ -118,15 +122,20 @@ import { AlbumService } from '../../core/services/album.service';
           }
         }
 
-        <!-- BADGE SUPERIOR DE MUESTRA HD -->
-        @if (photo().isSampleHD) {
-          <div class="absolute top-2.5 left-2.5 px-2.5 py-0.5 rounded-full bg-emerald-500 text-zinc-950 font-black text-[9px] shadow-sm flex items-center gap-1 z-20">
-            <svg class="w-2.5 h-2.5 text-zinc-950 fill-current shrink-0" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 2l2.4 7.2h7.6l-6.1 4.5 2.3 7.3-6.2-4.6-6.2 4.6 2.3-7.3-6.1-4.5h7.6z"/>
-            </svg>
-            <span>Muestra HD</span>
-          </div>
-        }
+        <!-- BADGES SUPERIORES: NÚMERO SECUENCIAL E INSIGNIA HD -->
+        <div class="absolute top-2.5 left-2.5 flex items-center gap-1.5 z-20">
+          <span class="px-2 py-0.5 rounded-lg bg-zinc-950/85 text-amber-300 border border-white/15 font-mono font-bold text-[11px] shadow-sm">
+            {{ formattedSequenceNumber() }}
+          </span>
+          @if (photo().isSampleHD) {
+            <div class="px-2.5 py-0.5 rounded-full bg-emerald-500 text-zinc-950 font-black text-[9px] shadow-sm flex items-center gap-1">
+              <svg class="w-2.5 h-2.5 text-zinc-950 fill-current shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 2l2.4 7.2h7.6l-6.1 4.5 2.3 7.3-6.2-4.6-6.2 4.6 2.3-7.3-6.1-4.5h7.6z"/>
+              </svg>
+              <span>Muestra HD</span>
+            </div>
+          }
+        </div>
 
         <!-- OVERLAY DE HOVER SUGIRIENDO EXPANDIR -->
         <div class="absolute bottom-2 right-2 px-2.5 py-1 rounded-xl bg-black/60 backdrop-blur-md text-white/95 text-[11px] font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 pointer-events-none shadow-xs">
@@ -363,7 +372,12 @@ export class PhotoCardPolaroidComponent {
   public readonly albumId = input<string>();
   public readonly isSelected = input<boolean>(false);
   public readonly isPurchased = input<boolean>(false);
+  public readonly isMobileFlashlightActive = input<boolean>(false);
   public readonly isMobileSpotlightActive = input<boolean>(false);
+
+  public readonly isMobileFlashlightEnabled = computed<boolean>(() => {
+    return this.isMobileFlashlightActive() || this.isMobileSpotlightActive();
+  });
 
   public readonly isSpotlightEffectActive = computed<boolean>(() => {
     return !this.isFreeDownload() && !this.isPurchased();
@@ -373,7 +387,9 @@ export class PhotoCardPolaroidComponent {
   private animFrameId: number | null = null;
   private pendingX = 100;
   private pendingY = 100;
+  private touchFadeTimeout: ReturnType<typeof setTimeout> | null = null;
 
+  public readonly isHovering = signal<boolean>(false);
   public readonly isSpotActive = signal<boolean>(false);
   public readonly spotX = signal<number>(100);
   public readonly spotY = signal<number>(100);
@@ -382,6 +398,11 @@ export class PhotoCardPolaroidComponent {
     const albId = this.albumId();
     if (!albId || !this.isFreeDownload()) return '';
     return this.albumService.getFreePhotoDownloadUrl(albId, this.photo().id);
+  });
+
+  // Insignia comercial formateada (#001, #002)
+  public readonly formattedSequenceNumber = computed<string>(() => {
+    return '#' + String(this.index() + 1).padStart(3, '0');
   });
 
   // Retraso de animación de entrada en cascada a 60fps
@@ -446,9 +467,12 @@ export class PhotoCardPolaroidComponent {
 
   public onCardPointerEnter(event: PointerEvent): void {
     if (!this.isSpotlightEffectActive()) return;
+    if (event.pointerType === 'touch' && !this.isMobileFlashlightEnabled()) return;
+
     const target = event.currentTarget as HTMLElement | null;
     if (target) {
       this.cardRect = target.getBoundingClientRect();
+      this.isHovering.set(true);
       this.isSpotActive.set(true);
       this.pendingX = event.clientX - this.cardRect.left;
       this.pendingY = event.clientY - this.cardRect.top;
@@ -457,13 +481,27 @@ export class PhotoCardPolaroidComponent {
   }
 
   public onCardPointerMove(event: PointerEvent): void {
-    if (!this.isSpotlightEffectActive() || !this.cardRect) return;
+    if (!this.isSpotlightEffectActive()) return;
+    if (event.pointerType === 'touch' && !this.isMobileFlashlightEnabled()) return;
+
+    if (!this.cardRect) {
+      const target = event.currentTarget as HTMLElement | null;
+      if (target) {
+        this.cardRect = target.getBoundingClientRect();
+      }
+    }
+    if (!this.cardRect) return;
+
+    this.isHovering.set(true);
+    this.isSpotActive.set(true);
     this.pendingX = event.clientX - this.cardRect.left;
     this.pendingY = event.clientY - this.cardRect.top;
     this.scheduleSpotlightUpdate();
   }
 
   public onCardPointerLeave(): void {
+    if (this.touchFadeTimeout) return;
+    this.isHovering.set(false);
     this.isSpotActive.set(false);
     this.cardRect = null;
     if (this.animFrameId) {
@@ -472,37 +510,67 @@ export class PhotoCardPolaroidComponent {
     }
   }
 
-  public onCardTouchStart(event: TouchEvent): void {
-    if (!this.isSpotlightEffectActive() || !this.isMobileSpotlightActive()) return;
+  public onTouchStart(event: TouchEvent): void {
+    if (!this.isSpotlightEffectActive() || !this.isMobileFlashlightEnabled()) return;
+    if (this.touchFadeTimeout) {
+      clearTimeout(this.touchFadeTimeout);
+      this.touchFadeTimeout = null;
+    }
     const target = event.currentTarget as HTMLElement | null;
     const touch = event.touches?.[0];
     if (target && touch) {
       this.cardRect = target.getBoundingClientRect();
+      this.isHovering.set(true);
       this.isSpotActive.set(true);
       this.pendingX = touch.clientX - this.cardRect.left;
-      this.pendingY = touch.clientY - this.cardRect.top - 35; // Offset de -35px sobre la yema
+      this.pendingY = touch.clientY - this.cardRect.top - 40; // Offset vertical de -40px sobre la yema
       this.scheduleSpotlightUpdate();
     }
   }
 
-  public onCardTouchMove(event: TouchEvent): void {
-    if (!this.isSpotlightEffectActive() || !this.isMobileSpotlightActive() || !this.cardRect) return;
+  public onTouchMove(event: TouchEvent): void {
+    if (!this.isSpotlightEffectActive() || !this.isMobileFlashlightEnabled()) return;
+    if (event.cancelable) {
+      event.preventDefault();
+    }
+    if (!this.cardRect) {
+      const target = event.currentTarget as HTMLElement | null;
+      if (target) {
+        this.cardRect = target.getBoundingClientRect();
+      }
+    }
+    if (!this.cardRect) return;
+
     const touch = event.touches?.[0];
     if (touch) {
+      this.isHovering.set(true);
+      this.isSpotActive.set(true);
       this.pendingX = touch.clientX - this.cardRect.left;
-      this.pendingY = touch.clientY - this.cardRect.top - 35; // Offset de -35px sobre la yema
+      this.pendingY = touch.clientY - this.cardRect.top - 40;
       this.scheduleSpotlightUpdate();
     }
   }
 
-  public onCardTouchEnd(): void {
-    this.isSpotActive.set(false);
-    this.cardRect = null;
-    if (this.animFrameId) {
-      cancelAnimationFrame(this.animFrameId);
-      this.animFrameId = null;
+  public onTouchEnd(): void {
+    if (this.touchFadeTimeout) {
+      clearTimeout(this.touchFadeTimeout);
     }
+    this.touchFadeTimeout = setTimeout(() => {
+      this.isHovering.set(false);
+      this.isSpotActive.set(false);
+      this.cardRect = null;
+      if (this.animFrameId) {
+        cancelAnimationFrame(this.animFrameId);
+        this.animFrameId = null;
+      }
+      this.touchFadeTimeout = null;
+    }, 600);
   }
+
+  // Backwards compatibility aliases
+  public onCardTouchStart(event: TouchEvent): void { this.onTouchStart(event); }
+  public onCardTouchMove(event: TouchEvent): void { this.onTouchMove(event); }
+  public onCardTouchEnd(): void { this.onTouchEnd(); }
 
   private scheduleSpotlightUpdate(): void {
     if (this.animFrameId) return;
