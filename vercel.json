@@ -9,7 +9,7 @@
       "destination": "https://laterceralr.up.railway.app/api/$1"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!_vercel/).*)",
       "destination": "/index.html"
     }
   ]
