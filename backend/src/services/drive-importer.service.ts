@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { extractGoogleDriveFolderId } from './drive-parser.service';
 import { isAllowedImageMimeType, isAllowedImageExtension, sanitizeFilename, validateImageBufferHeader } from './mime-validator.service';
 import { runConcurrentBatch, BatchProgress } from './concurrency.service';
-import { processImageWithWatermark } from './image.service';
+import { processImageWithWatermark, prepareWatermarkLogo } from './image.service';
 import { IStorageService, createStorageService } from './storage.service';
 
 export interface DriveFileMetadata {
@@ -62,6 +62,8 @@ export interface ImportDriveOptions {
   albumId: string;
   driveUrl: string;
   watermarkText?: string;
+  /** Buffer del logo opcional para marca de agua en lote (se pre-procesa una sola vez para todo el lote) */
+  watermarkLogoBuffer?: Buffer;
   concurrencyLimit?: number;
   markHdFirstN?: number;
   apiKey?: string;
@@ -172,6 +174,16 @@ export class GoogleDriveImporterService {
     let totalOriginalBytes = 0;
     let totalPreviewBytes = 0;
 
+    // Optimización de Memoria: Pre-procesar logo UNA SOLA VEZ para todo el lote
+    let preparedLogo: Buffer | undefined;
+    if (options.watermarkLogoBuffer) {
+      try {
+        preparedLogo = await prepareWatermarkLogo(options.watermarkLogoBuffer, 400, 0.35);
+      } catch (err) {
+        console.warn('[GoogleDriveImporterService] No se pudo pre-procesar logo de marca de agua:', err);
+      }
+    }
+
     // 4. Procesamiento concurrente controlado (anti-OOM en lotes 50+)
     const batchResult = await runConcurrentBatch<DriveFileMetadata, ProcessedPhotoItem>(
       eligibleFiles,
@@ -194,12 +206,14 @@ export class GoogleDriveImporterService {
         // c. Determinar si es foto HD de muestra (primeras N fotos del álbum)
         const isHD = index < markHdFirstN;
 
-        // d. Procesar con Sharp (redimensionar a 800px, WebP, marca de agua diagonal de píxeles)
+        // d. Procesar con Sharp (redimensionar con fit: 'inside' respetando orientación y reutilizando logo)
         const processed = await processImageWithWatermark(rawBuffer, {
           watermarkText,
           targetWidth: 800,
+          targetHeight: 800,
           quality: isHD ? 85 : 70,
-          isHD
+          isHD,
+          logoBuffer: preparedLogo
         });
 
         // e. Guardar archivo original en capa privada protegida

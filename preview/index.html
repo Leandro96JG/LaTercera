@@ -238,75 +238,150 @@
     <!-- ==================================================== -->
     <div id="homeSection" class="space-y-8">
       
-      <!-- BENTO GRID DE PRESENTACIÓN DE LA FOTÓGRAFA -->
-      <section class="grid grid-cols-1 md:grid-cols-12 gap-5">
+      <!-- BENTO GRID HERO DE PRESENTACIÓN DE LA FOTÓGRAFA -->
+      <section class="flex flex-col lg:grid lg:grid-cols-12 gap-4 lg:gap-6 mb-8 max-w-full overflow-x-hidden">
         
-        <!-- Tarjeta Perfil de la Fotógrafa (Grande) -->
-        <div class="md:col-span-7 bg-white rounded-[32px] p-6 sm:p-8 border border-black/[0.05] shadow-bento flex flex-col sm:flex-row items-center gap-6 relative overflow-hidden">
-          <!-- Foto de la fotógrafa en marco bento -->
-          <div class="w-36 h-36 sm:w-44 sm:h-44 rounded-[26px] overflow-hidden flex-shrink-0 shadow-md border-2 border-white">
-            <img src="../assets/branding/fotografa.jpg" alt="Fotógrafa La Tercera" class="w-full h-full object-cover object-top">
-          </div>
+        <!-- 1. CAJA PRINCIPAL DE PRESENTACIÓN (Blanca) - 7 Columnas en Desktop -->
+        <div class="lg:col-span-7 bg-white rounded-[28px] sm:rounded-[32px] p-5 sm:p-7 lg:p-8 border border-black/[0.05] shadow-bento flex flex-col justify-between h-full relative overflow-hidden">
+          <div>
+            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200/60 text-emerald-900 text-xs font-semibold mb-3.5 max-w-full">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+              <span class="truncate">Disponible en La Rioja, Argentina 🇦🇷</span>
+            </div>
 
-          <div class="flex-1 text-center sm:text-left">
-            <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-100 text-zinc-600 text-[11px] font-semibold mb-2">
-              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              Disponible para Coberturas en La Rioja
+            <!-- Cabecera de Perfil Responsiva -->
+            <div class="flex items-center sm:items-start gap-4 sm:gap-6">
+              <div class="w-20 h-20 sm:w-36 sm:h-36 rounded-2xl sm:rounded-[26px] overflow-hidden shrink-0 shadow-md border-2 border-white ring-1 ring-black/[0.05]">
+                <img src="../assets/branding/fotografa.jpg" alt="Fotógrafa La Tercera" class="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-500">
+              </div>
+
+              <div class="flex-1 min-w-0">
+                <h1 class="font-display font-black text-xl sm:text-2xl lg:text-3xl text-zinc-950 tracking-tight leading-tight truncate sm:whitespace-normal">
+                  Jenifer "Yuyo" Espeche
+                </h1>
+                <p class="text-xs sm:text-sm font-semibold text-zinc-500 mt-0.5 sm:mt-1">
+                  Fotografía Deportiva y Social • La Tercera
+                </p>
+
+                <div class="hidden sm:inline-flex items-center gap-1.5 mt-2.5 px-3 py-1 rounded-xl bg-zinc-100/90 border border-zinc-200/60 text-xs sm:text-sm font-medium text-zinc-700">
+                  <span class="text-zinc-500 shrink-0">Buscá tus fotos de</span>
+                  <span class="font-bold text-zinc-950">Fútbol & Cancha</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="sm:hidden flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-xl bg-zinc-100/90 border border-zinc-200/60 text-xs font-medium text-zinc-700 w-fit max-w-full">
+              <span class="text-zinc-500 shrink-0">Buscá tus fotos de</span>
+              <span class="font-bold text-zinc-950">Fútbol & Cancha</span>
             </div>
             
-            <h1 class="font-display font-extrabold text-2xl sm:text-3xl text-zinc-900 tracking-tight leading-tight">
-              Jenifer "Yuyo" Espeche
-            </h1>
-            <p class="text-xs font-bold text-zinc-400 uppercase tracking-widest mt-0.5 mb-2">Fotografía Deportiva & Social • La Tercera</p>
-            
-            <p class="text-xs sm:text-sm text-zinc-500 mt-1 leading-relaxed">
-              Capturando la pasión del fútbol, hockey y básquet riojano a ras de cancha, y la emoción inolvidable de tus cumpleaños, fiestas y eventos especiales.
+            <p class="text-xs sm:text-sm lg:text-base text-zinc-600 mt-3 sm:mt-4 leading-relaxed max-w-xl">
+              Transformando momentos efímeros en imágenes permanentes para que cada recuerdo sea inolvidable.
             </p>
+          </div>
 
-            <!-- Redes Sociales de la Fotógrafa -->
-            <div class="flex items-center justify-center sm:justify-start gap-2.5 mt-4 pt-3 border-t border-black/[0.04]">
-              <a href="https://instagram.com" target="_blank" class="px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-semibold flex items-center gap-1.5 transition">
-                <i data-lucide="instagram" class="w-3.5 h-3.5 text-pink-600"></i> La Tercera
+          <div class="mt-5 pt-4 border-t border-black/[0.05] flex flex-col gap-2.5">
+            <!-- CTA Primario -->
+            <a href="#albumsBentoGrid" class="w-full sm:w-fit min-h-[46px] py-3.5 px-6 rounded-2xl bg-zinc-950 hover:bg-zinc-800 text-white font-bold text-xs sm:text-sm text-center flex items-center justify-center gap-2.5 shadow-md transition active:scale-[0.98]">
+              <i data-lucide="search" class="w-4 h-4 text-amber-400"></i>
+              <span>Ver Galerías y Buscar mis Fotos</span>
+            </a>
+
+            <!-- CTAs Secundarios -->
+            <div class="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-2.5 w-full">
+              <a href="https://instagram.com" target="_blank" class="min-h-[42px] px-3.5 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 text-xs font-semibold flex items-center justify-center gap-2 transition active:scale-95">
+                <i data-lucide="instagram" class="w-4 h-4 text-pink-600"></i>
+                <span>Instagram</span>
               </a>
-              <a href="https://wa.me/5493804868714?text=Hola%20Yuyo!%20Te%20escribo%20desde%20la%20p%C3%A1gina%20de%20La%20Tercera" target="_blank" class="px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-semibold flex items-center gap-1.5 transition">
-                <i data-lucide="phone" class="w-3.5 h-3.5 text-emerald-600"></i> 3804-868714
+              <a href="https://wa.me/5493804868714" target="_blank" class="min-h-[42px] px-3.5 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 text-xs font-semibold flex items-center justify-center gap-2 transition active:scale-95">
+                <i data-lucide="phone" class="w-4 h-4 text-emerald-600"></i>
+                <span class="sm:hidden">WhatsApp</span>
+                <span class="hidden sm:inline">WhatsApp (3804-868714)</span>
               </a>
             </div>
           </div>
         </div>
 
-        <!-- Tarjeta Disciplinas & Coberturas (Bento Oscuro) -->
-        <div class="md:col-span-5 bg-surface-darkCard text-white rounded-[32px] p-6 sm:p-8 shadow-bento flex flex-col justify-between">
-          <div>
-            <span class="text-[11px] font-bold text-zinc-400 uppercase tracking-widest block mb-2">Servicios Fotográficos</span>
-            <h3 class="font-display font-bold text-xl sm:text-2xl text-white">¿Qué eventos cubro?</h3>
-            <p class="text-xs text-zinc-400 mt-1.5">
-              Desde partidos oficiales de fin de semana hasta fiestas privadas.
-            </p>
+        <!-- 2. CAJA DE MUESTRA VISUAL (Destacados / Carrusel) - 5 Columnas en Desktop -->
+        <div class="lg:col-span-5 h-48 sm:h-64 lg:h-full lg:min-h-[320px] rounded-[28px] sm:rounded-[32px] overflow-hidden relative shadow-bento border border-black/[0.05] bg-zinc-950 flex flex-col justify-between p-4 sm:p-6 group">
+          <img src="https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1000&q=80" alt="Fútbol en Cancha" class="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 hover:scale-105">
+          <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/40 pointer-events-none"></div>
+
+          <div class="relative z-10 backdrop-blur-md bg-black/45 border border-white/20 text-white text-[11px] sm:text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-2 w-fit shadow-md">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>📸 Últimas coberturas subidas</span>
           </div>
 
-          <div class="grid grid-cols-2 gap-2.5 my-4">
-            <div class="bg-surface-darkPill p-3 rounded-2xl border border-white/5">
-              <span class="text-xs font-bold text-white block">⚽ Fútbol & Cancha</span>
-              <span class="text-[10px] text-zinc-400">Torneos y ligas locales</span>
+          <div class="relative z-10 flex items-end justify-between gap-3 text-white">
+            <div>
+              <span class="text-[10px] sm:text-xs uppercase tracking-wider text-amber-300 font-bold block">Fútbol en Cancha</span>
+              <span class="font-display font-bold text-sm sm:text-base lg:text-lg block drop-shadow-sm leading-tight">Liga Riojana de Primera</span>
             </div>
-            <div class="bg-surface-darkPill p-3 rounded-2xl border border-white/5">
-              <span class="text-xs font-bold text-white block">🏑 Hockey & Básquet</span>
-              <span class="text-[10px] text-zinc-400">Acción y retratos</span>
+            <div class="flex items-center gap-1.5">
+              <span class="w-5 h-1.5 rounded-full bg-amber-400"></span>
+              <span class="w-1.5 h-1.5 rounded-full bg-white/40"></span>
+              <span class="w-1.5 h-1.5 rounded-full bg-white/40"></span>
             </div>
-            <div class="bg-surface-darkPill p-3 rounded-2xl border border-white/5">
-              <span class="text-xs font-bold text-white block">🎉 Cumpleaños & 15s</span>
-              <span class="text-[10px] text-zinc-400">Momentos inolvidables</span>
+          </div>
+        </div>
+
+        <!-- 3. BLOQUE OSCURO DE COBERTURAS (#111111) - 12 Columnas en Desktop -->
+        <div class="lg:col-span-12 bg-[#111111] text-white rounded-[28px] sm:rounded-[32px] p-5 sm:p-6 lg:p-7 shadow-bento border border-white/5 relative overflow-hidden">
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-3 border-b border-white/10">
+            <div>
+              <span class="text-[11px] font-semibold text-zinc-400 block mb-0.5">Coberturas fotográficas</span>
+              <h2 class="font-display font-black text-lg sm:text-xl lg:text-2xl text-white tracking-tight">¿Qué eventos cubro?</h2>
+              <p class="text-xs text-zinc-400 mt-0.5">Eventos deportivos y sociales</p>
             </div>
-            <div class="bg-surface-darkPill p-3 rounded-2xl border border-white/5">
-              <span class="text-xs font-bold text-white block">🏆 Entregas de Premios</span>
-              <span class="text-[10px] text-zinc-400">Festejos y podios</span>
+
+            <!-- Botón de Presupuesto en Desktop -->
+            <a href="https://wa.me/5493804868714?text=Hola%20Yuyo!%20Quiero%20pedir%20presupuesto%20para%20la%20cobertura%20de%20un%20evento" target="_blank" class="hidden lg:flex min-h-[44px] py-2.5 px-5 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-950 font-bold text-xs sm:text-sm items-center gap-2 transition active:scale-[0.98] shadow-md">
+              <i data-lucide="message-circle" class="w-4 h-4 text-emerald-600"></i>
+              <span>Pedir presupuesto para mi evento</span>
+            </a>
+          </div>
+
+          <!-- Grilla de Chips Lado a Lado -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 my-4">
+            <!-- Deportes -->
+            <div>
+              <div class="flex items-center gap-2 mb-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                <span class="text-xs font-bold text-white uppercase tracking-wider">Deportivos: Cancha & Torneos</span>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <span class="px-3.5 py-2 rounded-xl bg-white/[0.06] border border-white/10 text-xs font-medium text-zinc-200">⚽ Fútbol</span>
+                <span class="px-3.5 py-2 rounded-xl bg-white/[0.06] border border-white/10 text-xs font-medium text-zinc-200">🏀 Básquet</span>
+                <span class="px-3.5 py-2 rounded-xl bg-white/[0.06] border border-white/10 text-xs font-medium text-zinc-200">🏑 Hockey</span>
+                <span class="px-3.5 py-2 rounded-xl bg-white/[0.06] border border-white/10 text-xs font-medium text-zinc-200">🏐 Vóley</span>
+                <span class="px-3.5 py-2 rounded-xl bg-white/[0.06] border border-emerald-400/30 text-xs font-medium text-emerald-300">+ Otras disciplinas</span>
+              </div>
+            </div>
+
+            <!-- Sociales -->
+            <div>
+              <div class="flex items-center gap-2 mb-2">
+                <span class="w-2 h-2 rounded-full bg-pink-400"></span>
+                <span class="text-xs font-bold text-white uppercase tracking-wider">Sociales: Fiestas & Familias</span>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <span class="px-3.5 py-2 rounded-xl bg-white/[0.06] border border-white/10 text-xs font-medium text-zinc-200">🎉 Cumpleaños</span>
+                <span class="px-3.5 py-2 rounded-xl bg-white/[0.06] border border-white/10 text-xs font-medium text-zinc-200">🕊️ Comuniones</span>
+                <span class="px-3.5 py-2 rounded-xl bg-white/[0.06] border border-white/10 text-xs font-medium text-zinc-200">👶 Bautismos</span>
+                <span class="px-3.5 py-2 rounded-xl bg-white/[0.06] border border-white/10 text-xs font-medium text-zinc-200">🎓 Egresos</span>
+                <span class="px-3.5 py-2 rounded-xl bg-white/[0.06] border border-white/10 text-xs font-medium text-zinc-200">💍 Casamientos</span>
+                <span class="px-3.5 py-2 rounded-xl bg-white/[0.06] border border-pink-400/30 text-xs font-medium text-pink-300">+ Eventos privados</span>
+              </div>
             </div>
           </div>
 
-          <a href="https://wa.me/5493804868714?text=Hola%20Yuyo!%20Quiero%20pedir%20presupuesto%20para%20la%20cobertura%20de%20un%20evento" target="_blank" class="w-full py-2.5 rounded-2xl bg-white hover:bg-zinc-200 text-zinc-950 font-bold text-xs text-center transition">
-            Pedir presupuesto para mi evento →
-          </a>
+          <!-- Botón Mobile en la base -->
+          <div class="lg:hidden mt-3 pt-3 border-t border-white/10">
+            <a href="https://wa.me/5493804868714" target="_blank" class="w-full py-3 rounded-xl bg-white text-zinc-950 font-bold text-xs text-center flex items-center justify-center gap-2">
+              <i data-lucide="message-circle" class="w-4 h-4 text-emerald-600"></i>
+              <span>Pedir presupuesto para mi evento</span>
+            </a>
+          </div>
         </div>
 
       </section>

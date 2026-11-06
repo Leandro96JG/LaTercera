@@ -37,6 +37,7 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
     createCoupon: ReturnType<typeof vi.fn>;
     updateCoupon: ReturnType<typeof vi.fn>;
     deleteCoupon: ReturnType<typeof vi.fn>;
+    uploadWatermarkLogo: ReturnType<typeof vi.fn>;
   };
 
   const initialMockAlbum = {
@@ -214,6 +215,10 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
         success: true,
         code: 'YUYO10',
         message: 'Cupón eliminado'
+      })),
+      uploadWatermarkLogo: vi.fn().mockReturnValue(of({
+        success: true,
+        logoUrl: 'https://cdn.example.com/branding/custom-logo.png'
       }))
     };
 
@@ -514,6 +519,25 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
     expect(component.albums().find(a => a.id === 'album-1')?.isPublished).toBe(false);
     expect(component.updateFeedback()?.success).toBe(true);
     expect(component.updateFeedback()?.message).toContain('ocultado');
+  });
+
+  it('debe alternar el destacado en hero de un álbum con toggleHeroFeatured y mostrar feedback', () => {
+    mockAdminService.updateAlbum.mockReturnValue(of({
+      success: true,
+      album: {
+        ...initialMockAlbum,
+        isHeroFeatured: true
+      },
+      message: 'Álbum actualizado'
+    }));
+
+    component.toggleHeroFeatured(initialMockAlbum);
+
+    expect(mockAdminService.updateAlbum).toHaveBeenCalledWith('album-1', { isHeroFeatured: true });
+    expect(component.isTogglingHeroId()).toBe(null);
+    expect(component.albums().find(a => a.id === 'album-1')?.isHeroFeatured).toBe(true);
+    expect(component.updateFeedback()?.success).toBe(true);
+    expect(component.updateFeedback()?.message).toContain('Hero');
   });
 
   it('debe paginar los álbumes en la vista de administración', () => {
@@ -1938,6 +1962,53 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
         expect(savedAlbum?.title).toBe('Clásico Riojano 2026 - Edición Especial');
         expect(savedAlbum?.subtitle).toBe('Gran Final del Torneo');
         expect(component.toast()?.type).toBe('success');
+      });
+    });
+
+    describe('Gestión de Marca de Agua Unificada (Texto y Logo Remoto)', () => {
+      it('debe asignar y remover logo de marca de agua en lote masivo', () => {
+        const mockFile = new File(['dummy logo'], 'logo.png', { type: 'image/png' });
+        const mockEvent = {
+          target: {
+            files: [mockFile]
+          }
+        } as unknown as Event;
+
+        component.onWatermarkLogoSelected(mockEvent, 'bulk');
+        expect(component.bulkLogoFile()).toBe(mockFile);
+        expect(component.bulkLogoPreview()).toBeTruthy();
+
+        component.removeWatermarkLogo('bulk');
+        expect(component.bulkLogoFile()).toBeNull();
+        expect(component.bulkLogoPreview()).toBeNull();
+      });
+
+      it('debe actualizar watermarkText y logo al seleccionar un álbum en carga masiva', () => {
+        const albumWithWatermark = {
+          ...initialMockAlbum,
+          id: 'album-watermark',
+          watermarkText: 'COPA CIUDAD • LA TERCERA',
+          watermarkLogoUrl: 'https://cdn.example.com/branding/copa.png'
+        };
+        component.albums.set([albumWithWatermark as any]);
+
+        component.onUploadAlbumChange('album-watermark', 'bulk');
+        expect(component.bulkForm.controls.watermarkText.value).toBe('COPA CIUDAD • LA TERCERA');
+        expect(component.bulkLogoPreview()).toBe('https://cdn.example.com/branding/copa.png');
+      });
+
+      it('debe subir logo al servidor cuando se selecciona en modal de edición', () => {
+        const mockFile = new File(['dummy logo'], 'torneo.png', { type: 'image/png' });
+        const mockEvent = {
+          target: {
+            files: [mockFile]
+          }
+        } as unknown as Event;
+
+        component.onWatermarkLogoSelected(mockEvent, 'edit');
+        expect(mockAdminService.uploadWatermarkLogo).toHaveBeenCalledWith(mockFile);
+        expect(component.editLogoPreview()).toBe('https://cdn.example.com/branding/custom-logo.png');
+        expect(component.editAlbumForm.controls.watermarkLogoUrl.value).toBe('https://cdn.example.com/branding/custom-logo.png');
       });
     });
   });

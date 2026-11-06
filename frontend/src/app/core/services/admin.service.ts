@@ -72,12 +72,20 @@ export class AdminService {
     files: File[],
     watermarkText: string = 'LA TERCERA • MUESTRA',
     hdPhotoIndices: number[] = [0, 1],
-    onProgress?: (percent: number) => void
+    onProgress?: (percent: number) => void,
+    watermarkLogoFile?: File | null,
+    watermarkLogoUrl?: string | null
   ): Observable<BulkUploadResponse> {
     const formData = new FormData();
     formData.append('albumId', albumId);
     formData.append('watermarkText', watermarkText);
     formData.append('hdPhotoIndices', JSON.stringify(hdPhotoIndices));
+
+    if (watermarkLogoFile) {
+      formData.append('watermarkLogo', watermarkLogoFile, watermarkLogoFile.name);
+    } else if (watermarkLogoUrl) {
+      formData.append('watermarkLogoUrl', watermarkLogoUrl);
+    }
 
     for (const file of files) {
       formData.append('photos', file, file.name);
@@ -131,6 +139,19 @@ export class AdminService {
     return this.http.get<AdminListAlbumsResponse>(`${this.baseUrl}/albums${params}`, {
       headers: this.getAuthHeaders()
     });
+  }
+
+  /**
+   * Sube un logo o escudo PNG/WebP desde PC o celular para marca de agua
+   */
+  public uploadWatermarkLogo(file: File): Observable<{ success: boolean; logoUrl: string }> {
+    const formData = new FormData();
+    formData.append('logo', file, file.name);
+    return this.http.post<{ success: boolean; logoUrl: string }>(
+      `${this.baseUrl}/albums/upload-watermark-logo`,
+      formData,
+      { headers: this.getAuthHeaders() }
+    );
   }
 
   /**

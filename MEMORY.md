@@ -49,8 +49,12 @@
 ---
 
 ## 4. Estado Actual y Últimos Hitos (ADRs Recientes)
-- **Suite de Pruebas Automatizadas:** **488 tests pasando al 100%** (224 backend con Vitest + 264 frontend con Angular TestBed/Vitest).
+- **Suite de Pruebas Automatizadas:** **504 tests pasando al 100%** (228 backend con Vitest + 276 frontend con Angular TestBed/Vitest).
 - **Últimos ADRs Consolidados:**
+  - **ADR-072:** Selector Remoto de Logo de Marca de Agua (PC/Móvil) y Formularios Unificados: Carga de logos PNG/WebP/SVG remotos desde celular o escritorio con previsualización reactiva y remoción inmediata en Modal Crear, Modal Editar, Carga Masiva y Google Drive. Endpoint `POST /api/admin/albums/upload-watermark-logo` hacia Storage `previews/branding`, resolución transparente en `/bulk-upload` y `/import-drive`, sincronización reactiva al cambiar de álbum y cobertura total con 276 tests frontend y 228 tests backend.
+  - **ADR-071:** Carrusel Hero Dinámico (Opción C) & Pipeline de Marcas de Agua con Logo y Optimización LCP: Portadas limpias de catálogo en Hero sin texto diagonal invasivo, canal alfa con `linear([1,1,1,0.35])` en Sharp, buffer de logo preprocesado una sola vez por lote en `/bulk-upload` y `/import-drive`, soporte de logos personalizados de torneos (`watermarkLogoUrl`), índice parcial PostgreSQL `WHERE is_hero_featured = true`, toggle en Panel Admin y `fetchpriority="high"` / `loading="eager"` en slide 0.
+  - **ADR-070:** Rediseño Completo de Hero con Bento Grid & Mobile-First (`frontend-design`): Fila superior 7+5 columnas igualada en altura (Presentación con Text Rotator 2.5s y CTA 'Ver Galerías' + Muestra Visual con Carrusel Ken Burns y badge vidrio esmerilado). Bloque inferior 12 columnas #111111 con selector de Tabs interactivos en móvil (anti-scroll eterno) y chips horizontales hover en Desktop.
+  - **ADR-069:** Actualización de Identidad en Hero: Biografía oficial, badge "La Rioja, Argentina" con icono SVG de Bandera Argentina, descripción "¿Qué eventos cubro? -> Eventos deportivos y sociales".
   - **ADR-068:** Elevación UI/UX Fase 4 (`frontend-design`): Erradicación de clichés de IA y emojis en CheckoutModal, PinUnlockModal, OrderRecoveryModal, AdminLogin y PaymentSuccess. Iconografía SVG vectorial, inputs y botones táctiles `min-h-[44px]`, foco accesible y 14 nuevos tests unitarios.
   - **ADR-067:** Elevación UI/UX Fase 3 (`frontend-design`): Lightbox cinemático con iconografía vectorial SVG nativa, controles táctiles accesibles (min 44px) y rediseño de la cápsula y drawer del carrito sin emojis ni flechas genéricas de IA.
   - **ADR-066:** Elevación UI/UX Fase 2 (`frontend-design`): Erradicación de emojis en tarjetas 3D y polaroids, iconos vectoriales SVG limpios, áreas táctiles móviles `min-h-[44px]` y prevención de falsos toques.

@@ -12,6 +12,8 @@ export interface DriveImportRequest {
   albumId: string;
   driveUrl: string;
   watermarkText?: string;
+  watermarkLogoUrl?: string | null;
+  watermarkLogoBase64?: string | null;
   concurrencyLimit?: number;
   markHdFirstN?: number;
 }
@@ -90,6 +92,9 @@ export interface CreateAlbumRequest {
   badge?: string;
   coverUrl?: string;
   isPublished?: boolean;
+  isHeroFeatured?: boolean;
+  watermarkText?: string;
+  watermarkLogoUrl?: string | null;
   customSlug?: string;
   isFreeDownload?: boolean;
   isPrivate?: boolean;
@@ -115,6 +120,9 @@ export interface UpdateAlbumRequest {
   badge?: string;
   coverUrl?: string;
   isPublished?: boolean;
+  isHeroFeatured?: boolean;
+  watermarkText?: string;
+  watermarkLogoUrl?: string | null;
   isFreeDownload?: boolean;
   isPrivate?: boolean;
   accessCode?: string | null;

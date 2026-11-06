@@ -16,6 +16,10 @@ export interface AdminDriveImportRequest {
   driveUrl: string;
   /** Texto personalizado para la marca de agua diagonal estampada (por defecto: 'LA TERCERA • MUESTRA') */
   watermarkText?: string;
+  /** URL pública o ruta del logo de marca de agua opcional para este lote */
+  watermarkLogoUrl?: string | null;
+  /** Buffer o string base64 del logo de marca de agua opcional */
+  watermarkLogoBase64?: string | null;
   /** Límite de procesamiento concurrente con Sharp (por defecto: 3, recomendado: 2 a 5 para evitar OOM) */
   concurrencyLimit?: number;
   /** Cantidad de fotos iniciales que se marcarán como muestra HD Master (por defecto: 2) */
@@ -114,6 +118,9 @@ export interface CreateAlbumRequest {
   badge?: string;
   coverUrl?: string;
   isPublished?: boolean;
+  isHeroFeatured?: boolean;
+  watermarkText?: string;
+  watermarkLogoUrl?: string | null;
   customSlug?: string;
   isFreeDownload?: boolean;
   isPrivate?: boolean;
@@ -139,6 +146,9 @@ export interface UpdateAlbumRequest {
   badge?: string;
   coverUrl?: string;
   isPublished?: boolean;
+  isHeroFeatured?: boolean;
+  watermarkText?: string;
+  watermarkLogoUrl?: string | null;
   deletedAt?: string | null;
   isFreeDownload?: boolean;
   isPrivate?: boolean;

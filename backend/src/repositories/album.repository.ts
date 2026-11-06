@@ -17,6 +17,9 @@ export interface AlbumDTO {
   coverUrl: string;
   badge?: string;
   isPublished?: boolean;
+  isHeroFeatured?: boolean;
+  watermarkText?: string;
+  watermarkLogoUrl?: string | null;
   // Campos de Papelera, Cortesía y Privacidad
   deletedAt?: string | null;
   isFreeDownload?: boolean;
@@ -599,6 +602,9 @@ export interface SupabaseAlbumRow {
   cover_url: string;
   badge?: string | null;
   is_published?: boolean | null;
+  is_hero_featured?: boolean | null;
+  watermark_text?: string | null;
+  watermark_logo_url?: string | null;
   deleted_at?: string | null;
   is_free_download?: boolean | null;
   free_download_unlocked_at?: string | null;
@@ -654,6 +660,9 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
       coverUrl: row.cover_url,
       badge: row.badge || undefined,
       isPublished: isTrashed ? false : (row.is_published ?? true),
+      isHeroFeatured: row.is_hero_featured ?? false,
+      watermarkText: row.watermark_text || undefined,
+      watermarkLogoUrl: row.watermark_logo_url || null,
       deletedAt: row.deleted_at || (isTrashed ? localDeletedAt : null),
       isFreeDownload: localFree !== undefined ? localFree : (row.is_free_download ?? false),
       freeDownloadUnlockedAt: row.free_download_unlocked_at || (localFree ? new Date().toISOString() : null),
@@ -747,6 +756,9 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
     if (album.eventTime) fullPayload.event_time = album.eventTime;
     if (album.date) fullPayload.event_date_display = album.date;
     if (album.isFreeDownload !== undefined) fullPayload.is_free_download = album.isFreeDownload;
+    if (album.isHeroFeatured !== undefined) fullPayload.is_hero_featured = album.isHeroFeatured;
+    if (album.watermarkText !== undefined) fullPayload.watermark_text = album.watermarkText;
+    if (album.watermarkLogoUrl !== undefined) fullPayload.watermark_logo_url = album.watermarkLogoUrl;
     if (album.isPrivate !== undefined) fullPayload.is_private = album.isPrivate;
     if (album.accessCode !== undefined) fullPayload.access_code = album.accessCode;
 
@@ -854,6 +866,9 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
       updatePayload.is_free_download = updates.isFreeDownload;
       updatePayload.free_download_unlocked_at = updates.isFreeDownload ? new Date().toISOString() : null;
     }
+    if (updates.isHeroFeatured !== undefined) updatePayload.is_hero_featured = updates.isHeroFeatured;
+    if (updates.watermarkText !== undefined) updatePayload.watermark_text = updates.watermarkText;
+    if (updates.watermarkLogoUrl !== undefined) updatePayload.watermark_logo_url = updates.watermarkLogoUrl;
     if (updates.isPrivate !== undefined) updatePayload.is_private = updates.isPrivate;
     if (updates.accessCode !== undefined) updatePayload.access_code = updates.accessCode;
 
@@ -871,6 +886,8 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
       delete updatePayload.event_date_display;
       delete updatePayload.is_free_download;
       delete updatePayload.free_download_unlocked_at;
+      delete updatePayload.is_hero_featured;
+      delete updatePayload.watermark_logo_url;
       delete updatePayload.is_private;
       delete updatePayload.access_code;
       delete updatePayload.deleted_at;

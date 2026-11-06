@@ -146,6 +146,49 @@ describe('Admin Albums API Endpoints (/api/admin/albums)', () => {
       expect(photosData.photos[0].originalPath).toBeUndefined();
       expect(photosData.photos[0].previewUrl).toBeDefined();
     });
+
+    it('debe permitir subir un logo PNG con /upload-watermark-logo y usarlo en bulk-upload', async () => {
+      // 1. Subir logo PNG personalizado
+      const logoBuffer = await sharp({
+        create: { width: 100, height: 100, channels: 4, background: { r: 255, g: 0, b: 0, alpha: 0.8 } }
+      }).png().toBuffer();
+
+      const logoFormData = new FormData();
+      logoFormData.append('logo', new Blob([logoBuffer], { type: 'image/png' }), 'logo_torneo.png');
+
+      const logoRes = await fetch(`${baseUrl}/api/admin/albums/upload-watermark-logo`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${adminToken}` },
+        body: logoFormData
+      });
+
+      expect(logoRes.status).toBe(200);
+      const logoData = await logoRes.json();
+      expect(logoData.success).toBe(true);
+      expect(logoData.logoUrl).toBeDefined();
+
+      // 2. Subir foto pasando watermarkLogo directamente en multipart
+      const photoBuffer = await sharp({
+        create: { width: 800, height: 600, channels: 3, background: { r: 50, g: 150, b: 200 } }
+      }).jpeg().toBuffer();
+
+      const bulkFormData = new FormData();
+      bulkFormData.append('albumId', 'album-1');
+      bulkFormData.append('watermarkText', 'COPA LA RIOJA 2026');
+      bulkFormData.append('photos', new Blob([photoBuffer], { type: 'image/jpeg' }), 'partido_01.jpg');
+      bulkFormData.append('watermarkLogo', new Blob([logoBuffer], { type: 'image/png' }), 'logo_torneo.png');
+
+      const bulkRes = await fetch(`${baseUrl}/api/admin/albums/bulk-upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${adminToken}` },
+        body: bulkFormData
+      });
+
+      expect(bulkRes.status).toBe(200);
+      const bulkData = await bulkRes.json();
+      expect(bulkData.success).toBe(true);
+      expect(bulkData.photos.length).toBe(1);
+    });
   });
 
   describe('Gestión Administrativa de Álbumes y Precios (CRUD)', () => {

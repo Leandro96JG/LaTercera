@@ -263,6 +263,7 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
 
   // Estado de actualización de visibilidad (Ocultar/Publicar) por tarjeta
   public readonly isTogglingPublishId = signal<string | null>(null);
+  public readonly isTogglingHeroId = signal<string | null>(null);
 
   // --- Barra de Búsqueda y Filtros Reactivos de Álbumes ---
   public readonly albumSearchQuery = signal<string>('');
@@ -488,6 +489,9 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     badge: ['⚽ Fútbol', [Validators.required]],
     coverUrl: [''],
     isPublished: [true],
+    isHeroFeatured: [false],
+    watermarkText: ['LA TERCERA • MUESTRA', [Validators.required]],
+    watermarkLogoUrl: [''],
     isFreeDownload: [false],
     isPrivate: [false],
     accessCode: ['']
@@ -501,8 +505,26 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     badge: [''],
     eventDate: [''],
     eventTime: [''],
-    location: ['']
+    location: [''],
+    isHeroFeatured: [false],
+    watermarkText: ['LA TERCERA • MUESTRA', [Validators.required]],
+    watermarkLogoUrl: ['']
   });
+
+  // Estado reactivo para Logo de Marca de Agua (desde PC o Celular)
+  public readonly createLogoFile = signal<File | null>(null);
+  public readonly createLogoPreview = signal<string | null>(null);
+  public readonly isUploadingCreateLogo = signal<boolean>(false);
+
+  public readonly editLogoFile = signal<File | null>(null);
+  public readonly editLogoPreview = signal<string | null>(null);
+  public readonly isUploadingEditLogo = signal<boolean>(false);
+
+  public readonly bulkLogoFile = signal<File | null>(null);
+  public readonly bulkLogoPreview = signal<string | null>(null);
+
+  public readonly driveLogoFile = signal<File | null>(null);
+  public readonly driveLogoPreview = signal<string | null>(null);
 
   // Formulario de Importación de Google Drive
   public readonly driveForm = this.fb.nonNullable.group({
@@ -1536,6 +1558,8 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     this.pendingTargetForm.set(targetForm || null);
     this.createAlbumError.set(null);
     this.createAlbumSuccess.set(null);
+    this.createLogoFile.set(null);
+    this.createLogoPreview.set(null);
     this.createAlbumForm.reset({
       title: '',
       category: 'futbol',
@@ -1546,7 +1570,13 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
       fullAlbumPrice: 9500,
       badge: '⚽ Fútbol',
       coverUrl: '',
-      isPublished: true
+      isPublished: true,
+      isHeroFeatured: false,
+      watermarkText: 'LA TERCERA • MUESTRA',
+      watermarkLogoUrl: '',
+      isFreeDownload: false,
+      isPrivate: false,
+      accessCode: ''
     });
     this.isCreateModalOpen.set(true);
   }
@@ -1604,6 +1634,9 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
       badge: val.badge,
       coverUrl: val.coverUrl || undefined,
       isPublished: val.isPublished,
+      isHeroFeatured: val.isHeroFeatured,
+      watermarkText: val.watermarkText?.trim() || 'LA TERCERA • MUESTRA',
+      watermarkLogoUrl: val.watermarkLogoUrl?.trim() || null,
       isFreeDownload: val.isFreeDownload,
       isPrivate: val.isPrivate,
       accessCode: val.isPrivate && val.accessCode?.trim() ? val.accessCode.trim() : null
@@ -1641,6 +1674,8 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
   public openEditAlbumModal(album: Album): void {
     this.editingAlbum.set(album);
     this.editAlbumError.set(null);
+    this.editLogoFile.set(null);
+    this.editLogoPreview.set(album.watermarkLogoUrl || null);
     this.editAlbumForm.reset({
       title: album.title,
       subtitle: album.subtitle || '',
@@ -1648,7 +1683,10 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
       badge: album.badge || '',
       eventDate: album.eventDate || album.date || '',
       eventTime: album.eventTime || '',
-      location: album.location || ''
+      location: album.location || '',
+      isHeroFeatured: album.isHeroFeatured ?? false,
+      watermarkText: album.watermarkText || 'LA TERCERA • MUESTRA',
+      watermarkLogoUrl: album.watermarkLogoUrl ?? ''
     });
     this.isEditAlbumModalOpen.set(true);
   }
@@ -1690,7 +1728,10 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
       badge: formVal.badge.trim() || undefined,
       eventDate: formVal.eventDate || undefined,
       eventTime: formVal.eventTime.trim() || undefined,
-      location: formVal.location.trim() || undefined
+      location: formVal.location.trim() || undefined,
+      isHeroFeatured: formVal.isHeroFeatured,
+      watermarkText: formVal.watermarkText?.trim() || 'LA TERCERA • MUESTRA',
+      watermarkLogoUrl: formVal.watermarkLogoUrl.trim() || null
     }).subscribe({
       next: (res) => {
         this.isUpdatingAlbum.set(false);
@@ -1708,6 +1749,116 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
         this.editAlbumError.set(this.extractErrorMessage(err, 'Error al actualizar el álbum.'));
       }
     });
+  }
+
+  // --- Manejo Unificado de Logo de Marca de Agua (PC y Móvil) ---
+  public onWatermarkLogoSelected(event: Event, context: 'create' | 'edit' | 'bulk' | 'drive'): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      this.showToast('El logo supera el límite de 5 MB. Selecciona una imagen más liviana.', 'error');
+      input.value = '';
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+
+    switch (context) {
+      case 'create':
+        this.createLogoFile.set(file);
+        this.createLogoPreview.set(previewUrl);
+        this.isUploadingCreateLogo.set(true);
+        this.adminService.uploadWatermarkLogo(file).subscribe({
+          next: (res) => {
+            this.isUploadingCreateLogo.set(false);
+            if (res.success && res.logoUrl) {
+              this.createLogoPreview.set(res.logoUrl);
+              this.createAlbumForm.patchValue({ watermarkLogoUrl: res.logoUrl });
+            }
+          },
+          error: () => {
+            this.isUploadingCreateLogo.set(false);
+            this.createAlbumForm.patchValue({ watermarkLogoUrl: previewUrl });
+          }
+        });
+        break;
+
+      case 'edit':
+        this.editLogoFile.set(file);
+        this.editLogoPreview.set(previewUrl);
+        this.isUploadingEditLogo.set(true);
+        this.adminService.uploadWatermarkLogo(file).subscribe({
+          next: (res) => {
+            this.isUploadingEditLogo.set(false);
+            if (res.success && res.logoUrl) {
+              this.editLogoPreview.set(res.logoUrl);
+              this.editAlbumForm.patchValue({ watermarkLogoUrl: res.logoUrl });
+            }
+          },
+          error: () => {
+            this.isUploadingEditLogo.set(false);
+            this.editAlbumForm.patchValue({ watermarkLogoUrl: previewUrl });
+          }
+        });
+        break;
+
+      case 'bulk':
+        this.bulkLogoFile.set(file);
+        this.bulkLogoPreview.set(previewUrl);
+        break;
+
+      case 'drive':
+        this.driveLogoFile.set(file);
+        this.driveLogoPreview.set(previewUrl);
+        break;
+    }
+
+    input.value = '';
+  }
+
+  public removeWatermarkLogo(context: 'create' | 'edit' | 'bulk' | 'drive'): void {
+    switch (context) {
+      case 'create':
+        this.createLogoFile.set(null);
+        this.createLogoPreview.set(null);
+        this.createAlbumForm.patchValue({ watermarkLogoUrl: '' });
+        break;
+      case 'edit':
+        this.editLogoFile.set(null);
+        this.editLogoPreview.set(null);
+        this.editAlbumForm.patchValue({ watermarkLogoUrl: '' });
+        break;
+      case 'bulk':
+        this.bulkLogoFile.set(null);
+        this.bulkLogoPreview.set(null);
+        break;
+      case 'drive':
+        this.driveLogoFile.set(null);
+        this.driveLogoPreview.set(null);
+        break;
+    }
+  }
+
+  public onUploadAlbumChange(albumId: string, context: 'bulk' | 'drive'): void {
+    const selected = this.albums().find(a => a.id === albumId);
+    const existingLogo = selected?.watermarkLogoUrl || null;
+    const existingText = selected?.watermarkText || 'LA TERCERA • MUESTRA';
+
+    if (context === 'bulk') {
+      this.bulkLogoFile.set(null);
+      this.bulkLogoPreview.set(existingLogo);
+      if (selected?.watermarkText) {
+        this.bulkForm.patchValue({ watermarkText: existingText });
+      }
+    } else {
+      this.driveLogoFile.set(null);
+      this.driveLogoPreview.set(existingLogo);
+      if (selected?.watermarkText) {
+        this.driveForm.patchValue({ watermarkText: existingText });
+      }
+    }
   }
 
   // --- Edición de Precios en Línea ---
@@ -1799,6 +1950,37 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
         this.updateFeedback.set({
           albumId: album.id,
           message: err.error?.error || 'Error al actualizar visibilidad',
+          success: false
+        });
+      }
+    });
+  }
+
+  public toggleHeroFeatured(album: Album): void {
+    const newStatus = !album.isHeroFeatured;
+    this.isTogglingHeroId.set(album.id);
+    this.adminService.updateAlbum(album.id, { isHeroFeatured: newStatus }).subscribe({
+      next: (res) => {
+        this.isTogglingHeroId.set(null);
+        if (res.success && res.album) {
+          this.albums.set(this.albums().map(a => a.id === album.id ? res.album : a));
+          this.updateFeedback.set({
+            albumId: album.id,
+            message: newStatus ? 'Álbum destacado en el carrusel de inicio (Hero)' : 'Álbum removido del carrusel de inicio',
+            success: true
+          });
+          setTimeout(() => {
+            if (this.updateFeedback()?.albumId === album.id) {
+              this.updateFeedback.set(null);
+            }
+          }, 3500);
+        }
+      },
+      error: (err) => {
+        this.isTogglingHeroId.set(null);
+        this.updateFeedback.set({
+          albumId: album.id,
+          message: this.extractErrorMessage(err, 'Error al actualizar destacado en hero.'),
           success: false
         });
       }
@@ -2228,11 +2410,13 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
   // --- Navegación Rápida a Subida ---
   public navigateToUploadWithAlbum(albumId: string): void {
     this.bulkForm.patchValue({ albumId });
+    this.onUploadAlbumChange(albumId, 'bulk');
     this.activeTab.set('upload');
   }
 
   public navigateToDriveWithAlbum(albumId: string): void {
     this.driveForm.patchValue({ albumId });
+    this.onUploadAlbumChange(albumId, 'drive');
     this.activeTab.set('drive');
   }
 
@@ -2253,6 +2437,7 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
       albumId: formVal.albumId,
       driveUrl: formVal.driveUrl,
       watermarkText: formVal.watermarkText,
+      watermarkLogoUrl: this.driveLogoPreview() || undefined,
       concurrencyLimit: formVal.concurrencyLimit,
       markHdFirstN: formVal.markHdFirstN
     }).subscribe({
@@ -2719,7 +2904,9 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
             Math.round(((completedFiles + currentBatchLoadedFraction) / totalFiles) * 100)
           );
           this.uploadProgress.set(globalPercent);
-        }
+        },
+        this.bulkLogoFile(),
+        this.bulkLogoPreview()
       ).subscribe({
         next: (batchResponse) => {
           completedFiles += batchFiles.length;

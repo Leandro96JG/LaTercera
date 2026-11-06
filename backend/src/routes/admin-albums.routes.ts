@@ -1,4 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
 import multer from 'multer';
 import {
   GoogleDriveImporterService,
@@ -210,6 +212,9 @@ export function createAdminAlbumsRouter(
         coverUrl: resolvedCover,
         badge: resolvedBadge,
         isPublished: body.isPublished ?? true,
+        isHeroFeatured: body.isHeroFeatured ?? false,
+        watermarkText: body.watermarkText?.trim() || undefined,
+        watermarkLogoUrl: body.watermarkLogoUrl?.trim() || null,
         isFreeDownload: body.isFreeDownload ?? false,
         isPrivate: body.isPrivate ?? false,
         accessCode: body.isPrivate && body.accessCode ? body.accessCode.trim() : null
@@ -460,6 +465,55 @@ export function createAdminAlbumsRouter(
   });
 
   /**
+   * Helper para resolver Buffer de logo para marca de agua desde archivo, base64 o URL remota/álbum
+   */
+  async function resolveWatermarkLogoBuffer(options: {
+    logoFile?: Express.Multer.File;
+    logoBase64?: string | null;
+    logoUrl?: string | null;
+    albumId?: string;
+  }): Promise<Buffer | undefined> {
+    if (options.logoFile?.buffer) {
+      return options.logoFile.buffer;
+    }
+    if (options.logoBase64) {
+      try {
+        const raw = options.logoBase64.replace(/^data:image\/\w+;base64,/, '');
+        return Buffer.from(raw, 'base64');
+      } catch (err) {
+        console.warn('[AdminAlbums] Error decodificando watermarkLogoBase64:', err);
+      }
+    }
+    let targetUrl = options.logoUrl;
+    if (!targetUrl && options.albumId) {
+      try {
+        const album = await albumRepository.getAlbumById(options.albumId);
+        targetUrl = album?.watermarkLogoUrl || undefined;
+      } catch {
+        // Ignorar
+      }
+    }
+    if (targetUrl) {
+      try {
+        if (targetUrl.startsWith('data:image/')) {
+          const raw = targetUrl.replace(/^data:image\/\w+;base64,/, '');
+          return Buffer.from(raw, 'base64');
+        }
+        if (targetUrl.startsWith('http://') || targetUrl.startsWith('https://')) {
+          const fetchRes = await fetch(targetUrl, { signal: AbortSignal.timeout(5000) });
+          if (fetchRes.ok) {
+            const arrayBuf = await fetchRes.arrayBuffer();
+            return Buffer.from(arrayBuf);
+          }
+        }
+      } catch (fetchErr) {
+        console.warn(`[AdminAlbums] No se pudo obtener logo de marca de agua desde '${targetUrl}':`, fetchErr);
+      }
+    }
+    return undefined;
+  }
+
+  /**
    * POST /api/admin/albums/import-drive
    * Importa fotos desde una carpeta compartida de Google Drive
    */
@@ -469,6 +523,8 @@ export function createAdminAlbumsRouter(
         albumId,
         driveUrl,
         watermarkText,
+        watermarkLogoUrl,
+        watermarkLogoBase64,
         concurrencyLimit,
         markHdFirstN,
         apiKey
@@ -481,10 +537,17 @@ export function createAdminAlbumsRouter(
         });
       }
 
+      const watermarkLogoBuffer = await resolveWatermarkLogoBuffer({
+        logoBase64: watermarkLogoBase64,
+        logoUrl: watermarkLogoUrl,
+        albumId
+      });
+
       const result = await driveImporterService.importFromDrive({
         albumId,
         driveUrl,
         watermarkText,
+        watermarkLogoBuffer,
         concurrencyLimit: concurrencyLimit ? Number(concurrencyLimit) : 3,
         markHdFirstN: markHdFirstN !== undefined ? Number(markHdFirstN) : 2,
         apiKey
@@ -545,7 +608,10 @@ export function createAdminAlbumsRouter(
    * y responder con códigos semánticos (413 Payload Too Large) y JSON estructurado
    */
   const handleMulterUpload = (req: Request, res: Response, next: NextFunction) => {
-    upload.array('photos', 100)(req, res, (err: unknown) => {
+    upload.fields([
+      { name: 'photos', maxCount: 100 },
+      { name: 'watermarkLogo', maxCount: 1 }
+    ])(req, res, (err: unknown) => {
       if (err) {
         if (err instanceof multer.MulterError) {
           if (err.code === 'LIMIT_FILE_SIZE') {
@@ -575,12 +641,55 @@ export function createAdminAlbumsRouter(
   };
 
   /**
+   * POST /api/admin/albums/upload-watermark-logo
+   * Permite subir un logo o escudo PNG/WebP desde la PC o celular de forma remota
+   */
+  router.post('/upload-watermark-logo', requireAdminAuth, upload.single('logo'), async (req: Request, res: Response) => {
+    try {
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({ success: false, error: 'No se envió ningún archivo en el campo "logo"' });
+      }
+
+      const validMimes = ['image/png', 'image/webp', 'image/jpeg', 'image/svg+xml'];
+      if (!validMimes.includes(file.mimetype) && !file.originalname.match(/\.(png|webp|jpe?g|svg)$/i)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Formato no admitido. Selecciona un archivo PNG, WebP o JPG.'
+        });
+      }
+
+      const logoId = 'logo_' + uuidv4().substring(0, 8);
+      const saved = await storageService.savePreview('branding', logoId, file.buffer);
+
+      return res.status(200).json({
+        success: true,
+        logoUrl: saved.publicUrl,
+        message: 'Logo de marca de agua subido con éxito'
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al procesar el logo';
+      return res.status(500).json({ success: false, error: msg });
+    }
+  });
+
+  /**
    * POST /api/admin/albums/bulk-upload
    * Procesa subida directa de múltiples fotos (drag-and-drop)
    */
   router.post('/bulk-upload', requireAdminAuth, handleMulterUpload, async (req: Request, res: Response) => {
     try {
-      const files = req.files as Express.Multer.File[] | undefined;
+      let files: Express.Multer.File[] = [];
+      let logoFile: Express.Multer.File | undefined;
+
+      if (Array.isArray(req.files)) {
+        files = req.files;
+      } else if (req.files && typeof req.files === 'object') {
+        const filesMap = req.files as { [fieldname: string]: Express.Multer.File[] };
+        files = filesMap['photos'] || [];
+        logoFile = filesMap['watermarkLogo']?.[0];
+      }
+
       const albumId = req.body.albumId;
       const watermarkText = req.body.watermarkText;
       const concurrencyLimit = req.body.concurrencyLimit ? Number(req.body.concurrencyLimit) : 3;
@@ -617,10 +726,18 @@ export function createAdminAlbumsRouter(
         size: f.size
       }));
 
+      const watermarkLogoBuffer = await resolveWatermarkLogoBuffer({
+        logoFile,
+        logoBase64: req.body.watermarkLogoBase64,
+        logoUrl: req.body.watermarkLogoUrl,
+        albumId
+      });
+
       const result = await bulkUploadService.processBulkUpload({
         albumId,
         files: uploadItems,
         watermarkText,
+        watermarkLogoBuffer,
         concurrencyLimit,
         hdPhotoIndices
       });

@@ -18,6 +18,9 @@ export interface Album {
   readonly badge: string;
   readonly location?: string;
   readonly isPublished?: boolean;
+  readonly isHeroFeatured?: boolean;
+  readonly watermarkText?: string;
+  readonly watermarkLogoUrl?: string | null;
   readonly deletedAt?: string | null;
   readonly isFreeDownload?: boolean;
   readonly freeDownloadUnlockedAt?: string | null;

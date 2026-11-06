@@ -362,6 +362,11 @@
                     >
                       {{ album.isPublished !== false ? '🟢 Publicado' : '⚪ Oculto' }}
                     </span>
+                    @if (album.isHeroFeatured) {
+                      <span class="px-2 py-0.5 rounded-full bg-amber-400 text-zinc-950 font-extrabold text-[10px] shadow-2xs flex items-center gap-1">
+                        ⭐ Hero
+                      </span>
+                    }
                   </div>
 
                   <span class="text-[10px] font-mono text-zinc-400">ID: {{ album.id }}</span>
@@ -562,6 +567,24 @@
                   >
                     <span>🔒</span>
                     <span class="truncate">{{ album.isPrivate ? 'PIN Activo' : 'Público' }}</span>
+                  </button>
+
+                  <!-- 4b. Destacar en Hero -->
+                  <button
+                    type="button"
+                    (click)="toggleHeroFeatured(album)"
+                    [disabled]="isTogglingHeroId() === album.id"
+                    [class]="album.isHeroFeatured
+                      ? 'px-2.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 border border-amber-500 font-extrabold text-[11px] transition flex items-center justify-center gap-1 truncate active:scale-95 disabled:opacity-50 shadow-2xs'
+                      : 'px-2.5 py-2 rounded-xl bg-white hover:bg-zinc-100 text-zinc-600 border border-zinc-200 text-[11px] font-bold transition flex items-center justify-center gap-1 truncate active:scale-95 disabled:opacity-50 shadow-2xs'"
+                    [title]="album.isHeroFeatured ? 'Destacado en Carrusel de Inicio (clic para quitar)' : 'Destacar en Carrusel de Inicio (Hero)'"
+                  >
+                    @if (isTogglingHeroId() === album.id) {
+                      <span class="w-2.5 h-2.5 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
+                    } @else {
+                      <span>⭐</span>
+                      <span class="truncate">{{ album.isHeroFeatured ? 'Hero ON' : 'Hero' }}</span>
+                    }
                   </button>
 
                   <!-- 5. Publicar / Ocultar -->
@@ -1854,6 +1877,7 @@
             </div>
             <select
               formControlName="albumId"
+              (change)="onUploadAlbumChange($any($event.target).value, 'drive')"
               class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-semibold focus:outline-none focus:border-zinc-950 transition"
             >
               @for (album of albums(); track album.id) {
@@ -1861,20 +1885,91 @@
               }
             </select>
           </div>
+        </div>
 
-          <!-- Texto de Marca de Agua -->
+        <!-- BLOQUE UNIFICADO DE MARCA DE AGUA (TEXTO + LOGO PNG DESDE PC O CELULAR) -->
+        <div class="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-3">
           <div>
-            <div class="mb-1.5">
-              <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider">
-                Marca de Agua Diagonal
+            <span class="block text-xs font-bold text-zinc-900 uppercase tracking-wider">
+              🛡️ Marca de Agua para Muestras y Venta
+            </span>
+            <span class="text-[11px] text-zinc-500">
+              Texto diagonal protector e insignia/logo opcional (club, torneo, evento o marca).
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <!-- 1. Texto de Marca de Agua -->
+            <div>
+              <label class="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                Texto Diagonal
               </label>
+              <input
+                type="text"
+                formControlName="watermarkText"
+                placeholder="LA TERCERA • MUESTRA"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-white border border-zinc-200 text-zinc-900 text-xs font-semibold focus:outline-none focus:border-zinc-950 transition"
+              />
+              <span class="text-[10px] text-zinc-400 mt-1 block">Patrón diagonal en fotos de muestra</span>
             </div>
-            <input
-              type="text"
-              formControlName="watermarkText"
-              placeholder="LA TERCERA • MUESTRA"
-              class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
-            />
+
+            <!-- 2. Logo / Insignia PNG desde PC o Celular -->
+            <div>
+              <label class="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                Logo / Escudo PNG (PC o Móvil)
+              </label>
+
+              @if (!driveLogoPreview()) {
+                <label class="border-2 border-dashed border-zinc-300 hover:border-zinc-950 rounded-xl p-3 text-center bg-white hover:bg-zinc-50 transition cursor-pointer flex flex-col items-center justify-center gap-1 group">
+                  <input
+                    type="file"
+                    accept="image/png,image/webp,image/jpeg,image/svg+xml"
+                    (change)="onWatermarkLogoSelected($event, 'drive')"
+                    class="hidden"
+                  />
+                  <div class="flex items-center gap-1.5 text-zinc-700 group-hover:text-zinc-950">
+                    <span class="text-sm">📁</span>
+                    <span class="text-xs font-bold">Elegir logo desde PC o Celular</span>
+                  </div>
+                  <span class="text-[10px] text-zinc-400">PNG transparente o WebP (máx. 5 MB)</span>
+                </label>
+              } @else {
+                <div class="p-2 rounded-xl bg-white border border-zinc-200 flex items-center justify-between gap-2 shadow-2xs">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <div class="w-9 h-9 rounded-lg bg-zinc-900/10 border border-zinc-200 flex items-center justify-center overflow-hidden shrink-0 p-1">
+                      <img
+                        [src]="driveLogoPreview()"
+                        alt="Logo de marca de agua"
+                        class="w-full h-full object-contain"
+                      />
+                    </div>
+                    <div class="min-w-0">
+                      <span class="text-xs font-bold text-zinc-900 truncate block">Logo Listo</span>
+                      <span class="text-[10px] text-emerald-600 font-semibold block">Configurado para este lote</span>
+                    </div>
+                  </div>
+
+                  <div class="flex items-center gap-1 shrink-0">
+                    <label class="px-2 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-[10px] font-bold transition cursor-pointer">
+                      <input
+                        type="file"
+                        accept="image/png,image/webp,image/jpeg,image/svg+xml"
+                        (change)="onWatermarkLogoSelected($event, 'drive')"
+                        class="hidden"
+                      />
+                      Cambiar
+                    </label>
+                    <button
+                      type="button"
+                      (click)="removeWatermarkLogo('drive')"
+                      class="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-[10px] font-bold transition"
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
           </div>
         </div>
 
@@ -2007,41 +2102,113 @@
       }
 
       <form [formGroup]="bulkForm" (ngSubmit)="submitBulkUpload()" class="space-y-5">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <div class="flex items-center justify-between mb-1.5">
-              <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider">
-                Álbum de Destino
-              </label>
-              <button
-                type="button"
-                (click)="openCreateModal('bulk')"
-                class="text-[11px] font-bold text-amber-600 hover:text-amber-700 hover:underline flex items-center gap-1 transition"
-              >
-                ✨ + Crear nuevo álbum
-              </button>
-            </div>
-            <select
-              formControlName="albumId"
-              class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-semibold focus:outline-none focus:border-zinc-950 transition"
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider">
+              Álbum de Destino
+            </label>
+            <button
+              type="button"
+              (click)="openCreateModal('bulk')"
+              class="text-[11px] font-bold text-amber-600 hover:text-amber-700 hover:underline flex items-center gap-1 transition"
             >
-              @for (album of albums(); track album.id) {
-                <option [value]="album.id">{{ album.title }} ({{ album.badge }})</option>
-              }
-            </select>
+              ✨ + Crear nuevo álbum
+            </button>
+          </div>
+          <select
+            formControlName="albumId"
+            (change)="onUploadAlbumChange($any($event.target).value, 'bulk')"
+            class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-semibold focus:outline-none focus:border-zinc-950 transition"
+          >
+            @for (album of albums(); track album.id) {
+              <option [value]="album.id">{{ album.title }} ({{ album.badge }})</option>
+            }
+          </select>
+        </div>
+
+        <!-- BLOQUE UNIFICADO DE MARCA DE AGUA (TEXTO + LOGO PNG DESDE PC O CELULAR) -->
+        <div class="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-3">
+          <div>
+            <span class="block text-xs font-bold text-zinc-900 uppercase tracking-wider">
+              🛡️ Marca de Agua para Muestras y Venta
+            </span>
+            <span class="text-[11px] text-zinc-500">
+              Texto diagonal protector e insignia/logo opcional (club, torneo, evento o marca).
+            </span>
           </div>
 
-          <div>
-            <div class="mb-1.5">
-              <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider">
-                Texto Marca de Agua
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <!-- 1. Texto de Marca de Agua -->
+            <div>
+              <label class="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                Texto Diagonal
               </label>
+              <input
+                type="text"
+                formControlName="watermarkText"
+                placeholder="LA TERCERA • MUESTRA"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-white border border-zinc-200 text-zinc-900 text-xs font-semibold focus:outline-none focus:border-zinc-950 transition"
+              />
+              <span class="text-[10px] text-zinc-400 mt-1 block">Patrón diagonal en fotos de muestra</span>
             </div>
-            <input
-              type="text"
-              formControlName="watermarkText"
-              class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
-            />
+
+            <!-- 2. Logo / Insignia PNG desde PC o Celular -->
+            <div>
+              <label class="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                Logo / Escudo PNG (PC o Móvil)
+              </label>
+
+              @if (!bulkLogoPreview()) {
+                <label class="border-2 border-dashed border-zinc-300 hover:border-zinc-950 rounded-xl p-3 text-center bg-white hover:bg-zinc-50 transition cursor-pointer flex flex-col items-center justify-center gap-1 group">
+                  <input
+                    type="file"
+                    accept="image/png,image/webp,image/jpeg,image/svg+xml"
+                    (change)="onWatermarkLogoSelected($event, 'bulk')"
+                    class="hidden"
+                  />
+                  <div class="flex items-center gap-1.5 text-zinc-700 group-hover:text-zinc-950">
+                    <span class="text-sm">📁</span>
+                    <span class="text-xs font-bold">Elegir logo desde PC o Celular</span>
+                  </div>
+                  <span class="text-[10px] text-zinc-400">PNG transparente o WebP (máx. 5 MB)</span>
+                </label>
+              } @else {
+                <div class="p-2 rounded-xl bg-white border border-zinc-200 flex items-center justify-between gap-2 shadow-2xs">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <div class="w-9 h-9 rounded-lg bg-zinc-900/10 border border-zinc-200 flex items-center justify-center overflow-hidden shrink-0 p-1">
+                      <img
+                        [src]="bulkLogoPreview()"
+                        alt="Logo de marca de agua"
+                        class="w-full h-full object-contain"
+                      />
+                    </div>
+                    <div class="min-w-0">
+                      <span class="text-xs font-bold text-zinc-900 truncate block">Logo Listo</span>
+                      <span class="text-[10px] text-emerald-600 font-semibold block">Configurado para este lote</span>
+                    </div>
+                  </div>
+
+                  <div class="flex items-center gap-1 shrink-0">
+                    <label class="px-2 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-[10px] font-bold transition cursor-pointer">
+                      <input
+                        type="file"
+                        accept="image/png,image/webp,image/jpeg,image/svg+xml"
+                        (change)="onWatermarkLogoSelected($event, 'bulk')"
+                        class="hidden"
+                      />
+                      Cambiar
+                    </label>
+                    <button
+                      type="button"
+                      (click)="removeWatermarkLogo('bulk')"
+                      class="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-[10px] font-bold transition"
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
           </div>
         </div>
 
@@ -2649,6 +2816,110 @@
               </div>
             }
           </div>
+
+          <!-- Destacar en Carrusel Hero -->
+          <div class="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-300/40 flex items-start gap-2.5">
+            <input
+              type="checkbox"
+              id="modalIsHeroFeatured"
+              formControlName="isHeroFeatured"
+              class="w-4 h-4 mt-0.5 rounded text-amber-500 focus:ring-amber-400 border-zinc-300"
+            />
+            <label for="modalIsHeroFeatured" class="text-xs text-zinc-700 cursor-pointer">
+              <strong class="font-bold text-zinc-950 block">⭐ Destacar en Carrusel de Inicio (Hero)</strong>
+              <span class="text-[11px] text-zinc-500">Muestra la portada de este álbum con alta estética en el carrusel principal de la página de inicio.</span>
+            </label>
+          </div>
+
+          <!-- BLOQUE UNIFICADO DE MARCA DE AGUA (TEXTO + LOGO PNG DESDE PC O CELULAR) -->
+          <div class="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-3">
+            <div>
+              <span class="block text-xs font-bold text-zinc-900 uppercase tracking-wider">
+                🛡️ Marca de Agua para Muestras y Venta
+              </span>
+              <span class="text-[11px] text-zinc-500">
+                Texto diagonal protector e insignia/logo opcional (club, torneo, evento o marca).
+              </span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <!-- 1. Texto de Marca de Agua -->
+              <div>
+                <label class="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                  Texto Diagonal
+                </label>
+                <input
+                  type="text"
+                  formControlName="watermarkText"
+                  placeholder="LA TERCERA • MUESTRA"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-white border border-zinc-200 text-zinc-900 text-xs font-semibold focus:outline-none focus:border-zinc-950 transition"
+                />
+                <span class="text-[10px] text-zinc-400 mt-1 block">Patrón diagonal en fotos de muestra</span>
+              </div>
+
+              <!-- 2. Logo / Insignia PNG desde PC o Celular -->
+              <div>
+                <label class="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                  Logo / Escudo PNG (PC o Móvil)
+                </label>
+
+                @if (!createLogoPreview()) {
+                  <label class="border-2 border-dashed border-zinc-300 hover:border-zinc-950 rounded-xl p-3 text-center bg-white hover:bg-zinc-50 transition cursor-pointer flex flex-col items-center justify-center gap-1 group">
+                    <input
+                      type="file"
+                      accept="image/png,image/webp,image/jpeg,image/svg+xml"
+                      (change)="onWatermarkLogoSelected($event, 'create')"
+                      class="hidden"
+                    />
+                    <div class="flex items-center gap-1.5 text-zinc-700 group-hover:text-zinc-950">
+                      <span class="text-sm">📁</span>
+                      <span class="text-xs font-bold">Elegir logo desde PC o Celular</span>
+                    </div>
+                    <span class="text-[10px] text-zinc-400">PNG transparente o WebP (máx. 5 MB)</span>
+                  </label>
+                } @else {
+                  <div class="p-2 rounded-xl bg-white border border-zinc-200 flex items-center justify-between gap-2 shadow-2xs">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <div class="w-9 h-9 rounded-lg bg-zinc-900/10 border border-zinc-200 flex items-center justify-center overflow-hidden shrink-0 p-1">
+                        <img
+                          [src]="createLogoPreview()"
+                          alt="Logo de marca de agua"
+                          class="w-full h-full object-contain"
+                        />
+                      </div>
+                      <div class="min-w-0">
+                        <span class="text-xs font-bold text-zinc-900 truncate block">Logo Listo</span>
+                        @if (isUploadingCreateLogo()) {
+                          <span class="text-[10px] text-amber-600 font-semibold block animate-pulse">Subiendo...</span>
+                        } @else {
+                          <span class="text-[10px] text-emerald-600 font-semibold block">Configurado</span>
+                        }
+                      </div>
+                    </div>
+
+                    <div class="flex items-center gap-1 shrink-0">
+                      <label class="px-2 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-[10px] font-bold transition cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/png,image/webp,image/jpeg,image/svg+xml"
+                          (change)="onWatermarkLogoSelected($event, 'create')"
+                          class="hidden"
+                        />
+                        Cambiar
+                      </label>
+                      <button
+                        type="button"
+                        (click)="removeWatermarkLogo('create')"
+                        class="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-[10px] font-bold transition"
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Footer Sticky de Botones -->
@@ -2823,6 +3094,110 @@
               placeholder="Ej: Estadio Carlos A. Mercado Luna, La Rioja"
               class="w-full px-4 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
             />
+          </div>
+
+          <!-- Destacar en Carrusel Hero -->
+          <div class="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-300/40 flex items-start gap-2.5">
+            <input
+              type="checkbox"
+              id="editIsHeroFeatured"
+              formControlName="isHeroFeatured"
+              class="w-4 h-4 mt-0.5 rounded text-amber-500 focus:ring-amber-400 border-zinc-300"
+            />
+            <label for="editIsHeroFeatured" class="text-xs text-zinc-700 cursor-pointer">
+              <strong class="font-bold text-zinc-950 block">⭐ Destacar en Carrusel de Inicio (Hero)</strong>
+              <span class="text-[11px] text-zinc-500">Muestra la portada de este álbum con alta estética en el carrusel principal.</span>
+            </label>
+          </div>
+
+          <!-- BLOQUE UNIFICADO DE MARCA DE AGUA (TEXTO + LOGO PNG DESDE PC O CELULAR) -->
+          <div class="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-3">
+            <div>
+              <span class="block text-xs font-bold text-zinc-900 uppercase tracking-wider">
+                🛡️ Marca de Agua para Muestras y Venta
+              </span>
+              <span class="text-[11px] text-zinc-500">
+                Texto diagonal protector e insignia/logo opcional (club, torneo, evento o marca).
+              </span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <!-- 1. Texto de Marca de Agua -->
+              <div>
+                <label class="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                  Texto Diagonal
+                </label>
+                <input
+                  type="text"
+                  formControlName="watermarkText"
+                  placeholder="LA TERCERA • MUESTRA"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-white border border-zinc-200 text-zinc-900 text-xs font-semibold focus:outline-none focus:border-zinc-950 transition"
+                />
+                <span class="text-[10px] text-zinc-400 mt-1 block">Patrón diagonal en fotos de muestra</span>
+              </div>
+
+              <!-- 2. Logo / Insignia PNG desde PC o Celular -->
+              <div>
+                <label class="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                  Logo / Escudo PNG (PC o Móvil)
+                </label>
+
+                @if (!editLogoPreview()) {
+                  <label class="border-2 border-dashed border-zinc-300 hover:border-zinc-950 rounded-xl p-3 text-center bg-white hover:bg-zinc-50 transition cursor-pointer flex flex-col items-center justify-center gap-1 group">
+                    <input
+                      type="file"
+                      accept="image/png,image/webp,image/jpeg,image/svg+xml"
+                      (change)="onWatermarkLogoSelected($event, 'edit')"
+                      class="hidden"
+                    />
+                    <div class="flex items-center gap-1.5 text-zinc-700 group-hover:text-zinc-950">
+                      <span class="text-sm">📁</span>
+                      <span class="text-xs font-bold">Elegir logo desde PC o Celular</span>
+                    </div>
+                    <span class="text-[10px] text-zinc-400">PNG transparente o WebP (máx. 5 MB)</span>
+                  </label>
+                } @else {
+                  <div class="p-2 rounded-xl bg-white border border-zinc-200 flex items-center justify-between gap-2 shadow-2xs">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <div class="w-9 h-9 rounded-lg bg-zinc-900/10 border border-zinc-200 flex items-center justify-center overflow-hidden shrink-0 p-1">
+                        <img
+                          [src]="editLogoPreview()"
+                          alt="Logo de marca de agua"
+                          class="w-full h-full object-contain"
+                        />
+                      </div>
+                      <div class="min-w-0">
+                        <span class="text-xs font-bold text-zinc-900 truncate block">Logo Listo</span>
+                        @if (isUploadingEditLogo()) {
+                          <span class="text-[10px] text-amber-600 font-semibold block animate-pulse">Subiendo...</span>
+                        } @else {
+                          <span class="text-[10px] text-emerald-600 font-semibold block">Configurado</span>
+                        }
+                      </div>
+                    </div>
+
+                    <div class="flex items-center gap-1 shrink-0">
+                      <label class="px-2 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-[10px] font-bold transition cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/png,image/webp,image/jpeg,image/svg+xml"
+                          (change)="onWatermarkLogoSelected($event, 'edit')"
+                          class="hidden"
+                        />
+                        Cambiar
+                      </label>
+                      <button
+                        type="button"
+                        (click)="removeWatermarkLogo('edit')"
+                        class="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-[10px] font-bold transition"
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
           </div>
         </div>
 

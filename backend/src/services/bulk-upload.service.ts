@@ -7,7 +7,7 @@ import {
   validateImageBufferHeader
 } from './mime-validator.service';
 import { runConcurrentBatch, BatchProgress } from './concurrency.service';
-import { processImageWithWatermark } from './image.service';
+import { processImageWithWatermark, prepareWatermarkLogo } from './image.service';
 import { IStorageService, createStorageService } from './storage.service';
 
 export interface UploadedFileItem {
@@ -21,6 +21,8 @@ export interface BulkUploadOptions {
   albumId: string;
   files: UploadedFileItem[];
   watermarkText?: string;
+  /** Buffer del logo opcional para marca de agua en lote (se pre-procesa una sola vez para todo el lote) */
+  watermarkLogoBuffer?: Buffer;
   concurrencyLimit?: number;
   hdPhotoIndices?: number[];
   onProgress?: (progress: BatchProgress) => void;
@@ -84,6 +86,16 @@ export class BulkUploadService {
     let totalOriginalBytes = 0;
     let totalPreviewBytes = 0;
 
+    // Optimización de Memoria: Pre-procesar logo UNA SOLA VEZ para todo el lote
+    let preparedLogo: Buffer | undefined;
+    if (options.watermarkLogoBuffer) {
+      try {
+        preparedLogo = await prepareWatermarkLogo(options.watermarkLogoBuffer, 400, 0.35);
+      } catch (err) {
+        console.warn('[BulkUploadService] No se pudo pre-procesar logo de marca de agua:', err);
+      }
+    }
+
     const batchResult = await runConcurrentBatch<UploadedFileItem, ProcessedUploadPhotoItem>(
       files,
       async (file, index) => {
@@ -113,12 +125,14 @@ export class BulkUploadService {
 
         const isHD = hdPhotoIndices.includes(index);
 
-        // Procesar preview WebP 800px con marca de agua
+        // Procesar preview WebP con fit: 'inside' y marca de agua reutilizando el logo en memoria
         const processed = await processImageWithWatermark(file.buffer, {
           watermarkText,
           targetWidth: 800,
+          targetHeight: 800,
           quality: isHD ? 85 : 70,
-          isHD
+          isHD,
+          logoBuffer: preparedLogo
         });
 
         // Guardar original en capa privada
