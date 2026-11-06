@@ -39,10 +39,21 @@ import { AlbumService } from '../../core/services/album.service';
         <div class="gloss-shine absolute inset-0 pointer-events-none"></div>
       </div>
 
-      <!-- CONTENEDOR DE LA IMAGEN CON PROPORCIÓN Y CAPA ANTI-DESCARGA -->
+      <!-- CONTENEDOR DE LA IMAGEN CON PROPORCIÓN, SPOTLIGHT Y CAPA ANTI-DESCARGA -->
       <div
         (click)="onViewClicked($event)"
-        class="relative w-full aspect-[4/3] rounded-[20px] overflow-hidden bg-zinc-100 cursor-pointer"
+        (pointerenter)="onCardPointerEnter($event)"
+        (pointerleave)="onCardPointerLeave()"
+        (pointermove)="onCardPointerMove($event)"
+        (touchstart)="onCardTouchStart($event)"
+        (touchmove)="onCardTouchMove($event)"
+        (touchend)="onCardTouchEnd()"
+        (touchcancel)="onCardTouchEnd()"
+        class="relative w-full aspect-[4/3] rounded-[20px] overflow-hidden bg-zinc-950 cursor-pointer select-none"
+        [style.--spot-x]="spotX() + 'px'"
+        [style.--spot-y]="spotY() + 'px'"
+        [style.--spot-size]="'165px'"
+        [style.--spot-opacity]="isSpotActive() ? '1' : '0'"
         tabindex="0"
         (keydown.enter)="onViewClicked($event)"
         (keydown.space)="onViewClicked($event)"
@@ -77,7 +88,7 @@ import { AlbumService } from '../../core/services/album.service';
             </span>
           </div>
         } @else {
-          <!-- IMAGEN PROTEGIDA CON FADE-IN -->
+          <!-- IMAGEN BASE -->
           <img
             [src]="photo().previewUrl"
             [alt]="photo().title || ('Foto #' + (index() + 1))"
@@ -85,12 +96,26 @@ import { AlbumService } from '../../core/services/album.service';
             decoding="async"
             (load)="onImageLoaded()"
             (error)="onImageError()"
-            class="w-full h-full object-cover group-hover:scale-105 transition-all duration-500 prevent-save"
+            class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 prevent-save select-none"
             [class.opacity-0]="isLoading()"
             [class.opacity-100]="!isLoading()"
             (contextmenu)="$event.preventDefault()"
             draggable="false"
           />
+
+          <!-- CAPA DE OSCURECIMIENTO AUTÉNTICA Y SPOTLIGHT / HAZ DE LUZ -->
+          @if (isSpotlightEffectActive() && !isLoading()) {
+            <div
+              class="spotlight-darkness-layer absolute inset-0 pointer-events-none rounded-[20px] overflow-hidden"
+              [class.is-spot-active]="isSpotActive()"
+              [class.is-selected]="isSelected()"
+              aria-hidden="true"
+            >
+              @if (isSpotActive()) {
+                <div class="spotlight-rim absolute rounded-full pointer-events-none"></div>
+              }
+            </div>
+          }
         }
 
         <!-- BADGE SUPERIOR DE MUESTRA HD -->
@@ -153,11 +178,35 @@ import { AlbumService } from '../../core/services/album.service';
           </button>
         } @else {
           <div class="flex items-center gap-1.5 shrink-0">
+            <!-- Botón Elegir para Lista de Descarga Gratuita -->
+            <button
+              type="button"
+              (click)="onSelectClicked($event)"
+              [class]="isSelected()
+                ? 'relative z-50 pointer-events-auto cursor-pointer min-h-[44px] px-3 py-2 rounded-2xl bg-emerald-500 text-zinc-950 font-extrabold text-xs flex items-center gap-1 shadow-md transition-all active:scale-95 animate-check-pop focus-visible:ring-2 focus-visible:ring-emerald-400 shrink-0'
+                : 'relative z-50 pointer-events-auto cursor-pointer min-h-[44px] px-3 py-2 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 font-bold text-xs flex items-center gap-1 transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-zinc-950 shrink-0'"
+              [attr.aria-label]="isSelected() ? 'Quitar de lista gratuita' : 'Elegir para lote gratuito'"
+              title="Seleccionar para descarga gratuita"
+            >
+              @if (isSelected()) {
+                <svg class="w-3.5 h-3.5 text-zinc-950 stroke-[3] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                <span>✓ En lote</span>
+              } @else {
+                <svg class="w-3.5 h-3.5 text-zinc-600 stroke-[2.5] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                <span>+ Elegir</span>
+              }
+            </button>
+
             <a
               [href]="freeDownloadUrl()"
               [download]="'LA_TERCERA_' + photo().id + '.jpg'"
               (click)="$event.stopPropagation()"
-              class="relative z-50 pointer-events-auto cursor-pointer min-h-[44px] px-3.5 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-xs transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-500"
+              class="relative z-50 pointer-events-auto cursor-pointer min-h-[44px] px-3.5 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-xs transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-500 shrink-0"
               [attr.aria-label]="'Descargar foto ' + (index() + 1) + ' en máxima calidad HD'"
               title="Descargar foto HD gratis"
             >
@@ -171,7 +220,7 @@ import { AlbumService } from '../../core/services/album.service';
             <button
               type="button"
               (click)="onViewClicked($event)"
-              class="relative z-50 pointer-events-auto cursor-pointer min-h-[44px] min-w-[44px] p-2.5 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 font-bold text-xs flex items-center justify-center transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-zinc-950"
+              class="relative z-50 pointer-events-auto cursor-pointer min-h-[44px] min-w-[44px] p-2.5 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 font-bold text-xs flex items-center justify-center transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-zinc-950 shrink-0"
               [attr.aria-label]="'Ver foto ' + (index() + 1) + ' en máxima calidad'"
               title="Ver en pantalla completa"
             >
@@ -234,6 +283,48 @@ import { AlbumService } from '../../core/services/album.service';
       animation: polaroidBounce 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
     }
 
+    /* Capa de Oscurecimiento Real y Efecto Linterna / Spotlight acelerado por GPU */
+    .spotlight-darkness-layer {
+      background: rgba(9, 9, 11, 0.86);
+      transition: background 150ms ease-out;
+      transform: translateZ(0);
+      will-change: background;
+    }
+
+    .spotlight-darkness-layer.is-selected {
+      background: rgba(9, 9, 11, 0.25);
+    }
+
+    .spotlight-darkness-layer.is-spot-active {
+      background: radial-gradient(
+        circle 135px at var(--spot-x, 50%) var(--spot-y, 50%),
+        transparent 0%,
+        rgba(9, 9, 11, 0.20) 45%,
+        rgba(9, 9, 11, 0.90) 80%,
+        rgba(9, 9, 11, 0.95) 100%
+      );
+    }
+
+    .spotlight-darkness-layer.is-spot-active.is-selected {
+      background: radial-gradient(
+        circle 135px at var(--spot-x, 50%) var(--spot-y, 50%),
+        transparent 0%,
+        rgba(9, 9, 11, 0.10) 45%,
+        rgba(9, 9, 11, 0.20) 80%,
+        rgba(9, 9, 11, 0.25) 100%
+      );
+    }
+
+    .spotlight-rim {
+      width: 270px;
+      height: 270px;
+      left: calc(var(--spot-x, 50%) - 135px);
+      top: calc(var(--spot-y, 50%) - 135px);
+      border: 1.5px solid rgba(254, 240, 138, 0.45);
+      box-shadow: 0 0 25px 6px rgba(253, 184, 19, 0.25);
+      transform: translateZ(0);
+    }
+
     @keyframes polaroidBounce {
       0% {
         transform: perspective(1000px) rotate(var(--polaroid-rotation, 0deg)) scale(1);
@@ -271,6 +362,21 @@ export class PhotoCardPolaroidComponent {
   public readonly isFreeDownload = input<boolean>(false);
   public readonly albumId = input<string>();
   public readonly isSelected = input<boolean>(false);
+  public readonly isPurchased = input<boolean>(false);
+  public readonly isMobileSpotlightActive = input<boolean>(false);
+
+  public readonly isSpotlightEffectActive = computed<boolean>(() => {
+    return !this.isFreeDownload() && !this.isPurchased();
+  });
+
+  private cardRect: DOMRect | null = null;
+  private animFrameId: number | null = null;
+  private pendingX = 100;
+  private pendingY = 100;
+
+  public readonly isSpotActive = signal<boolean>(false);
+  public readonly spotX = signal<number>(100);
+  public readonly spotY = signal<number>(100);
 
   public readonly freeDownloadUrl = computed<string>(() => {
     const albId = this.albumId();
@@ -334,5 +440,76 @@ export class PhotoCardPolaroidComponent {
     event.stopPropagation();
     (event.currentTarget as HTMLElement | null)?.blur();
     this.toggleSelect.emit(this.photo());
+  }
+
+  // --- Handlers de Efecto Linterna (Zero getBoundingClientRect in move) ---
+
+  public onCardPointerEnter(event: PointerEvent): void {
+    if (!this.isSpotlightEffectActive()) return;
+    const target = event.currentTarget as HTMLElement | null;
+    if (target) {
+      this.cardRect = target.getBoundingClientRect();
+      this.isSpotActive.set(true);
+      this.pendingX = event.clientX - this.cardRect.left;
+      this.pendingY = event.clientY - this.cardRect.top;
+      this.scheduleSpotlightUpdate();
+    }
+  }
+
+  public onCardPointerMove(event: PointerEvent): void {
+    if (!this.isSpotlightEffectActive() || !this.cardRect) return;
+    this.pendingX = event.clientX - this.cardRect.left;
+    this.pendingY = event.clientY - this.cardRect.top;
+    this.scheduleSpotlightUpdate();
+  }
+
+  public onCardPointerLeave(): void {
+    this.isSpotActive.set(false);
+    this.cardRect = null;
+    if (this.animFrameId) {
+      cancelAnimationFrame(this.animFrameId);
+      this.animFrameId = null;
+    }
+  }
+
+  public onCardTouchStart(event: TouchEvent): void {
+    if (!this.isSpotlightEffectActive() || !this.isMobileSpotlightActive()) return;
+    const target = event.currentTarget as HTMLElement | null;
+    const touch = event.touches?.[0];
+    if (target && touch) {
+      this.cardRect = target.getBoundingClientRect();
+      this.isSpotActive.set(true);
+      this.pendingX = touch.clientX - this.cardRect.left;
+      this.pendingY = touch.clientY - this.cardRect.top - 35; // Offset de -35px sobre la yema
+      this.scheduleSpotlightUpdate();
+    }
+  }
+
+  public onCardTouchMove(event: TouchEvent): void {
+    if (!this.isSpotlightEffectActive() || !this.isMobileSpotlightActive() || !this.cardRect) return;
+    const touch = event.touches?.[0];
+    if (touch) {
+      this.pendingX = touch.clientX - this.cardRect.left;
+      this.pendingY = touch.clientY - this.cardRect.top - 35; // Offset de -35px sobre la yema
+      this.scheduleSpotlightUpdate();
+    }
+  }
+
+  public onCardTouchEnd(): void {
+    this.isSpotActive.set(false);
+    this.cardRect = null;
+    if (this.animFrameId) {
+      cancelAnimationFrame(this.animFrameId);
+      this.animFrameId = null;
+    }
+  }
+
+  private scheduleSpotlightUpdate(): void {
+    if (this.animFrameId) return;
+    this.animFrameId = requestAnimationFrame(() => {
+      this.spotX.set(Math.round(this.pendingX));
+      this.spotY.set(Math.round(this.pendingY));
+      this.animFrameId = null;
+    });
   }
 }

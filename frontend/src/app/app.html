@@ -69,7 +69,7 @@
   @if (currentView() === 'portfolio') {
     <div class="space-y-8 animate-fadeIn">
       <!-- Hero de la Fotógrafa Jenifer 'Yuyo' Espeche -->
-      <app-hero [albums]="albums()" (selectAlbum)="openAlbum($event)" />
+      <app-hero [albums]="albums()" (selectAlbum)="openAlbum($event)" (heroLoaded)="onHeroLoaded()" />
 
       <!-- Barra de Filtros y Álbumes -->
       <section id="catalogo-albumes" class="space-y-4 pt-4 scroll-mt-6">
@@ -170,6 +170,7 @@
             } @else {
               @for (album of paginatedAlbums(); track album.id; let idx = $index) {
                 <app-album-card-3d
+                  class="h-full block"
                   [album]="album"
                   [index]="idx"
                   [isSelected]="currentAlbum()?.id === album.id"
@@ -331,6 +332,30 @@
                   <span>Comprar Álbum Completo (${{ album.fullAlbumPrice.toLocaleString('es-AR') }})</span>
                   <span>⚡</span>
                 </button>
+
+                <!-- Botón de Tutorial Linterna Onboarding -->
+                <button
+                  type="button"
+                  (click)="openSpotlightTutorial()"
+                  class="px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/15 backdrop-blur-sm transition active:scale-95 flex items-center gap-2"
+                  title="Ver cómo funciona la linterna de muestras"
+                >
+                  <span>🔦</span>
+                  <span>¿Cómo iluminar?</span>
+                </button>
+
+                <!-- Toggle de Linterna Táctil para Celulares -->
+                <button
+                  type="button"
+                  (click)="toggleMobileSpotlight()"
+                  [class]="isMobileSpotlightActive()
+                    ? 'sm:hidden px-4 py-3 rounded-2xl bg-amber-400 text-zinc-950 font-black text-xs shadow-md transition active:scale-95 flex items-center gap-1.5'
+                    : 'sm:hidden px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-zinc-300 font-bold text-xs border border-white/15 backdrop-blur-sm transition active:scale-95 flex items-center gap-1.5'"
+                  aria-label="Alternar linterna táctil"
+                >
+                  <span>🔦</span>
+                  <span>{{ isMobileSpotlightActive() ? 'Linterna Activa' : 'Modo Linterna' }}</span>
+                </button>
               }
             </div>
           </div>
@@ -435,7 +460,9 @@
                   [unitPrice]="album.unitPrice"
                   [isFreeDownload]="album.isFreeDownload || false"
                   [albumId]="album.id"
-                  [isSelected]="cartStore.isPhotoSelected(item.photo.id)"
+                  [isSelected]="isPhotoSelected(item.photo.id)"
+                  [isPurchased]="albumAccessStore.isPhotoPurchased(item.photo.id)"
+                  [isMobileSpotlightActive]="isMobileSpotlightActive()"
                   (toggleSelect)="togglePhoto($event)"
                   (openViewer)="openLightbox($event.photo, $event.index)"
                 />
@@ -602,7 +629,12 @@
 
 <!-- Cápsula Flotante de Compra Reactiva (Oculta en pago exitoso y administración) -->
 @if (currentView() === 'portfolio' || currentView() === 'album') {
-  <app-floating-cart (checkout)="openCheckout()" />
+  <app-floating-cart
+    [isFreeAlbum]="currentAlbum()?.isFreeDownload || false"
+    [activeAlbumId]="currentAlbum()?.id || null"
+    [activeAlbumTitle]="currentAlbum()?.title || null"
+    (checkout)="openCheckout()"
+  />
 }
 
 <!-- Lightbox Cinemático -->
@@ -614,10 +646,19 @@
   [isSelected]="isCurrentLightboxPhotoSelected()"
   [isFreeDownload]="currentAlbum()?.isFreeDownload || false"
   [albumId]="currentAlbum()?.id || ''"
+  [isPurchased]="currentLightboxPhoto() ? albumAccessStore.isPhotoPurchased(currentLightboxPhoto()!.id) : false"
+  [isMobileSpotlightActive]="isMobileSpotlightActive()"
   (close)="closeLightbox()"
   (next)="nextLightboxPhoto()"
   (prev)="prevLightboxPhoto()"
   (toggleSelect)="togglePhotoFromLightbox($event)"
+/>
+
+<!-- Onboarding Tutorial Bento Glassmorphism para Efecto Linterna -->
+<app-spotlight-tutorial
+  [isOpen]="isSpotlightTutorialOpen()"
+  (close)="closeSpotlightTutorial()"
+  (closeTutorial)="closeSpotlightTutorial()"
 />
 
 <!-- Modal Checkout Mercado Pago -->

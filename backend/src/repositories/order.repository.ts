@@ -97,7 +97,11 @@ export class MemoryOrderRepository implements IOrderRepository {
 
     order.status = status;
     if (paymentId) order.paymentId = paymentId;
-    if (downloadToken) order.downloadToken = downloadToken;
+    if (status === 'CANCELLED') {
+      delete order.downloadToken;
+    } else if (downloadToken) {
+      order.downloadToken = downloadToken;
+    }
     order.updatedAt = new Date().toISOString();
 
     return { ...order, photoIds: [...order.photoIds] };
@@ -447,7 +451,11 @@ export class SupabaseOrderRepository implements IOrderRepository {
       updated_at: new Date().toISOString()
     };
     if (paymentId) updates.payment_id = paymentId;
-    if (downloadToken) updates.download_token = downloadToken;
+    if (status === 'CANCELLED') {
+      updates.download_token = null;
+    } else if (downloadToken) {
+      updates.download_token = downloadToken;
+    }
 
     const { data, error } = await this.supabase
       .from('orders')

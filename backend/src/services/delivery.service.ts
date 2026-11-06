@@ -11,6 +11,7 @@ import { OrderDeliveryInfo, PhotoDownloadItem } from '../contracts/delivery.cont
 export interface DeliveryInfoResult {
   valid: boolean;
   isExpired?: boolean;
+  isCancelled?: boolean;
   error?: string;
   info?: OrderDeliveryInfo;
 }
@@ -84,9 +85,13 @@ export class DeliveryService {
 
     const order = await this.orderService.getOrderAsync(payload.orderId);
     if (!order || order.status !== 'PAID') {
+      const isCancelled = order?.status === 'CANCELLED';
       return {
         valid: false,
-        error: 'La orden vinculada a esta descarga no se encuentra activa o no está pagada'
+        isCancelled,
+        error: isCancelled
+          ? 'Esta orden ha sido cancelada o reembolsada. El acceso a las descargas fue revocado.'
+          : 'La orden vinculada a esta descarga no se encuentra activa o no está pagada'
       };
     }
 
@@ -449,12 +454,20 @@ export class DeliveryService {
   }
 
   /**
-   * Empaqueta en streaming todas las fotos de un álbum liberado de cortesía en un archivo ZIP con archiver
+   * Empaqueta en streaming todas las fotos (o un conjunto seleccionado) de un álbum liberado de cortesía en un archivo ZIP con archiver
    */
-  public async streamFreeAlbumZip(albumId: string, albumTitle: string, res: Response): Promise<void> {
+  public async streamFreeAlbumZip(
+    albumId: string,
+    albumTitle: string,
+    res: Response,
+    selectedPhotoIds?: string[]
+  ): Promise<void> {
     const cleanAlbumId = this.sanitizeId(albumId);
     const safeTitle = albumTitle.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 30);
-    const zipFilename = `LA_TERCERA_${cleanAlbumId}_${safeTitle}_HD.zip`;
+    const isSelective = Array.isArray(selectedPhotoIds) && selectedPhotoIds.length > 0;
+    const zipFilename = isSelective
+      ? `LA_TERCERA_${cleanAlbumId}_SELECCION_${selectedPhotoIds.length}_FOTOS_HD.zip`
+      : `LA_TERCERA_${cleanAlbumId}_${safeTitle}_HD.zip`;
 
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`);
@@ -496,6 +509,11 @@ export class DeliveryService {
     }
     if (photosToPack.length === 0) {
       photosToPack = Array.from({ length: 12 }, (_, i) => `foto_${i + 1}`);
+    }
+
+    if (isSelective) {
+      const selectedSet = new Set(selectedPhotoIds.map(id => this.sanitizeId(id)));
+      photosToPack = photosToPack.filter(p => selectedSet.has(p));
     }
 
     for (const pId of photosToPack) {

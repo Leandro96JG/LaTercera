@@ -1,10 +1,11 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, OnInit, OnDestroy, input, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
 import confetti from 'canvas-confetti';
 import { DeliveryService } from '../../core/services/delivery.service';
 import { OrderDeliveryInfo, PhotoDownloadItem, DeliveryStatusResponse } from '../../core/models/delivery.model';
 
-export type PaymentSuccessState = 'loading' | 'polling' | 'ready' | 'expired' | 'error';
+export type PaymentSuccessState = 'loading' | 'polling' | 'ready' | 'expired' | 'revoked' | 'error';
 
 @Component({
   selector: 'app-payment-success',
@@ -16,6 +17,7 @@ export type PaymentSuccessState = 'loading' | 'polling' | 'ready' | 'expired' | 
 })
 export class PaymentSuccessComponent implements OnInit, OnDestroy {
   private deliveryService: DeliveryService;
+  private readonly router = inject(Router, { optional: true });
 
   public readonly initialOrderId = input<string | undefined>(undefined);
   public readonly initialToken = input<string | undefined>(undefined);
@@ -135,9 +137,12 @@ export class PaymentSuccessComponent implements OnInit, OnDestroy {
           this.triggerConfetti();
         }
       },
-      error: (err: { status?: number; error?: { isExpired?: boolean; error?: string } }) => {
+      error: (err: { status?: number; error?: { isExpired?: boolean; isCancelled?: boolean; error?: string } }) => {
         if (this.isDestroyed) return;
-        if (err?.status === 410 || err?.error?.isExpired) {
+        if (err?.status === 403 || err?.error?.isCancelled) {
+          this.state.set('revoked');
+          this.errorMessage.set(err?.error?.error || 'El acceso a las fotografías fue revocado debido a la anulación o reembolso del pago.');
+        } else if (err?.status === 410 || err?.error?.isExpired) {
           this.state.set('expired');
           this.isExpired.set(true);
         } else {
@@ -155,15 +160,18 @@ export class PaymentSuccessComponent implements OnInit, OnDestroy {
         if (this.isDestroyed) return;
         if (res.status === 'PAID' && res.downloadToken) {
           this.loadDeliveryInfo(res.downloadToken);
+        } else if (res.status === 'CANCELLED') {
+          this.state.set('revoked');
+          this.errorMessage.set('El acceso a las fotografías fue revocado debido a la anulación o reembolso del pago.');
         } else if (res.status === 'PENDING' || res.status === 'PROCESSING') {
-          // El webhook de Mercado Pago está impactando; polling reactivo hasta 10 intentos
+          // El webhook de Mercado Pago está impactando; polling reactivo cada 3s hasta 6 intentos (18s máx)
           const attempt = this.pollingAttempt();
-          if (attempt < 10) {
+          if (attempt < 6) {
             this.state.set('polling');
             this.pollingAttempt.set(attempt + 1);
             this.registerTimeout(() => {
               this.loadByOrderId(orderId);
-            }, 2500);
+            }, 3000);
           } else {
             this.state.set('error');
             this.errorMessage.set('El pago sigue procesándose en Mercado Pago. Haz clic en Reintentar en unos segundos.');
@@ -219,6 +227,14 @@ export class PaymentSuccessComponent implements OnInit, OnDestroy {
   }
 
   public onGoHome(): void {
+    if (this.router) {
+      this.router.navigate(['/'], { replaceUrl: true });
+    }
+    if (typeof window !== 'undefined' && typeof window.history !== 'undefined') {
+      try {
+        window.history.replaceState({}, document.title, '/');
+      } catch {}
+    }
     this.goHome.emit();
   }
 

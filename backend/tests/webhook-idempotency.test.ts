@@ -102,4 +102,40 @@ describe('Webhook Idempotency & Concurrency - Protección contra Duplicados', ()
     expect(result.success).toBe(true);
     expect(result.alreadyProcessed).toBe(true);
   });
+
+  it('debe revocar la orden y anular el token de descarga si Mercado Pago notifica refunded o charged_back', () => {
+    const order = orderService.createOrder({
+      albumId: 'album-1',
+      photoIds: ['p4'],
+      isFullAlbum: false,
+      customer: { email: 'reembolso@test.com' }
+    });
+
+    // 1. Pagar orden
+    orderService.processWebhookPayment({
+      eventId: 'evt-pay-004',
+      orderId: order.id,
+      paymentId: 'pay-004',
+      status: 'approved',
+      currencyId: 'ARS',
+      transactionAmount: 1200
+    });
+    expect(orderService.getOrder(order.id)?.status).toBe('PAID');
+    expect(orderService.getOrder(order.id)?.downloadToken).toBeDefined();
+
+    // 2. Notificación de reembolso
+    const refundResult = orderService.processWebhookPayment({
+      eventId: 'evt-refund-004',
+      orderId: order.id,
+      paymentId: 'pay-004',
+      status: 'refunded',
+      currencyId: 'ARS',
+      transactionAmount: 1200
+    });
+
+    expect(refundResult.success).toBe(true);
+    const updatedOrder = orderService.getOrder(order.id);
+    expect(updatedOrder?.status).toBe('CANCELLED');
+    expect(updatedOrder?.downloadToken).toBeUndefined();
+  });
 });

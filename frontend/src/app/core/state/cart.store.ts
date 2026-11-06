@@ -23,6 +23,10 @@ export class CartStore {
   private readonly _couponDiscountPercent = signal<number | null>(null);
   private readonly _customer = signal<CustomerInfo>({ email: '', name: '', phone: '' });
 
+  // Selección Aislada de Descarga Gratuita de Cortesía (isFreeDownload: true)
+  private readonly _freeSelectedPhotos = signal<Map<string, Photo>>(new Map());
+  private readonly _freeActiveAlbumId = signal<string | null>(null);
+
   // Configuración de descuentos por volumen sincronizada con el backend
   private readonly _tierConfig = signal<PricingTierConfig>({
     enableTierDiscounts: true,
@@ -98,6 +102,25 @@ export class CartStore {
   public readonly hasItems = computed<boolean>(() => {
     return this._isFullAlbum() || this._selectedPhotos().size > 0;
   });
+
+  // --- Selección de Cortesía Gratuita (Públicos) ---
+  public readonly freeActiveAlbumId = this._freeActiveAlbumId.asReadonly();
+
+  public readonly freeSelectedPhotosArray = computed<readonly Photo[]>(() =>
+    Array.from(this._freeSelectedPhotos().values())
+  );
+
+  public readonly freeSelectedPhotoIds = computed<readonly string[]>(() =>
+    Array.from(this._freeSelectedPhotos().keys())
+  );
+
+  public readonly freeSelectedCount = computed<number>(() =>
+    this._freeSelectedPhotos().size
+  );
+
+  public readonly hasFreeItems = computed<boolean>(() =>
+    this._freeSelectedPhotos().size > 0
+  );
 
   // --- Recomendación Inteligente de Pack Álbum Completo ---
   public readonly shouldRecommendFullAlbum = computed<boolean>(() => {
@@ -236,6 +259,18 @@ export class CartStore {
         if (typeof parsed.couponDiscountPercent === 'number') {
           this._couponDiscountPercent.set(parsed.couponDiscountPercent);
         }
+        if (Array.isArray(parsed.freeSelectedPhotos)) {
+          const freeMap = new Map<string, Photo>();
+          for (const photo of parsed.freeSelectedPhotos) {
+            if (photo && photo.id) {
+              freeMap.set(photo.id, photo);
+            }
+          }
+          this._freeSelectedPhotos.set(freeMap);
+        }
+        if (parsed.freeActiveAlbumId !== undefined) {
+          this._freeActiveAlbumId.set(parsed.freeActiveAlbumId);
+        }
         if (parsed.customer && typeof parsed.customer === 'object') {
           this._customer.set({
             email: parsed.customer.email || '',
@@ -260,12 +295,52 @@ export class CartStore {
         fullAlbumPrice: this._fullAlbumPrice(),
         couponCode: this._couponCode(),
         couponDiscountPercent: this._couponDiscountPercent(),
+        freeSelectedPhotos: Array.from(this._freeSelectedPhotos().values()),
+        freeActiveAlbumId: this._freeActiveAlbumId(),
         customer: this._customer()
       };
       sessionStorage.setItem(CartStore.STORAGE_KEY, JSON.stringify(state));
     } catch {
       // Ignorar quota exceeded o storage deshabilitado
     }
+  }
+
+  // --- Mutadores de Estado de Selección Gratuita de Cortesía ---
+
+  public isFreePhotoSelected(photoId: string): boolean {
+    return this._freeSelectedPhotos().has(photoId);
+  }
+
+  public toggleFreePhoto(photo: Photo): void {
+    if (photo.albumId && this._freeActiveAlbumId() && this._freeActiveAlbumId() !== photo.albumId) {
+      this._freeSelectedPhotos.set(new Map());
+    }
+    if (photo.albumId) {
+      this._freeActiveAlbumId.set(photo.albumId);
+    }
+
+    const updated = new Map(this._freeSelectedPhotos());
+    if (updated.has(photo.id)) {
+      updated.delete(photo.id);
+    } else {
+      updated.set(photo.id, photo);
+    }
+    this._freeSelectedPhotos.set(updated);
+    this.persistToSession();
+  }
+
+  public removeFreePhoto(photoId: string): void {
+    if (this._freeSelectedPhotos().has(photoId)) {
+      const updated = new Map(this._freeSelectedPhotos());
+      updated.delete(photoId);
+      this._freeSelectedPhotos.set(updated);
+      this.persistToSession();
+    }
+  }
+
+  public clearFreeSelection(): void {
+    this._freeSelectedPhotos.set(new Map());
+    this.persistToSession();
   }
 
   // --- Mutadores de Estado ---

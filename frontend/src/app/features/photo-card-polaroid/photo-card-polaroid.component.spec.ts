@@ -239,4 +239,48 @@ describe('PhotoCardPolaroidComponent', () => {
     const selectButton = fixture.nativeElement.querySelector('button') as HTMLButtonElement;
     expect(selectButton.classList.contains('min-h-[44px]')).toBe(true);
   });
+
+  it('debe renderizar .spotlight-darkness-layer en álbumes pagos y ocultarlo en álbumes gratuitos o fotos compradas', () => {
+    fixture.componentRef.setInput('photo', mockPhoto);
+    fixture.componentRef.setInput('index', 0);
+    fixture.componentRef.setInput('unitPrice', 1200);
+    fixture.componentRef.setInput('isFreeDownload', false);
+    fixture.componentRef.setInput('isPurchased', false);
+    component.onImageLoaded();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('.spotlight-darkness-layer')).not.toBeNull();
+
+    // En álbum gratuito debe desaparecer por completo
+    fixture.componentRef.setInput('isFreeDownload', true);
+    fixture.detectChanges();
+    expect(compiled.querySelector('.spotlight-darkness-layer')).toBeNull();
+
+    // En foto comprada debe desaparecer por completo
+    fixture.componentRef.setInput('isFreeDownload', false);
+    fixture.componentRef.setInput('isPurchased', true);
+    fixture.detectChanges();
+    expect(compiled.querySelector('.spotlight-darkness-layer')).toBeNull();
+  });
+
+  it('debe activar spotlight-rim y clases reactivas cuando isSpotActive es true', () => {
+    fixture.componentRef.setInput('photo', mockPhoto);
+    fixture.componentRef.setInput('index', 0);
+    fixture.componentRef.setInput('unitPrice', 1200);
+    fixture.componentRef.setInput('isFreeDownload', false);
+    fixture.componentRef.setInput('isPurchased', false);
+    component.onImageLoaded();
+    fixture.detectChanges();
+
+    const layer = fixture.nativeElement.querySelector('.spotlight-darkness-layer') as HTMLElement;
+    expect(layer.classList.contains('is-spot-active')).toBe(false);
+    expect(fixture.nativeElement.querySelector('.spotlight-rim')).toBeNull();
+
+    component.isSpotActive.set(true);
+    fixture.detectChanges();
+
+    expect(layer.classList.contains('is-spot-active')).toBe(true);
+    expect(fixture.nativeElement.querySelector('.spotlight-rim')).not.toBeNull();
+  });
 });

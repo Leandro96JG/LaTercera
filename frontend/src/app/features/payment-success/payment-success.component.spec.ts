@@ -162,4 +162,42 @@ describe('PaymentSuccessComponent (TDD)', () => {
     expect(component.state()).toBe('polling');
     expect(deliveryServiceMock.getOrderStatus).toHaveBeenCalledWith('order-pend-456');
   });
+
+  it('debe transicionar a estado revoked cuando el token está cancelado/revocado por reembolso (403)', () => {
+    deliveryServiceMock.getDeliveryInfo.mockReturnValue(
+      throwError(() => ({ status: 403, error: { error: 'Acceso revocado por reembolso', isCancelled: true } }))
+    );
+
+    component.loadDeliveryInfo('revoked-token');
+
+    expect(component.state()).toBe('revoked');
+    expect(component.errorMessage()).toContain('revocado');
+  });
+
+  it('debe transicionar a estado revoked cuando la orden consultada por ID tiene estado CANCELLED', () => {
+    const cancelledStatus: DeliveryStatusResponse = {
+      orderId: 'order-canc-789',
+      status: 'CANCELLED'
+    };
+    deliveryServiceMock.getOrderStatus.mockReturnValue(of(cancelledStatus));
+
+    component.loadByOrderId('order-canc-789');
+
+    expect(component.state()).toBe('revoked');
+    expect(component.errorMessage()).toContain('revocado');
+  });
+
+  it('debe limpiar la URL a / con window.history.replaceState y emitir goHome al hacer clic en volver', () => {
+    let homeEmitted = false;
+    component.goHome.subscribe(() => {
+      homeEmitted = true;
+    });
+
+    const replaceStateSpy = vi.spyOn(window.history, 'replaceState');
+
+    component.onGoHome();
+
+    expect(homeEmitted).toBe(true);
+    expect(replaceStateSpy).toHaveBeenCalledWith({}, document.title, '/');
+  });
 });

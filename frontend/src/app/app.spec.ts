@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of, Subject } from 'rxjs';
@@ -24,6 +25,7 @@ describe('App Root Component - LA TERCERA', () => {
     await TestBed.configureTestingModule({
       imports: [App],
       providers: [
+        provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting()
       ]
@@ -92,15 +94,17 @@ describe('App Root Component - LA TERCERA', () => {
     expect(app.adminAuthStore.isAuthenticated()).toBe(false);
   });
 
-  it('debe transicionar a la vista payment-success y regresar al catálogo con goHome()', () => {
+  it('debe transicionar a la vista payment-success y regresar al catálogo con goHome() limpiando URL', () => {
     const fixture = TestBed.createComponent(App);
     const app = fixture.componentInstance;
+    const replaceStateSpy = vi.spyOn(window.history, 'replaceState');
 
     app.currentView.set('payment-success');
     expect(app.currentView()).toBe('payment-success');
 
     app.goHome();
     expect(app.currentView()).toBe('portfolio');
+    expect(replaceStateSpy).toHaveBeenCalledWith({}, document.title, '/');
   });
 
   it('debe paginar los álbumes en el catálogo público y calcular páginas correctamente', () => {
@@ -575,6 +579,62 @@ describe('App Root Component - LA TERCERA', () => {
     // Imagen de portada dentro de la tarjeta 3D
     const coverImg = heroCard?.querySelector('img') as HTMLImageElement;
     expect(coverImg?.src).toContain('cover-hero.webp');
+  });
+
+  it('debe rutear la selección de fotos hacia freeSelectedPhotos cuando el álbum es gratuito', () => {
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+    const albumService = TestBed.inject(AlbumService);
+
+    const freeAlbum: Album = {
+      id: 'album-gratis-1',
+      category: 'futbol',
+      title: 'Torneo Infantil Gratis',
+      subtitle: 'Cortesía Oficial',
+      badge: '🎁 Cortesía',
+      date: '2026',
+      photosCount: 5,
+      unitPrice: 0,
+      fullAlbumPrice: 0,
+      coverUrl: '',
+      isFreeDownload: true
+    };
+
+    vi.spyOn(albumService, 'getAlbumPhotos').mockReturnValue(of([]));
+    app.openAlbum(freeAlbum);
+
+    const photo: Photo = {
+      id: 'f-free-1',
+      albumId: 'album-gratis-1',
+      title: 'Gol de cabeza',
+      previewUrl: '',
+      originalWidth: 4000,
+      originalHeight: 3000,
+      isSampleHD: false
+    };
+
+    expect(app.isPhotoSelected(photo.id)).toBe(false);
+    app.togglePhoto(photo);
+    expect(app.isPhotoSelected(photo.id)).toBe(true);
+    expect(app.cartStore.isFreePhotoSelected(photo.id)).toBe(true);
+    expect(app.cartStore.isPhotoSelected(photo.id)).toBe(false);
+  });
+
+  it('debe alternar el modo linterna móvil con toggleMobileSpotlight y controlar el tutorial', () => {
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+
+    expect(app.isMobileSpotlightActive()).toBe(false);
+    app.toggleMobileSpotlight();
+    expect(app.isMobileSpotlightActive()).toBe(true);
+    app.toggleMobileSpotlight();
+    expect(app.isMobileSpotlightActive()).toBe(false);
+
+    expect(app.isSpotlightTutorialOpen()).toBe(false);
+    app.openSpotlightTutorial();
+    expect(app.isSpotlightTutorialOpen()).toBe(true);
+    app.closeSpotlightTutorial();
+    expect(app.isSpotlightTutorialOpen()).toBe(false);
   });
 });
 

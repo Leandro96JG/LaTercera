@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, effect, untracked, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
 import { HeaderComponent } from './features/header/header.component';
 import { HeroComponent } from './features/hero/hero.component';
 import { FloatingCartComponent } from './features/cart/floating-cart.component';
@@ -12,6 +13,7 @@ import { AlbumCard3dComponent } from './features/album-card-3d/album-card-3d.com
 import { PhotoCardPolaroidComponent } from './features/photo-card-polaroid/photo-card-polaroid.component';
 import { PinUnlockModalComponent } from './features/pin-unlock/pin-unlock-modal.component';
 import { OrderRecoveryModalComponent } from './features/order-recovery/order-recovery-modal.component';
+import { SpotlightTutorialComponent } from './features/spotlight-tutorial/spotlight-tutorial.component';
 import { AlbumService } from './core/services/album.service';
 import { CartStore } from './core/state/cart.store';
 import { AdminAuthStore } from './core/state/admin-auth.store';
@@ -38,7 +40,8 @@ import { Photo } from './core/models/photo.model';
     AlbumCard3dComponent,
     PhotoCardPolaroidComponent,
     PinUnlockModalComponent,
-    OrderRecoveryModalComponent
+    OrderRecoveryModalComponent,
+    SpotlightTutorialComponent
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './app.html',
@@ -51,6 +54,7 @@ export class App implements OnInit, OnDestroy {
   public readonly albumAccessStore = inject(AlbumAccessStore);
   public readonly paymentService = inject(PaymentService);
   public readonly categoryService = inject(CategoryService);
+  private readonly router = inject(Router, { optional: true });
 
   // Categorías dinámicas consultadas desde la API / Supabase
   public readonly apiCategories = signal<readonly CategoryDTO[]>(DEFAULT_CATEGORIES);
@@ -96,6 +100,14 @@ export class App implements OnInit, OnDestroy {
   // Splash Screen de Inicio
   public readonly showSplash = signal<boolean>(true);
   private splashTimer: any = null;
+  private splashFallbackTimer: any = null;
+  private readonly minSplashElapsed = signal<boolean>(false);
+  private readonly albumsReceived = signal<boolean>(false);
+  private readonly heroImageReceived = signal<boolean>(false);
+
+  // Efecto Linterna y Onboarding Tutorial
+  public readonly isSpotlightTutorialOpen = signal<boolean>(false);
+  public readonly isMobileSpotlightActive = signal<boolean>(false);
 
   // Estado de carga de álbumes públicos
   public readonly isLoadingPublicAlbums = signal<boolean>(true);
@@ -359,21 +371,61 @@ export class App implements OnInit, OnDestroy {
     return photos[idx] || null;
   });
 
+  public isPhotoSelected(photoId: string): boolean {
+    const alb = this.currentAlbum();
+    if (alb?.isFreeDownload) {
+      return this.cartStore.isFreePhotoSelected(photoId);
+    }
+    return this.cartStore.isPhotoSelected(photoId);
+  }
+
   public readonly isCurrentLightboxPhotoSelected = computed<boolean>(() => {
     const p = this.currentLightboxPhoto();
-    return p ? this.cartStore.isPhotoSelected(p.id) : false;
+    return p ? this.isPhotoSelected(p.id) : false;
   });
+
+  public openSpotlightTutorial(): void {
+    this.isSpotlightTutorialOpen.set(true);
+  }
+
+  public closeSpotlightTutorial(): void {
+    this.isSpotlightTutorialOpen.set(false);
+  }
+
+  public toggleMobileSpotlight(): void {
+    this.isMobileSpotlightActive.update(v => !v);
+  }
 
   public dismissSplash(): void {
     if (this.splashTimer) {
       clearTimeout(this.splashTimer);
       this.splashTimer = null;
     }
+    if (this.splashFallbackTimer) {
+      clearTimeout(this.splashFallbackTimer);
+      this.splashFallbackTimer = null;
+    }
     this.showSplash.set(false);
     if (typeof sessionStorage !== 'undefined') {
       try {
         sessionStorage.setItem('la_tercera_splash_seen', 'true');
       } catch {}
+    }
+  }
+
+  public onHeroLoaded(): void {
+    this.heroImageReceived.set(true);
+    this.checkSplashDismissal();
+  }
+
+  public onAlbumsLoaded(): void {
+    this.albumsReceived.set(true);
+    this.checkSplashDismissal();
+  }
+
+  private checkSplashDismissal(): void {
+    if (this.minSplashElapsed() && this.albumsReceived()) {
+      this.dismissSplash();
     }
   }
 
@@ -389,9 +441,16 @@ export class App implements OnInit, OnDestroy {
     }
 
     if (typeof window !== 'undefined') {
+      // Tiempo mínimo anti-parpadeo: 450ms
       this.splashTimer = setTimeout(() => {
+        this.minSplashElapsed.set(true);
+        this.checkSplashDismissal();
+      }, 450);
+
+      // Timeout de seguridad máximo: 1800ms
+      this.splashFallbackTimer = setTimeout(() => {
         this.dismissSplash();
-      }, 900);
+      }, 1800);
     }
   }
 
@@ -402,7 +461,7 @@ export class App implements OnInit, OnDestroy {
         this.isLoadingPublicAlbums.set(false);
         this.albums.set(albums);
         this.checkDirectAlbumLink();
-        this.dismissSplash();
+        this.onAlbumsLoaded();
       },
       error: () => {
         this.isLoadingPublicAlbums.set(false);
@@ -458,7 +517,7 @@ export class App implements OnInit, OnDestroy {
           }
         ]);
         this.checkDirectAlbumLink();
-        this.dismissSplash();
+        this.onAlbumsLoaded();
       }
     });
   }
@@ -640,6 +699,21 @@ export class App implements OnInit, OnDestroy {
       this.cartStore.setAlbumPricing(album.id, album.fullAlbumPrice, album.unitPrice);
       this.activeAlbumPhotos.set([]); // Limpiar fotos anteriores
       this.currentView.set('album');
+
+      // Tutorial Onboarding automático si es álbum pago y el usuario nunca lo vio
+      if (!album.isFreeDownload) {
+        if (typeof localStorage !== 'undefined') {
+          try {
+            const seen = localStorage.getItem('la_tercera_spotlight_tutorial_v1');
+            if (!seen) {
+              this.isSpotlightTutorialOpen.set(true);
+            }
+          } catch {}
+        }
+      } else {
+        this.isSpotlightTutorialOpen.set(false);
+        this.isMobileSpotlightActive.set(false);
+      }
     });
 
     // Cargar fotos reales del álbum desde el backend / Supabase
@@ -664,6 +738,14 @@ export class App implements OnInit, OnDestroy {
   }
 
   public goHome(): void {
+    if (this.router) {
+      this.router.navigate(['/'], { replaceUrl: true });
+    }
+    if (typeof window !== 'undefined' && typeof window.history !== 'undefined') {
+      try {
+        window.history.replaceState({}, document.title, '/');
+      } catch {}
+    }
     this.transitionView(() => {
       this.activeAlbumPhotos.set([]);
       this.isLoadingAlbumPhotos.set(false);
@@ -728,7 +810,12 @@ export class App implements OnInit, OnDestroy {
   }
 
   public togglePhoto(photo: Photo): void {
-    this.cartStore.togglePhoto(photo);
+    const alb = this.currentAlbum();
+    if (alb?.isFreeDownload) {
+      this.cartStore.toggleFreePhoto(photo);
+    } else {
+      this.cartStore.togglePhoto(photo);
+    }
   }
 
   public togglePhotoFromLightbox(photo: Photo): void {

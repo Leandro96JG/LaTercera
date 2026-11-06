@@ -64,10 +64,11 @@ export function createDownloadsRouter(
       const result = await deliveryService.getDeliveryInfo(token, baseUrl);
 
       if (!result.valid) {
-        const statusCode = result.isExpired ? 410 : 401;
+        const statusCode = result.isCancelled ? 403 : result.isExpired ? 410 : 401;
         return res.status(statusCode).json({
           error: result.error,
-          isExpired: result.isExpired || false
+          isExpired: result.isExpired || false,
+          isCancelled: result.isCancelled || false
         });
       }
 
@@ -250,9 +251,56 @@ export function createDownloadsRouter(
         });
       }
 
-      await deliveryService.streamFreeAlbumZip(album.id, album.title, res);
+      const queryPhotos = req.query.photos;
+      const selectedPhotoIds = typeof queryPhotos === 'string'
+        ? queryPhotos.split(',').map((s) => s.trim()).filter(Boolean)
+        : Array.isArray(queryPhotos)
+          ? queryPhotos.map((s) => String(s).trim()).filter(Boolean)
+          : undefined;
+
+      await deliveryService.streamFreeAlbumZip(album.id, album.title, res, selectedPhotoIds);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Error al descargar álbum gratuito';
+      if (!res.headersSent) {
+        return res.status(500).json({ error: message });
+      }
+    }
+  });
+
+  /**
+   * POST /api/downloads/free/:albumId/selective-zip
+   * Descarga Gratuita de Cortesía para Selección Específica de Fotos (JSON body con photoIds)
+   */
+  router.post('/free/:albumId/selective-zip', async (req: Request, res: Response) => {
+    try {
+      const rawAlbumId = req.params.albumId;
+      const albumId = Array.isArray(rawAlbumId) ? rawAlbumId[0] : rawAlbumId;
+      const photoIds = req.body?.photoIds;
+
+      if (!Array.isArray(photoIds) || photoIds.length === 0) {
+        return res.status(400).json({ error: 'Debes seleccionar al menos una foto para descargar' });
+      }
+
+      const album = await albumRepository.getAlbumById(albumId);
+      if (!album || album.deletedAt) {
+        return res.status(404).json({ error: 'Álbum no encontrado' });
+      }
+
+      if (!album.isFreeDownload) {
+        return res.status(403).json({
+          error: 'Este álbum no tiene habilitada la descarga gratuita de cortesía'
+        });
+      }
+
+      if (!verifyAlbumPrivacyAccess(album, req)) {
+        return res.status(403).json({
+          error: 'Acceso denegado: Este álbum es privado y requiere un código PIN o token de acceso válido'
+        });
+      }
+
+      await deliveryService.streamFreeAlbumZip(album.id, album.title, res, photoIds);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al descargar fotos seleccionadas';
       if (!res.headersSent) {
         return res.status(500).json({ error: message });
       }

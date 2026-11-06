@@ -237,4 +237,24 @@ describe('AlbumCard3dComponent', () => {
     const lockSvg = compiled.querySelector('.cover-flap svg');
     expect(lockSvg).not.toBeNull();
   });
+
+  it('debe tener altura uniforme h-full, título con min-h-[2.75rem] y subtítulo con min-h-[1.125rem]', () => {
+    fixture.componentRef.setInput('album', mockPublicAlbum);
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.classList.contains('h-full')).toBe(true);
+
+    const article = host.querySelector('.album-card-root') as HTMLElement;
+    expect(article.classList.contains('h-full')).toBe(true);
+    expect(article.classList.contains('flex')).toBe(true);
+
+    const title = host.querySelector('h3') as HTMLElement;
+    expect(title.classList.contains('min-h-[2.75rem]')).toBe(true);
+    expect(title.classList.contains('line-clamp-2')).toBe(true);
+
+    const subtitle = host.querySelector('p') as HTMLElement;
+    expect(subtitle.classList.contains('min-h-[1.125rem]')).toBe(true);
+    expect(subtitle.classList.contains('line-clamp-1')).toBe(true);
+  });
 });

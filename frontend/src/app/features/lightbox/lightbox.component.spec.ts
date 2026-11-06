@@ -269,5 +269,42 @@ describe('LightboxComponent (Visor Cinemático Táctil)', () => {
     expect(downloadLink).not.toBeNull();
     expect(downloadLink.getAttribute('href')).toContain('/api/downloads/free/album-1/photo/photo-lightbox-1');
   });
+
+  it('debe renderizar .spotlight-darkness-layer en lightbox para álbumes pagos y ocultarlo en álbumes gratuitos o fotos compradas', () => {
+    fixture.componentRef.setInput('isOpen', true);
+    fixture.componentRef.setInput('currentPhoto', mockPhoto);
+    fixture.componentRef.setInput('isFreeDownload', false);
+    fixture.componentRef.setInput('isPurchased', false);
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('.spotlight-darkness-layer')).not.toBeNull();
+
+    // En álbum libre se oculta
+    fixture.componentRef.setInput('isFreeDownload', true);
+    fixture.detectChanges();
+    expect(compiled.querySelector('.spotlight-darkness-layer')).toBeNull();
+
+    // En foto comprada se oculta
+    fixture.componentRef.setInput('isFreeDownload', false);
+    fixture.componentRef.setInput('isPurchased', true);
+    fixture.detectChanges();
+    expect(compiled.querySelector('.spotlight-darkness-layer')).toBeNull();
+  });
+
+  it('debe renderizar .spotlight-rim en lightbox cuando isSpotActive es true', () => {
+    fixture.componentRef.setInput('isOpen', true);
+    fixture.componentRef.setInput('currentPhoto', mockPhoto);
+    fixture.componentRef.setInput('isFreeDownload', false);
+    fixture.componentRef.setInput('isPurchased', false);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.spotlight-rim')).toBeNull();
+
+    component.isSpotActive.set(true);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.spotlight-rim')).not.toBeNull();
+  });
 });
 

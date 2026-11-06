@@ -83,11 +83,18 @@ export class AlbumService {
   /**
    * Obtiene la URL de descarga directa para el ZIP de un álbum liberado de cortesía
    */
-  public getFreeAlbumZipUrl(albumId: string): string {
+  public getFreeAlbumZipUrl(albumId: string, photoIds?: string[]): string {
     const token = this.albumAccessStore.getAccessToken(albumId);
     const baseUrl = `${this.downloadApiUrl}/free/${albumId}/zip`;
+    const params: string[] = [];
+    if (photoIds && photoIds.length > 0) {
+      params.push(`photos=${encodeURIComponent(photoIds.join(','))}`);
+    }
     if (token) {
-      return `${baseUrl}?accessToken=${encodeURIComponent(token)}`;
+      params.push(`accessToken=${encodeURIComponent(token)}`);
+    }
+    if (params.length > 0) {
+      return `${baseUrl}?${params.join('&')}`;
     }
     return baseUrl;
   }

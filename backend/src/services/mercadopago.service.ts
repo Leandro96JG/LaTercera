@@ -60,6 +60,8 @@ export class MercadoPagoService {
         },
         external_reference: order.id,
         binary_mode: true, // Forzar solo approved o rejected (evita estados intermedios pendientes prolongados)
+        expires: true,
+        expiration_date_to: new Date(Date.now() + 45 * 60 * 1000).toISOString(),
         back_urls: {
           success: `${frontendUrl}/pago-exitoso`,
           failure: `${frontendUrl}/pago-exitoso`,

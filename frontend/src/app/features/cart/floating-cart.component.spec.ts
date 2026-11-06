@@ -99,4 +99,35 @@ describe('FloatingCartComponent', () => {
     buyButton.click();
     expect(checkoutEmitted).toBe(true);
   });
+
+  it('debe renderizar la píldora verde de cortesía cuando isFreeAlbum es true y hay fotos gratuitas elegidas', () => {
+    fixture.componentRef.setInput('isFreeAlbum', true);
+    fixture.componentRef.setInput('activeAlbumId', 'album-gratis');
+    cartStore.clearFreeSelection();
+    cartStore.toggleFreePhoto(mockPhoto);
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).toContain('Cortesía Gratis');
+    expect(compiled.textContent).toContain('Descargar Selección (ZIP)');
+  });
+
+  it('debe mostrar el drawer de cortesía con opciones de descarga ZIP al expandir', () => {
+    fixture.componentRef.setInput('isFreeAlbum', true);
+    fixture.componentRef.setInput('activeAlbumId', 'album-gratis');
+    cartStore.clearFreeSelection();
+    cartStore.toggleFreePhoto(mockPhoto);
+    component.toggleExpanded();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).toContain('Lote de Cortesía (1 fotos)');
+    expect(compiled.textContent).toContain('Descargar Todo el Álbum (ZIP)');
+    expect(compiled.textContent).toContain('Descargar Selección (1 Fotos ZIP)');
+
+    // Remover la foto libre
+    component.removeFreePhoto(mockPhoto.id);
+    fixture.detectChanges();
+    expect(cartStore.hasFreeItems()).toBe(false);
+  });
 });

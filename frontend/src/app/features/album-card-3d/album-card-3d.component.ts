@@ -19,19 +19,19 @@ import { Album } from '../../core/models/album.model';
   imports: [CommonModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
-    'class': 'block select-none animate-stagger-fade-in',
+    'class': 'block h-full select-none animate-stagger-fade-in',
     '[style.animation-delay]': 'staggerDelay()',
-    '(pointerenter)': 'onPointerEnter()',
+    '(pointerenter)': 'onPointerEnter($event)',
     '(pointerleave)': 'onPointerLeave()',
     '(pointermove)': 'onPointerMove($event)',
-    '(touchstart)': 'onTouchStart($event)',
+    '(touchstart)': 'onTouchStart()',
     '(touchend)': 'onTouchEnd()',
     '(touchcancel)': 'onTouchEnd()'
   },
   template: `
     <article
       #cardArticle
-      class="album-card-root group relative cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 rounded-[32px]"
+      class="album-card-root group relative cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 rounded-[32px] h-full flex flex-col justify-between"
       [style.view-transition-name]="viewTransitionName()"
       (click)="handleAction($event)"
       tabindex="0"
@@ -44,6 +44,7 @@ import { Album } from '../../core/models/album.model';
       <div
         class="folder-container relative w-full aspect-[4/3] rounded-[30px] bg-zinc-950 border border-zinc-800/90 shadow-2xl transition-all duration-300 ease-out transform-gpu group-hover:shadow-amber-500/10 group-hover:border-zinc-700/80"
         [class.is-open]="isOpenState()"
+        [class.is-active-gpu]="isOpenState()"
         [style.--tilt-rx]="tiltRotateX() + 'deg'"
         [style.--tilt-ry]="tiltRotateY() + 'deg'"
       >
@@ -111,8 +112,8 @@ import { Album } from '../../core/models/album.model';
             <!-- Gradiente de profundidad interior -->
             <div class="absolute inset-0 bg-gradient-to-t from-zinc-950/90 via-zinc-950/25 to-transparent"></div>
 
-            <!-- Contador de fotos en esquina interior -->
-            <div class="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-mono text-zinc-300">
+            <!-- Contador de fotos en esquina interior (sin backdrop-blur para no degradar GPU móvil) -->
+            <div class="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-lg bg-black/90 border border-white/10 text-[10px] font-mono text-zinc-300">
               {{ album().photosCount }} hojas
             </div>
           </div>
@@ -122,8 +123,9 @@ import { Album } from '../../core/models/album.model';
         <!-- TAPA FRONTAL ABATIBLE 3D (OPEN COVER & SPECULAR SHINE)    -->
         <!-- ======================================================== -->
         <div
-          class="cover-flap absolute inset-0 left-9 sm:left-11 rounded-r-[30px] bg-zinc-900/95 backdrop-blur-md border-l border-white/10 p-4 sm:p-5 flex flex-col justify-between transition-all duration-500 ease-out origin-left z-20 shadow-xl overflow-hidden"
+          class="cover-flap absolute inset-0 left-9 sm:left-11 rounded-r-[30px] bg-zinc-950/95 border-l border-white/10 p-4 sm:p-5 flex flex-col justify-between transition-all duration-500 ease-out origin-left z-20 shadow-xl overflow-hidden"
           [class.flap-open]="isOpenState()"
+          [class.is-active-gpu]="isOpenState()"
           [style.--shine-x]="specularX() + '%'"
           [style.--shine-y]="specularY() + '%'"
         >
@@ -178,14 +180,16 @@ import { Album } from '../../core/models/album.model';
 
           <!-- Troquelado Central / Título y Metadatos del Evento -->
           <div class="relative z-10 my-auto py-2">
-            <h3 class="text-base sm:text-lg font-bold text-white tracking-tight line-clamp-1 group-hover:text-amber-400 transition-colors drop-shadow-md">
+            <h3 class="text-base sm:text-lg font-bold text-white tracking-tight line-clamp-2 min-h-[2.75rem] leading-snug group-hover:text-amber-400 transition-colors drop-shadow-md">
               {{ album().title }}
             </h3>
-            @if (album().subtitle) {
-              <p class="text-xs text-zinc-300 line-clamp-1 font-medium mt-0.5 drop-shadow">
+            <p class="text-xs text-zinc-300 line-clamp-1 min-h-[1.125rem] font-medium mt-0.5 drop-shadow">
+              @if (album().subtitle) {
                 {{ album().subtitle }}
-              </p>
-            }
+              } @else {
+                <span class="opacity-0 select-none">-</span>
+              }
+            </p>
             <div class="flex items-center gap-2 mt-2 text-[11px] text-zinc-400 font-medium">
               <span class="flex items-center gap-1">
                 <svg class="w-3 h-3 text-zinc-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -252,22 +256,38 @@ import { Album } from '../../core/models/album.model';
   `,
   styles: [`
     :host {
-      perspective: 1200px;
+      perspective: 1000px;
+      display: block;
+      height: 100%;
+    }
+
+    .album-card-root {
+      transform-style: preserve-3d;
+      height: 100%;
     }
 
     .folder-container {
-      perspective: 1200px;
+      perspective: 1000px;
       transform-style: preserve-3d;
-      will-change: transform, box-shadow;
-      transform: perspective(1200px) rotateX(var(--tilt-rx, 0deg)) rotateY(var(--tilt-ry, 0deg));
-      transition: transform 280ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 400ms ease;
+      transform: perspective(1000px) rotateX(var(--tilt-rx, 0deg)) rotateY(var(--tilt-ry, 0deg));
+      transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 400ms ease;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .album-card-root:hover .folder-container {
+        transform: perspective(1000px) rotateX(var(--tilt-rx, 0deg)) rotateY(var(--tilt-ry, 0deg)) scale3d(1.02, 1.02, 1.02);
+      }
+    }
+
+    .folder-container.is-active-gpu,
+    .cover-flap.is-active-gpu {
+      will-change: transform;
     }
 
     /* Solapa Frontal 3D */
     .cover-flap {
       transform-style: preserve-3d;
       backface-visibility: hidden;
-      will-change: transform, box-shadow;
       transform-origin: left center;
       box-shadow: -4px 0 20px rgba(0, 0, 0, 0.4);
     }
@@ -275,7 +295,7 @@ import { Album } from '../../core/models/album.model';
     /* Apertura 3D en Hover o Estado Abierto Activo */
     .flap-open {
       transform: rotateY(-24deg) scale(0.985);
-      background-color: rgba(24, 24, 27, 0.75);
+      background-color: rgba(24, 24, 27, 0.85);
       box-shadow: 12px 14px 28px rgba(0, 0, 0, 0.55);
     }
 
@@ -283,6 +303,17 @@ import { Album } from '../../core/models/album.model';
       .flap-open {
         transform: rotateY(-18deg) scale(0.98);
         box-shadow: 8px 10px 20px rgba(0, 0, 0, 0.45);
+      }
+    }
+
+    /* En celulares táctiles, deshabilitar inclinación continua 3D para scroll a 120fps */
+    @media (hover: none) and (pointer: coarse) {
+      .folder-container {
+        transform: none !important;
+        perspective: none !important;
+      }
+      .specular-shine {
+        display: none !important;
       }
     }
 
@@ -350,6 +381,12 @@ export class AlbumCard3dComponent {
   public readonly specularX = signal<number>(50);
   public readonly specularY = signal<number>(50);
 
+  private cardRect: DOMRect | null = null;
+  private animFrameId: number | null = null;
+  private pendingSpecularX = 50;
+  private pendingSpecularY = 50;
+  private isCoarsePointer = false;
+
   // Inclinación reactiva suave de la carpeta (-5deg a +5deg)
   public readonly tiltRotateX = computed<number>(() => {
     if (!this.isHovered() && !this.isTouchActive()) return 0;
@@ -370,26 +407,45 @@ export class AlbumCard3dComponent {
 
   constructor() {
     afterNextRender(() => {
+      if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+        this.isCoarsePointer = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+      }
       this.initMobileIntersectionObserver();
     });
   }
 
-  public onPointerEnter(): void {
+  public onPointerEnter(event?: PointerEvent): void {
     this.isHovered.set(true);
+    if (!this.isCoarsePointer && event) {
+      const target = event.currentTarget as HTMLElement | null;
+      if (target) {
+        this.cardRect = target.getBoundingClientRect();
+      }
+    }
   }
 
   public onPointerLeave(): void {
     this.isHovered.set(false);
+    this.cardRect = null;
+    if (this.animFrameId) {
+      cancelAnimationFrame(this.animFrameId);
+      this.animFrameId = null;
+    }
     this.specularX.set(50);
     this.specularY.set(50);
   }
 
   public onPointerMove(event: PointerEvent): void {
-    if (!this.isHovered()) return;
-    const target = event.currentTarget as HTMLElement | null;
-    if (!target) return;
+    if (!this.isHovered() || this.isCoarsePointer) return;
+    if (!this.cardRect && event.currentTarget) {
+      const target = event.currentTarget as HTMLElement | null;
+      if (target?.getBoundingClientRect) {
+        this.cardRect = target.getBoundingClientRect();
+      }
+    }
+    if (!this.cardRect) return;
 
-    const rect = target.getBoundingClientRect();
+    const rect = this.cardRect;
     if (rect.width > 0 && rect.height > 0) {
       const x = Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100));
       const y = Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100));
@@ -398,35 +454,23 @@ export class AlbumCard3dComponent {
     }
   }
 
-  public onTouchStart(event?: TouchEvent): void {
+  public onTouchStart(): void {
     this.isTouchActive.set(true);
-    if (event?.touches?.[0]) {
-      this.updateTouchCoords(event.touches[0], event.currentTarget as HTMLElement | null);
-    }
-  }
-
-  public onTouchMove(event: TouchEvent): void {
-    if (!this.isTouchActive()) return;
-    if (event?.touches?.[0]) {
-      this.updateTouchCoords(event.touches[0], event.currentTarget as HTMLElement | null);
-    }
-  }
-
-  private updateTouchCoords(touch: Touch, target: HTMLElement | null): void {
-    if (!target) return;
-    const rect = target.getBoundingClientRect();
-    if (rect.width > 0 && rect.height > 0) {
-      const x = Math.max(0, Math.min(100, ((touch.clientX - rect.left) / rect.width) * 100));
-      const y = Math.max(0, Math.min(100, ((touch.clientY - rect.top) / rect.height) * 100));
-      this.specularX.set(Math.round(x));
-      this.specularY.set(Math.round(y));
-    }
   }
 
   public onTouchEnd(): void {
     this.isTouchActive.set(false);
     this.specularX.set(50);
     this.specularY.set(50);
+  }
+
+  private scheduleShineUpdate(): void {
+    if (this.animFrameId) return;
+    this.animFrameId = requestAnimationFrame(() => {
+      this.specularX.set(Math.round(this.pendingSpecularX));
+      this.specularY.set(Math.round(this.pendingSpecularY));
+      this.animFrameId = null;
+    });
   }
 
   public handleAction(event: Event): void {

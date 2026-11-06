@@ -21,6 +21,49 @@ import { AlbumService } from '../../core/services/album.service';
   host: {
     '(window:keydown)': 'handleKeydown($event)'
   },
+  styles: [`
+    /* Capa de Oscurecimiento Real y Efecto Linterna / Spotlight acelerado por GPU */
+    .spotlight-darkness-layer {
+      background: rgba(9, 9, 11, 0.86);
+      transition: background 150ms ease-out;
+      transform: translateZ(0);
+      will-change: background;
+    }
+
+    .spotlight-darkness-layer.is-selected {
+      background: rgba(9, 9, 11, 0.25);
+    }
+
+    .spotlight-darkness-layer.is-spot-active {
+      background: radial-gradient(
+        circle 165px at var(--spot-x, 50%) var(--spot-y, 50%),
+        transparent 0%,
+        rgba(9, 9, 11, 0.20) 45%,
+        rgba(9, 9, 11, 0.90) 80%,
+        rgba(9, 9, 11, 0.95) 100%
+      );
+    }
+
+    .spotlight-darkness-layer.is-spot-active.is-selected {
+      background: radial-gradient(
+        circle 165px at var(--spot-x, 50%) var(--spot-y, 50%),
+        transparent 0%,
+        rgba(9, 9, 11, 0.10) 45%,
+        rgba(9, 9, 11, 0.20) 80%,
+        rgba(9, 9, 11, 0.25) 100%
+      );
+    }
+
+    .spotlight-rim {
+      width: 330px;
+      height: 330px;
+      left: calc(var(--spot-x, 50%) - 165px);
+      top: calc(var(--spot-y, 50%) - 165px);
+      border: 1.5px solid rgba(254, 240, 138, 0.45);
+      box-shadow: 0 0 25px 6px rgba(253, 184, 19, 0.25);
+      transform: translateZ(0);
+    }
+  `],
   template: `
     @if (isOpen() && currentPhoto()) {
       <div
@@ -88,21 +131,46 @@ import { AlbumService } from '../../core/services/album.service';
                   <span>+ Seleccionar</span>
                 }
               </button>
-            } @else if (freeDownloadUrl()) {
-              <a
-                [href]="freeDownloadUrl()"
-                [download]="'LA_TERCERA_' + (currentPhoto()?.id || 'foto') + '.jpg'"
-                class="min-h-[40px] px-4 py-2 rounded-full bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black text-xs flex items-center gap-1.5 transition-all shadow-lg active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-400"
-                [attr.aria-label]="'Descargar foto HD gratis'"
-                title="Descargar foto HD gratis"
+            } @else {
+              <!-- En álbum gratuito: Botón para sumar a la selección de lote gratis + Descarga directa HD -->
+              <button
+                type="button"
+                (click)="toggleSelect.emit(currentPhoto()!)"
+                [class]="isSelected()
+                  ? 'min-h-[40px] px-3.5 py-2 rounded-full bg-emerald-500 text-zinc-950 font-black text-xs flex items-center gap-1.5 transition-all shadow-lg active:scale-95'
+                  : 'min-h-[40px] px-3.5 py-2 rounded-full bg-white/20 hover:bg-white/30 text-white font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 border border-white/20'"
+                [attr.aria-label]="isSelected() ? 'Quitar de lote gratuito' : 'Elegir para lote gratuito'"
               >
-                <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="7 10 12 15 17 10"/>
-                  <line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
-                <span>Descargar HD</span>
-              </a>
+                @if (isSelected()) {
+                  <svg class="w-3.5 h-3.5 text-zinc-950 stroke-[3] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                  <span>✓ En lote gratis</span>
+                } @else {
+                  <svg class="w-3.5 h-3.5 text-white stroke-[2.5] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="12" y1="5" x2="12" y2="19"/>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                  </svg>
+                  <span>+ Elegir gratis</span>
+                }
+              </button>
+
+              @if (freeDownloadUrl()) {
+                <a
+                  [href]="freeDownloadUrl()"
+                  [download]="'LA_TERCERA_' + (currentPhoto()?.id || 'foto') + '.jpg'"
+                  class="min-h-[40px] px-3.5 py-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-md active:scale-95"
+                  [attr.aria-label]="'Descargar foto HD gratis'"
+                  title="Descargar foto HD gratis directamente"
+                >
+                  <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                  <span class="hidden sm:inline">Descargar HD</span>
+                </a>
+              }
             }
 
             <!-- Botón Cerrar (Accesible y con icono SVG) -->
@@ -137,14 +205,22 @@ import { AlbumService } from '../../core/services/album.service';
             </svg>
           </button>
 
-          <!-- Contenedor Transformable de la Imagen con Desplazamiento Táctil en Vivo y Doble Clic Zoom -->
+          <!-- Contenedor Transformable de la Imagen con Desplazamiento Táctil en Vivo, Doble Clic Zoom y Spotlight GPU -->
           <div
-            class="relative max-h-full max-w-full flex items-center justify-center transition-transform duration-200 ease-out select-none cursor-pointer"
+            (pointerenter)="onPointerEnter($event)"
+            (pointerleave)="onPointerLeave()"
+            (pointermove)="onPointerMove($event)"
+            class="relative max-h-full max-w-full flex items-center justify-center transition-transform duration-200 ease-out select-none cursor-pointer overflow-hidden rounded-2xl"
             [class.cursor-zoom-in]="zoomScale() === 1"
             [class.cursor-zoom-out]="zoomScale() > 1"
             [style.transform]="touchTransform()"
+            [style.--spot-x]="spotX() + 'px'"
+            [style.--spot-y]="spotY() + 'px'"
+            [style.--spot-size]="'190px'"
+            [style.--spot-opacity]="isSpotActive() ? '1' : '0'"
             (dblclick)="toggleZoom($event)"
           >
+            <!-- Imagen base -->
             <img
               [src]="currentPhoto()?.previewUrl"
               [alt]="currentPhoto()?.title"
@@ -152,6 +228,20 @@ import { AlbumService } from '../../core/services/album.service';
               (contextmenu)="$event.preventDefault()"
               draggable="false"
             />
+
+            <!-- Capa de Oscurecimiento Real y Spotlight / Haz de Luz -->
+            @if (isSpotlightEffectActive()) {
+              <div
+                class="spotlight-darkness-layer absolute inset-0 pointer-events-none rounded-2xl overflow-hidden"
+                [class.is-spot-active]="isSpotActive()"
+                [class.is-selected]="isSelected()"
+                aria-hidden="true"
+              >
+                @if (isSpotActive()) {
+                  <div class="spotlight-rim absolute rounded-full pointer-events-none"></div>
+                }
+              </div>
+            }
           </div>
 
           <!-- Botón Foto Siguiente (Desktop / Tablet) -->
@@ -186,7 +276,13 @@ export class LightboxComponent {
   public readonly totalCount = input<number>(0);
   public readonly isSelected = input<boolean>(false);
   public readonly isFreeDownload = input<boolean>(false);
+  public readonly isPurchased = input<boolean>(false);
+  public readonly isMobileSpotlightActive = input<boolean>(false);
   public readonly albumId = input<string>();
+
+  public readonly isSpotlightEffectActive = computed<boolean>(() => {
+    return !this.isFreeDownload() && !this.isPurchased();
+  });
 
   public readonly freeDownloadUrl = computed<string>(() => {
     const albId = this.albumId();
@@ -200,6 +296,16 @@ export class LightboxComponent {
   public readonly next = output<void>();
   public readonly prev = output<void>();
   public readonly toggleSelect = output<Photo>();
+
+  // Estado del Haz de Luz / Spotlight GPU
+  public readonly isSpotActive = signal<boolean>(false);
+  public readonly spotX = signal<number>(100);
+  public readonly spotY = signal<number>(100);
+
+  private containerRect: DOMRect | null = null;
+  private animFrameId: number | null = null;
+  private pendingX = 100;
+  private pendingY = 100;
 
   // Estado de Gestos Táctiles y Zoom Cinemático
   public readonly zoomScale = signal<number>(1);
@@ -321,6 +427,45 @@ export class LightboxComponent {
     if (dy > 70) {
       this.close.emit();
     }
+  }
+
+  // --- Handlers de Efecto Linterna en Lightbox (0 getBoundingClientRect en move) ---
+
+  public onPointerEnter(event: PointerEvent): void {
+    if (!this.isSpotlightEffectActive()) return;
+    const target = event.currentTarget as HTMLElement | null;
+    if (target) {
+      this.containerRect = target.getBoundingClientRect();
+      this.isSpotActive.set(true);
+      this.pendingX = event.clientX - this.containerRect.left;
+      this.pendingY = event.clientY - this.containerRect.top;
+      this.scheduleSpotlightUpdate();
+    }
+  }
+
+  public onPointerMove(event: PointerEvent): void {
+    if (!this.isSpotlightEffectActive() || !this.containerRect) return;
+    this.pendingX = event.clientX - this.containerRect.left;
+    this.pendingY = event.clientY - this.containerRect.top;
+    this.scheduleSpotlightUpdate();
+  }
+
+  public onPointerLeave(): void {
+    this.isSpotActive.set(false);
+    this.containerRect = null;
+    if (this.animFrameId) {
+      cancelAnimationFrame(this.animFrameId);
+      this.animFrameId = null;
+    }
+  }
+
+  private scheduleSpotlightUpdate(): void {
+    if (this.animFrameId) return;
+    this.animFrameId = requestAnimationFrame(() => {
+      this.spotX.set(Math.round(this.pendingX));
+      this.spotY.set(Math.round(this.pendingY));
+      this.animFrameId = null;
+    });
   }
 
   public handleKeydown(event: KeyboardEvent): void {

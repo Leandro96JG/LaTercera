@@ -47,6 +47,8 @@ export interface ShowcaseSlide {
                 src="assets/branding/fotografa.jpg"
                 alt="Fotógrafa Jenifer 'Yuyo' Espeche"
                 class="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-500 ease-out"
+                (load)="onHeroImageLoaded()"
+                (error)="onHeroImageLoaded()"
               />
             </div>
 
@@ -160,6 +162,8 @@ export interface ShowcaseSlide {
               [class.scale-100]="currentSlideIndex() !== idx"
               [attr.loading]="idx === 0 ? 'eager' : 'lazy'"
               [attr.fetchpriority]="idx === 0 ? 'high' : 'auto'"
+              (load)="idx === 0 ? onHeroImageLoaded() : null"
+              (error)="idx === 0 ? onHeroImageLoaded() : null"
             />
           </div>
         }
@@ -443,6 +447,11 @@ export class HeroComponent {
   // Entrada opcional de álbumes reales y salida de selección
   readonly albums = input<readonly Album[]>([]);
   readonly selectAlbum = output<Album>();
+  readonly heroLoaded = output<void>();
+
+  public onHeroImageLoaded(): void {
+    this.heroLoaded.emit();
+  }
 
   // Slides de muestra predeterminados (Fallback estético si no hay coberturas cargadas)
   readonly defaultSlides: readonly ShowcaseSlide[] = [

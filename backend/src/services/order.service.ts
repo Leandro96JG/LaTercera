@@ -511,14 +511,26 @@ export class OrderService {
       return { success: false, alreadyProcessed: false, error: 'Orden no encontrada' };
     }
 
-    // 4. Si la orden ya está pagada (por una notificación previa concurrente)
+    // 4. Si Mercado Pago notifica cancelación, reembolso o contracargo, revocar orden y token
+    const normalizedStatus = (input.status || '').toLowerCase();
+    const isRevocation = ['refunded', 'charged_back', 'cancelled'].includes(normalizedStatus);
+    if (isRevocation) {
+      order.status = 'CANCELLED';
+      delete order.downloadToken;
+      await this.repository.updateOrderStatus(order.id, 'CANCELLED');
+      this.processedEventIds.add(input.eventId);
+      await this.repository.markEventProcessed(input.eventId, input.orderId).catch(() => {});
+      return { success: true, alreadyProcessed: false };
+    }
+
+    // 5. Si la orden ya está pagada (por una notificación previa concurrente)
     if (order.status === 'PAID') {
       this.processedEventIds.add(input.eventId);
       await this.repository.markEventProcessed(input.eventId, input.orderId).catch(() => {});
       return { success: true, alreadyProcessed: true };
     }
 
-    // 5. Verificar y completar el pago asíncronamente
+    // 6. Verificar y completar el pago asíncronamente
     const result = await this.verifyAndCompletePaymentAsync(input.orderId, input);
 
     if (result.success || result.fraudAlert) {
@@ -548,6 +560,18 @@ export class OrderService {
     const order = this.orders.get(input.orderId);
     if (!order) {
       return { success: false, alreadyProcessed: false, error: 'Orden no encontrada' };
+    }
+
+    // Si Mercado Pago notifica cancelación, reembolso o contracargo, revocar orden y token
+    const normalizedStatus = (input.status || '').toLowerCase();
+    const isRevocation = ['refunded', 'charged_back', 'cancelled'].includes(normalizedStatus);
+    if (isRevocation) {
+      order.status = 'CANCELLED';
+      delete order.downloadToken;
+      this.repository.updateOrderStatus(order.id, 'CANCELLED');
+      this.processedEventIds.add(input.eventId);
+      this.repository.markEventProcessed(input.eventId, input.orderId).catch(() => {});
+      return { success: true, alreadyProcessed: false };
     }
 
     // Si la orden ya está pagada (por una notificación previa concurrente)

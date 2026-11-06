@@ -10,9 +10,30 @@ export class AlbumAccessStore {
   // Conjunto reactivo de IDs de álbumes desbloqueados en la sesión actual
   private readonly _unlockedIds = signal<Set<string>>(this.loadInitialFromSession());
   private readonly _accessTokens = signal<Map<string, string>>(this.loadTokensInitialFromSession());
+  private readonly _purchasedPhotoIds = signal<Set<string>>(new Set());
 
   // Selectores públicos computados y de lectura
   public readonly unlockedIds = computed(() => this._unlockedIds());
+  public readonly purchasedPhotoIds = computed(() => this._purchasedPhotoIds());
+
+  /**
+   * Comprueba si una foto o su álbum completo ya han sido adquiridos
+   */
+  public isPhotoPurchased(photoId: string, albumId?: string): boolean {
+    if (albumId && this.isUnlocked(albumId)) return true;
+    return this._purchasedPhotoIds().has(photoId);
+  }
+
+  /**
+   * Registra fotos como compradas en la sesión activa
+   */
+  public markPhotosPurchased(photoIds: string[]): void {
+    const updated = new Set(this._purchasedPhotoIds());
+    for (const id of photoIds) {
+      if (id) updated.add(id);
+    }
+    this._purchasedPhotoIds.set(updated);
+  }
 
   /**
    * Comprueba si un álbum ya ha sido desbloqueado por el cliente

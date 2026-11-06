@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import express from 'express';
 import { DownloadTokenService } from '../src/services/token.service';
 import { OrderService } from '../src/services/order.service';
@@ -260,6 +260,60 @@ describe('Downloads API Routes (TDD)', () => {
       expect(headers['Content-Disposition']).toContain('attachment; filename="LA_TERCERA_alb-gratis_foto-libre.jpg"');
       expect(Buffer.isBuffer(sentBuffer)).toBe(true);
       expect(sentBuffer.equals(realBuffer)).toBe(true);
+    });
+  });
+
+  describe('POST /api/downloads/free/:albumId/selective-zip (Descarga Selectiva Gratuita)', () => {
+    it('debe responder 400 si no se envían photoIds', async () => {
+      const albumRepo = new MemoryAlbumRepository();
+      const router = createDownloadsRouter(deliveryService, orderService, storageService, albumRepo);
+      const handler = (router as any).stack.find((s: any) => s.route?.path === '/free/:albumId/selective-zip')?.route?.stack[0]?.handle;
+
+      let statusCode = 200;
+      let jsonResult: any = null;
+      const req: any = { params: { albumId: 'alb-gratis' }, body: { photoIds: [] }, headers: {} };
+      const res: any = {
+        status: (code: number) => {
+          statusCode = code;
+          return res;
+        },
+        json: (data: any) => {
+          jsonResult = data;
+        }
+      };
+
+      await handler(req, res);
+      expect(statusCode).toBe(400);
+      expect(jsonResult.error).toContain('Debes seleccionar al menos una foto');
+    });
+
+    it('debe invocar streamFreeAlbumZip con los photoIds seleccionados en un álbum libre', async () => {
+      const albumRepo = new MemoryAlbumRepository();
+      await albumRepo.createAlbum({
+        id: 'alb-gratis-2',
+        title: 'Álbum Torneo Libre',
+        category: 'futbol',
+        unitPrice: 0,
+        fullAlbumPrice: 0,
+        coverUrl: 'https://example.com/cover.jpg',
+        photosCount: 2,
+        isFreeDownload: true
+      });
+
+      const spyStream = vi.spyOn(deliveryService, 'streamFreeAlbumZip').mockImplementation(async () => {});
+      const router = createDownloadsRouter(deliveryService, orderService, storageService, albumRepo);
+      const handler = (router as any).stack.find((s: any) => s.route?.path === '/free/:albumId/selective-zip')?.route?.stack[0]?.handle;
+
+      const req: any = {
+        params: { albumId: 'alb-gratis-2' },
+        body: { photoIds: ['p1', 'p2'] },
+        headers: {}
+      };
+      const res: any = { status: () => res, json: () => {} };
+
+      await handler(req, res);
+      expect(spyStream).toHaveBeenCalledWith('alb-gratis-2', 'Álbum Torneo Libre', res, ['p1', 'p2']);
+      spyStream.mockRestore();
     });
   });
 });
