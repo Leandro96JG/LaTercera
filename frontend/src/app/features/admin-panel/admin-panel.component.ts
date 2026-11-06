@@ -525,6 +525,7 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
 
   public readonly driveLogoFile = signal<File | null>(null);
   public readonly driveLogoPreview = signal<string | null>(null);
+  public readonly driveLogoBase64 = signal<string | null>(null);
 
   // Formulario de Importación de Google Drive
   public readonly driveForm = this.fb.nonNullable.group({
@@ -1812,6 +1813,23 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
       case 'drive':
         this.driveLogoFile.set(file);
         this.driveLogoPreview.set(previewUrl);
+
+        // 1. Leer como Base64 para envío inmediato sin depender de URL ni almacenamiento
+        const reader = new FileReader();
+        reader.onload = () => {
+          this.driveLogoBase64.set(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+
+        // 2. Subir también a Supabase Storage
+        this.adminService.uploadWatermarkLogo(file).subscribe({
+          next: (res) => {
+            if (res.success && res.logoUrl) {
+              this.driveLogoPreview.set(res.logoUrl);
+            }
+          },
+          error: () => {}
+        });
         break;
     }
 
@@ -1837,6 +1855,7 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
       case 'drive':
         this.driveLogoFile.set(null);
         this.driveLogoPreview.set(null);
+        this.driveLogoBase64.set(null);
         break;
     }
   }
@@ -2432,12 +2451,15 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     this.driveError.set(null);
 
     const formVal = this.driveForm.getRawValue();
+    const logoUrlVal = this.driveLogoPreview();
+    const safeLogoUrl = logoUrlVal && !logoUrlVal.startsWith('blob:') ? logoUrlVal : undefined;
 
     this.adminService.importFromDrive({
       albumId: formVal.albumId,
       driveUrl: formVal.driveUrl,
       watermarkText: formVal.watermarkText,
-      watermarkLogoUrl: this.driveLogoPreview() || undefined,
+      watermarkLogoUrl: safeLogoUrl,
+      watermarkLogoBase64: this.driveLogoBase64() || undefined,
       concurrencyLimit: formVal.concurrencyLimit,
       markHdFirstN: formVal.markHdFirstN
     }).subscribe({

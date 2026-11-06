@@ -193,4 +193,53 @@ describe('Google Drive Importer Service (TDD con Mocks HTTP)', () => {
     expect(result.summary.peakConcurrency).toBeLessThanOrEqual(3);
     expect(maxSimultaneous).toBeLessThanOrEqual(3);
   });
+
+  it('debe estampar logo PNG transparente en fotos importadas desde Google Drive (con logoBuffer)', async () => {
+    const testBuffer = await createTestImageBuffer(1200, 800, 'jpeg');
+    const mockLogo = await sharp({
+      create: {
+        width: 200,
+        height: 200,
+        channels: 4,
+        background: { r: 253, g: 184, b: 19, alpha: 0.9 }
+      }
+    }).png().toBuffer();
+
+    const mockFiles: DriveFileMetadata[] = [
+      { id: 'f_drive_hd', name: 'foto_01_hd.jpg', mimeType: 'image/jpeg', size: testBuffer.length },
+      { id: 'f_drive_regular', name: 'foto_02.jpg', mimeType: 'image/jpeg', size: testBuffer.length }
+    ];
+
+    const mockHttpClient: IDriveHttpClient = {
+      listFiles: vi.fn().mockResolvedValue(mockFiles),
+      downloadFile: vi.fn().mockResolvedValue(testBuffer)
+    };
+
+    const memoryStorage = new MemoryStorageService();
+    const importer = new GoogleDriveImporterService(mockHttpClient, memoryStorage);
+
+    const result = await importer.importFromDrive({
+      albumId: 'album_drive_logo',
+      driveUrl: 'https://drive.google.com/drive/folders/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms',
+      watermarkLogoBuffer: mockLogo,
+      watermarkText: 'LA TERCERA • DRIVE TEST',
+      markHdFirstN: 1
+    });
+
+    expect(result.summary.successful).toBe(2);
+    expect(result.photos.length).toBe(2);
+    expect(result.photos[0].isHD).toBe(true);
+    expect(result.photos[1].isHD).toBe(false);
+
+    // Verificar que las previews se hayan guardado en storage y sean webp válidos
+    const hdPreview = await memoryStorage.getPreviewBuffer('album_drive_logo', result.photos[0].id);
+    expect(hdPreview).toBeDefined();
+    const metaHd = await sharp(hdPreview!).metadata();
+    expect(metaHd.format).toBe('webp');
+
+    const regPreview = await memoryStorage.getPreviewBuffer('album_drive_logo', result.photos[1].id);
+    expect(regPreview).toBeDefined();
+    const metaReg = await sharp(regPreview!).metadata();
+    expect(metaReg.format).toBe('webp');
+  });
 });

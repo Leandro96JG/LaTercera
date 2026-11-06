@@ -486,6 +486,10 @@ export function createAdminAlbumsRouter(
       }
     }
     let targetUrl = options.logoUrl;
+    // Ignorar URLs locales de navegador tipo blob: que no pueden resolverse en Node.js
+    if (targetUrl && (targetUrl.startsWith('blob:') || targetUrl.trim() === '')) {
+      targetUrl = undefined;
+    }
     if (!targetUrl && options.albumId) {
       try {
         const album = await albumRepository.getAlbumById(options.albumId);
