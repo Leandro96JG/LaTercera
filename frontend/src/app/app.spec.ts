@@ -673,5 +673,121 @@ describe('App Root Component - LA TERCERA', () => {
     expect(app.isSpotlightTutorialOpen()).toBe(true);
     expect(app.isSpotlightTutorialManual()).toBe(false);
   });
+
+  it('debe registrar un estado en el historial al abrir un álbum y volver al portfolio al presionar atrás (popstate)', () => {
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+    const albumService = TestBed.inject(AlbumService);
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+
+    const testAlbum: Album = {
+      id: 'album-nav-1',
+      customSlug: 'superclasico-2026',
+      category: 'futbol',
+      title: 'Superclásico 2026',
+      subtitle: 'Estadio Centro',
+      date: '2026-10-18',
+      badge: '⚽ Fútbol',
+      photosCount: 15,
+      unitPrice: 1200,
+      fullAlbumPrice: 9500,
+      coverUrl: 'https://example.com/cover.jpg',
+      isPrivate: false
+    };
+
+    vi.spyOn(albumService, 'getAlbumPhotos').mockReturnValue(of([]));
+    app.albums.set([testAlbum]);
+    app.ngOnInit();
+
+    app.openAlbum(testAlbum);
+    expect(app.currentView()).toBe('album');
+    expect(app.currentAlbum()?.id).toBe('album-nav-1');
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      { view: 'album', albumId: 'album-nav-1' },
+      document.title,
+      expect.stringContaining('?album=superclasico-2026')
+    );
+
+    // Simular apertura de modal dentro del álbum
+    app.isLightboxOpen.set(true);
+
+    // Simular botón "Atrás" del navegador / celular regresando a '/'
+    window.history.replaceState(null, document.title, '/');
+    window.dispatchEvent(new PopStateEvent('popstate', { state: null }));
+
+    expect(app.currentView()).toBe('portfolio');
+    expect(app.currentAlbum()).toBeNull();
+    expect(app.isLightboxOpen()).toBe(false);
+  });
+
+  it('debe reabrir el álbum si el usuario navega hacia adelante (popstate con estado de álbum) sin duplicar historial', () => {
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+    const albumService = TestBed.inject(AlbumService);
+
+    const testAlbum: Album = {
+      id: 'album-nav-2',
+      category: 'hockey',
+      title: 'Final Hockey',
+      subtitle: 'Polideportivo',
+      date: '2026-10-20',
+      badge: '🏑 Hockey',
+      photosCount: 10,
+      unitPrice: 1200,
+      fullAlbumPrice: 9500,
+      coverUrl: '',
+      isPrivate: false
+    };
+
+    vi.spyOn(albumService, 'getAlbumPhotos').mockReturnValue(of([]));
+    app.albums.set([testAlbum]);
+    app.ngOnInit();
+
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+    pushStateSpy.mockClear();
+
+    window.dispatchEvent(
+      new PopStateEvent('popstate', { state: { view: 'album', albumId: 'album-nav-2' } })
+    );
+
+    expect(app.currentView()).toBe('album');
+    expect(app.currentAlbum()?.id).toBe('album-nav-2');
+    expect(pushStateSpy).not.toHaveBeenCalled();
+  });
+
+  it('no debe duplicar historial cuando se abre un álbum desde enlace directo (?album=...)', () => {
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+    const albumService = TestBed.inject(AlbumService);
+
+    const testAlbum: Album = {
+      id: 'album-direct-1',
+      customSlug: 'final-directa',
+      category: 'futbol',
+      title: 'Final Directa',
+      subtitle: 'Cancha 1',
+      date: '2026-10-22',
+      badge: '⚽ Fútbol',
+      photosCount: 10,
+      unitPrice: 1200,
+      fullAlbumPrice: 9500,
+      coverUrl: '',
+      isPrivate: false
+    };
+
+    vi.spyOn(albumService, 'getAlbumPhotos').mockReturnValue(of([]));
+    window.history.replaceState({}, document.title, '/?album=final-directa');
+    app.albums.set([testAlbum]);
+
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+    app.checkDirectAlbumLink();
+
+    expect(app.currentView()).toBe('album');
+    expect(app.currentAlbum()?.id).toBe('album-direct-1');
+    expect(pushStateSpy).not.toHaveBeenCalled();
+
+    // Limpiar URL para siguientes tests
+    window.history.replaceState({}, document.title, '/');
+  });
 });
 

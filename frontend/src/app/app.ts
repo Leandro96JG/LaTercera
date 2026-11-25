@@ -542,7 +542,7 @@ export class App implements OnInit, OnDestroy {
 
     const matched = this.albums().find(a => a.id === albumParam || a.customSlug === albumParam);
     if (matched) {
-      this.openAlbum(matched);
+      this.openAlbum(matched, false);
     }
   }
 
@@ -611,6 +611,8 @@ export class App implements OnInit, OnDestroy {
           });
         }
       });
+
+      window.addEventListener('popstate', this.onPopState);
     }
   }
 
@@ -619,6 +621,56 @@ export class App implements OnInit, OnDestroy {
       clearTimeout(this.splashTimer);
       this.splashTimer = null;
     }
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('popstate', this.onPopState);
+    }
+  }
+
+  private readonly onPopState = (event: PopStateEvent): void => {
+    if (typeof window === 'undefined') return;
+    const state = event.state as { view?: string; albumId?: string } | null;
+    const params = new URLSearchParams(window.location.search);
+    const albumParam = params.get('album')?.trim();
+
+    if (state?.view === 'album' || albumParam) {
+      const targetKey = state?.albumId || albumParam;
+      const matched = this.albums().find(a => a.id === targetKey || a.customSlug === targetKey);
+      if (matched) {
+        if (this.currentView() !== 'album' || this.currentAlbum()?.id !== matched.id) {
+          this.openAlbum(matched, false);
+        }
+        return;
+      }
+    }
+
+    this.closeAllModals();
+    if (this.currentView() !== 'portfolio') {
+      this.resetToPortfolio(false);
+    }
+  };
+
+  private closeAllModals(): void {
+    this.isLightboxOpen.set(false);
+    this.isCheckoutOpen.set(false);
+    this.isPinModalOpen.set(false);
+    this.selectedPrivateAlbum.set(null);
+    this.isOrderRecoveryOpen.set(false);
+    this.isSpotlightTutorialOpen.set(false);
+  }
+
+  private resetToPortfolio(reloadAlbums: boolean): void {
+    this.transitionView(() => {
+      this.currentAlbum.set(null);
+      this.activeAlbumPhotos.set([]);
+      this.isLoadingAlbumPhotos.set(false);
+      this.albumPhotosLoaded.set(false);
+      this.photosCurrentPage.set(1);
+      this.photosFilterMode.set('todas');
+      if (reloadAlbums) {
+        this.loadPublicAlbums();
+      }
+      this.currentView.set('portfolio');
+    });
   }
 
   /**
@@ -691,11 +743,23 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
-  public openAlbum(album: Album): void {
+  public openAlbum(album: Album, pushHistory = true): void {
     // Si el álbum es privado y no está desbloqueado, abrir modal de PIN
     if (album.isPrivate && !this.albumAccessStore.isUnlocked(album.id)) {
       this.openPinModal(album);
       return;
+    }
+
+    if (pushHistory && typeof window !== 'undefined' && typeof window.history !== 'undefined') {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('album', album.customSlug || album.id);
+        window.history.pushState(
+          { view: 'album', albumId: album.id },
+          document.title,
+          `${url.pathname}${url.search}`
+        );
+      } catch {}
     }
 
     this.isLoadingAlbumPhotos.set(true);
@@ -750,15 +814,7 @@ export class App implements OnInit, OnDestroy {
         window.history.replaceState({}, document.title, '/');
       } catch {}
     }
-    this.transitionView(() => {
-      this.activeAlbumPhotos.set([]);
-      this.isLoadingAlbumPhotos.set(false);
-      this.albumPhotosLoaded.set(false);
-      this.photosCurrentPage.set(1);
-      this.photosFilterMode.set('todas');
-      this.loadPublicAlbums();
-      this.currentView.set('portfolio');
-    });
+    this.resetToPortfolio(true);
   }
 
   public setCategory(cat: string): void {
