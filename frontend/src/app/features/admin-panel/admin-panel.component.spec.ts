@@ -14,6 +14,7 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
   let fixture: ComponentFixture<AdminPanelComponent>;
   let mockAdminService: {
     getStats: ReturnType<typeof vi.fn>;
+    listDriveFiles: ReturnType<typeof vi.fn>;
     importFromDrive: ReturnType<typeof vi.fn>;
     bulkUpload: ReturnType<typeof vi.fn>;
     registerPhotographer: ReturnType<typeof vi.fn>;
@@ -76,6 +77,7 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
       })),
       createAlbum: vi.fn(),
       updateAlbum: vi.fn(),
+      listDriveFiles: vi.fn(),
       importFromDrive: vi.fn(),
       bulkUpload: vi.fn(),
       registerPhotographer: vi.fn(),
@@ -257,24 +259,41 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
     expect(component.driveForm.valid).toBe(true);
   });
 
-  it('debe ejecutar submitDriveImport y actualizar driveResult al tener éxito', () => {
-    const mockResponse = {
+  it('debe ejecutar submitDriveImport por lotes y actualizar driveResult al tener éxito', () => {
+    const mockFiles = Array.from({ length: 7 }, (_, i) => ({
+      id: `drive_${i + 1}`,
+      name: `foto_${i + 1}.jpg`,
+      mimeType: 'image/jpeg',
+      size: 1024
+    }));
+
+    mockAdminService.listDriveFiles.mockReturnValue(of({
       success: true,
       albumId: 'album-1',
       folderId: '1ABC_XYZ123',
+      totalFound: 9,
+      eligibleFiles: mockFiles,
+      skippedFiles: [
+        { id: 's1', name: 'doc1.pdf', mimeType: 'application/pdf', reason: 'no soportado' },
+        { id: 's2', name: 'doc2.pdf', mimeType: 'application/pdf', reason: 'no soportado' }
+      ]
+    }));
+
+    mockAdminService.importFromDrive.mockImplementation((req) => of({
+      success: true,
+      albumId: req.albumId,
+      folderId: '1ABC_XYZ123',
       summary: {
-        totalFound: 10,
-        totalEligible: 8,
-        totalSkipped: 2,
-        successful: 8,
+        totalFound: req.files.length,
+        totalEligible: req.files.length,
+        totalSkipped: 0,
+        successful: req.files.length,
         failed: 0,
-        durationMs: 1200
+        durationMs: 400
       },
       photos: [],
       errors: []
-    };
-
-    mockAdminService.importFromDrive.mockReturnValue(of(mockResponse));
+    }));
 
     component.driveForm.patchValue({
       albumId: 'album-1',
@@ -285,12 +304,33 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
     component.submitDriveImport();
 
     expect(component.isDriveImporting()).toBe(false);
-    expect(component.driveResult()).toEqual(mockResponse);
-    expect(mockAdminService.importFromDrive).toHaveBeenCalled();
+    expect(mockAdminService.listDriveFiles).toHaveBeenCalledTimes(1);
+    // 7 archivos divididos en lotes de DRIVE_IMPORT_BATCH_SIZE (3): 3 + 3 + 1 = 3 llamadas
+    expect(mockAdminService.importFromDrive).toHaveBeenCalledTimes(3);
+    expect(mockAdminService.importFromDrive).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ startIndex: 0, files: mockFiles.slice(0, 3) })
+    );
+    expect(mockAdminService.importFromDrive).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ startIndex: 3, files: mockFiles.slice(3, 6) })
+    );
+    expect(mockAdminService.importFromDrive).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ startIndex: 6, files: mockFiles.slice(6, 7) })
+    );
+    expect(component.driveResult()?.summary).toEqual({
+      totalFound: 9,
+      totalEligible: 7,
+      totalSkipped: 2,
+      successful: 7,
+      failed: 0,
+      durationMs: 1200
+    });
   });
 
   it('debe capturar errores de importación de Drive de forma reactiva', () => {
-    mockAdminService.importFromDrive.mockReturnValue(
+    mockAdminService.listDriveFiles.mockReturnValue(
       throwError(() => ({ error: { error: 'Carpeta de Drive no encontrada o privada' } }))
     );
 

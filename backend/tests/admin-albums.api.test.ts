@@ -87,6 +87,29 @@ describe('Admin Albums API Endpoints (/api/admin/albums)', () => {
     });
   });
 
+  describe('POST /api/admin/albums/list-drive', () => {
+    it('debe rechazar /list-drive con 401 si no se envía Authorization', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/albums/list-drive`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ albumId: 'alb_1', driveUrl: 'https://drive.google.com/drive/folders/123' })
+      });
+      expect(res.status).toBe(401);
+    });
+
+    it('debe rechazar /list-drive con 400 si falta albumId o driveUrl', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/albums/list-drive`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({ albumId: 'alb_1' })
+      });
+      expect(res.status).toBe(400);
+    });
+  });
+
   describe('POST /api/admin/albums/bulk-upload', () => {
     it('debe rechazar con status 400 si no se envían fotos multipart', async () => {
       const formData = new FormData();

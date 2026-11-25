@@ -12,6 +12,8 @@ import { buildAlbumPhotoTitle } from '../services/mime-validator.service';
 import {
   AdminDriveImportRequest,
   AdminDriveImportResponse,
+  AdminDriveListRequest,
+  AdminDriveListResponse,
   AdminBulkUploadResponse,
   CreateAlbumRequest,
   CreateAlbumResponse,
@@ -532,14 +534,51 @@ export function createAdminAlbumsRouter(
   }
 
   /**
+   * POST /api/admin/albums/list-drive
+   * Lista archivos elegibles de una carpeta de Google Drive sin descargar imágenes (para importación por lotes)
+   */
+  router.post('/list-drive', requireAdminAuth, async (req: Request, res: Response) => {
+    try {
+      const { albumId, driveUrl, apiKey } = req.body as AdminDriveListRequest;
+
+      if (!albumId || !driveUrl) {
+        return res.status(400).json({
+          success: false,
+          error: 'Campos requeridos faltantes: albumId y driveUrl'
+        });
+      }
+
+      const listed = await driveImporterService.listEligibleFiles(driveUrl, apiKey);
+      const response: AdminDriveListResponse = {
+        success: true,
+        albumId,
+        folderId: listed.folderId,
+        totalFound: listed.totalFound,
+        eligibleFiles: listed.eligibleFiles,
+        skippedFiles: listed.skippedFiles
+      };
+
+      return res.status(200).json(response);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error interno al listar carpeta de Google Drive';
+      return res.status(500).json({
+        success: false,
+        error: message
+      });
+    }
+  });
+
+  /**
    * POST /api/admin/albums/import-drive
-   * Importa fotos desde una carpeta compartida de Google Drive
+   * Importa fotos desde una carpeta compartida de Google Drive (soporta lote completo o por chunks con files/startIndex)
    */
   router.post('/import-drive', requireAdminAuth, async (req: Request, res: Response) => {
     try {
       const {
         albumId,
         driveUrl,
+        files,
+        startIndex,
         watermarkText,
         watermarkLogoUrl,
         watermarkLogoBase64,
@@ -561,9 +600,12 @@ export function createAdminAlbumsRouter(
         albumId
       });
 
+      const isBatchMode = Array.isArray(files);
       const result = await driveImporterService.importFromDrive({
         albumId,
         driveUrl,
+        files: isBatchMode ? files : undefined,
+        startIndex: startIndex !== undefined ? Number(startIndex) : 0,
         watermarkText,
         watermarkLogoBuffer,
         concurrencyLimit: concurrencyLimit ? Number(concurrencyLimit) : 3,
@@ -624,7 +666,8 @@ export function createAdminAlbumsRouter(
         skippedFiles: result.skippedFiles
       };
 
-      return res.status(result.photos.length > 0 ? 200 : 422).json(response);
+      const statusCode = isBatchMode ? 200 : (result.photos.length > 0 ? 200 : 422);
+      return res.status(statusCode).json(response);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Error interno al importar carpeta de Google Drive';
       return res.status(500).json({

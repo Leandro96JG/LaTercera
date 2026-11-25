@@ -242,4 +242,61 @@ describe('Google Drive Importer Service (TDD con Mocks HTTP)', () => {
     const metaReg = await sharp(regPreview!).metadata();
     expect(metaReg.format).toBe('webp');
   });
+
+  it('debe listar archivos elegibles y omitidos sin descargar imágenes mediante listEligibleFiles', async () => {
+    const mockFiles: DriveFileMetadata[] = [
+      { id: 'f1', name: 'foto_01.jpg', mimeType: 'image/jpeg', size: 1000 },
+      { id: 'f2', name: 'doc.pdf', mimeType: 'application/pdf', size: 500 },
+      { id: 'f3', name: 'foto_02.png', mimeType: 'image/png', size: 2000 }
+    ];
+
+    const mockHttpClient: IDriveHttpClient = {
+      listFiles: vi.fn().mockResolvedValue(mockFiles),
+      downloadFile: vi.fn()
+    };
+
+    const memoryStorage = new MemoryStorageService();
+    const importer = new GoogleDriveImporterService(mockHttpClient, memoryStorage);
+
+    const listed = await importer.listEligibleFiles(
+      'https://drive.google.com/drive/folders/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms'
+    );
+
+    expect(listed.folderId).toBe('1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms');
+    expect(listed.totalFound).toBe(3);
+    expect(listed.eligibleFiles).toHaveLength(2);
+    expect(listed.skippedFiles).toHaveLength(1);
+    expect(mockHttpClient.downloadFile).not.toHaveBeenCalled();
+  });
+
+  it('debe procesar un lote específico con files y startIndex manteniendo el cálculo correcto de isHD sin volver a listar Drive', async () => {
+    const testBuffer = await createTestImageBuffer(800, 600, 'jpeg');
+
+    const mockHttpClient: IDriveHttpClient = {
+      listFiles: vi.fn(),
+      downloadFile: vi.fn().mockResolvedValue(testBuffer)
+    };
+
+    const memoryStorage = new MemoryStorageService();
+    const importer = new GoogleDriveImporterService(mockHttpClient, memoryStorage);
+
+    const batchFiles: DriveFileMetadata[] = [
+      { id: 'f_batch_1', name: 'foto_03.jpg', mimeType: 'image/jpeg', size: testBuffer.length },
+      { id: 'f_batch_2', name: 'foto_04.jpg', mimeType: 'image/jpeg', size: testBuffer.length }
+    ];
+
+    const result = await importer.importFromDrive({
+      albumId: 'album_batch_test',
+      driveUrl: 'https://drive.google.com/drive/folders/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms',
+      files: batchFiles,
+      startIndex: 2,
+      markHdFirstN: 3
+    });
+
+    expect(mockHttpClient.listFiles).not.toHaveBeenCalled();
+    expect(result.photos).toHaveLength(2);
+    // startIndex = 2, markHdFirstN = 3 => índice global 2 es HD (2 < 3), índice global 3 no es HD (3 >= 3)
+    expect(result.photos[0].isHD).toBe(true);
+    expect(result.photos[1].isHD).toBe(false);
+  });
 });

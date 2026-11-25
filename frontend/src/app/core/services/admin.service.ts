@@ -4,6 +4,8 @@ import { Observable, tap, filter, map } from 'rxjs';
 import { AdminAuthStore } from '../state/admin-auth.store';
 import {
   AdminStats,
+  DriveListRequest,
+  DriveListResponse,
   DriveImportRequest,
   DriveImportResponse,
   BulkUploadResponse,
@@ -56,7 +58,16 @@ export class AdminService {
   }
 
   /**
-   * Importa fotos desde una carpeta compartida de Google Drive
+   * Lista los archivos elegibles de una carpeta de Google Drive sin descargarlos
+   */
+  public listDriveFiles(req: DriveListRequest): Observable<DriveListResponse> {
+    return this.http.post<DriveListResponse>(`${this.baseUrl}/albums/list-drive`, req, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  /**
+   * Importa fotos desde una carpeta compartida de Google Drive (soporta lotes parciales)
    */
   public importFromDrive(req: DriveImportRequest): Observable<DriveImportResponse> {
     return this.http.post<DriveImportResponse>(`${this.baseUrl}/albums/import-drive`, req, {

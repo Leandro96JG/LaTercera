@@ -8,9 +8,32 @@ export interface AdminStats {
   lastUpdated: string;
 }
 
+export interface DriveFileMetadata {
+  id: string;
+  name: string;
+  mimeType: string;
+  size?: string | number;
+}
+
+export interface DriveListRequest {
+  albumId: string;
+  driveUrl: string;
+}
+
+export interface DriveListResponse {
+  success: boolean;
+  albumId: string;
+  folderId: string;
+  totalFound: number;
+  eligibleFiles: DriveFileMetadata[];
+  skippedFiles: Array<{ id: string; name: string; mimeType: string; reason: string }>;
+}
+
 export interface DriveImportRequest {
   albumId: string;
   driveUrl: string;
+  files?: DriveFileMetadata[];
+  startIndex?: number;
   watermarkText?: string;
   watermarkLogoUrl?: string | null;
   watermarkLogoBase64?: string | null;

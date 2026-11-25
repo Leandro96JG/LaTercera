@@ -9,11 +9,37 @@ import type { AlbumDTO } from '../repositories/album.repository';
 // 1. POST /api/admin/albums/import-drive
 // ==========================================
 
+export interface DriveFileMetadataDTO {
+  id: string;
+  name: string;
+  mimeType: string;
+  size?: string | number;
+}
+
+export interface AdminDriveListRequest {
+  albumId: string;
+  driveUrl: string;
+  apiKey?: string;
+}
+
+export interface AdminDriveListResponse {
+  success: boolean;
+  albumId: string;
+  folderId: string;
+  totalFound: number;
+  eligibleFiles: DriveFileMetadataDTO[];
+  skippedFiles: AdminSkippedFileDTO[];
+}
+
 export interface AdminDriveImportRequest {
   /** ID del álbum al cual se asociarán las fotos importadas */
   albumId: string;
   /** URL de Google Drive compartida o Folder ID directo */
   driveUrl: string;
+  /** Subconjunto opcional de archivos de Drive para importación por lotes sin timeout */
+  files?: DriveFileMetadataDTO[];
+  /** Índice inicial global del lote para calcular correctamente markHdFirstN */
+  startIndex?: number;
   /** Texto personalizado para la marca de agua diagonal estampada (por defecto: 'LA TERCERA • MUESTRA') */
   watermarkText?: string;
   /** URL pública o ruta del logo de marca de agua opcional para este lote */

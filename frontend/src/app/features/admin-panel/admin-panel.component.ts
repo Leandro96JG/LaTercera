@@ -1,7 +1,8 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, effect, untracked, OnInit, OnDestroy, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, from, of } from 'rxjs';
+import { catchError, concatMap, toArray } from 'rxjs/operators';
 import QRCode from 'qrcode';
 import { AdminAuthStore } from '../../core/state/admin-auth.store';
 import { CartStore } from '../../core/state/cart.store';
@@ -418,6 +419,8 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
 
   // Estados de carga de operaciones
   public readonly isDriveImporting = signal<boolean>(false);
+  public readonly driveProgressText = signal<string>('');
+  public readonly driveProgressPercent = signal<number>(0);
   public readonly isBulkUploading = signal<boolean>(false);
   public readonly uploadProgress = signal<number>(0);
   public readonly isRegisteringPhotographer = signal<boolean>(false);
@@ -2439,6 +2442,8 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     this.activeTab.set('drive');
   }
 
+  public static readonly DRIVE_IMPORT_BATCH_SIZE = 3;
+
   // --- Métodos de Subida Masiva y Drive ---
   public submitDriveImport(): void {
     if (this.driveForm.invalid) {
@@ -2449,12 +2454,13 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     this.isDriveImporting.set(true);
     this.driveResult.set(null);
     this.driveError.set(null);
+    this.driveProgressText.set('Consultando archivos en Google Drive...');
+    this.driveProgressPercent.set(5);
 
     const formVal = this.driveForm.getRawValue();
     const logoUrlVal = this.driveLogoPreview();
     const safeLogoUrl = logoUrlVal && !logoUrlVal.startsWith('blob:') ? logoUrlVal : undefined;
-
-    this.adminService.importFromDrive({
+    const baseRequest = {
       albumId: formVal.albumId,
       driveUrl: formVal.driveUrl,
       watermarkText: formVal.watermarkText,
@@ -2462,14 +2468,130 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
       watermarkLogoBase64: this.driveLogoBase64() || undefined,
       concurrencyLimit: formVal.concurrencyLimit,
       markHdFirstN: formVal.markHdFirstN
+    };
+
+    this.adminService.listDriveFiles({
+      albumId: formVal.albumId,
+      driveUrl: formVal.driveUrl
     }).subscribe({
-      next: (res) => {
-        this.isDriveImporting.set(false);
-        this.driveResult.set(res);
-        this.loadAlbums(); // Recargar conteos actualizados
+      next: (listRes) => {
+        const eligible = listRes.eligibleFiles || [];
+        if (eligible.length === 0) {
+          this.isDriveImporting.set(false);
+          this.driveProgressText.set('');
+          this.driveProgressPercent.set(100);
+          this.driveResult.set({
+            success: true,
+            albumId: listRes.albumId,
+            folderId: listRes.folderId,
+            summary: {
+              totalFound: listRes.totalFound,
+              totalEligible: 0,
+              totalSkipped: listRes.skippedFiles?.length || 0,
+              successful: 0,
+              failed: 0,
+              durationMs: 0
+            },
+            photos: [],
+            errors: []
+          });
+          return;
+        }
+
+        const batchSize = AdminPanelComponent.DRIVE_IMPORT_BATCH_SIZE;
+        const chunks: Array<{ files: typeof eligible; startIndex: number }> = [];
+        for (let i = 0; i < eligible.length; i += batchSize) {
+          chunks.push({
+            files: eligible.slice(i, i + batchSize),
+            startIndex: i
+          });
+        }
+
+        const totalBatches = chunks.length;
+        let processedFilesCount = 0;
+
+        from(chunks).pipe(
+          concatMap((chunk, batchIdx) => {
+            this.driveProgressText.set(
+              `Procesando lote ${batchIdx + 1} de ${totalBatches} (${processedFilesCount}/${eligible.length} fotos)...`
+            );
+            return this.adminService.importFromDrive({
+              ...baseRequest,
+              files: chunk.files,
+              startIndex: chunk.startIndex
+            }).pipe(
+              catchError((batchErr) => {
+                const msg = this.extractErrorMessage(batchErr, 'Error al procesar lote de Google Drive');
+                const fallbackResponse: DriveImportResponse = {
+                  success: false,
+                  albumId: formVal.albumId,
+                  folderId: listRes.folderId,
+                  summary: {
+                    totalFound: chunk.files.length,
+                    totalEligible: chunk.files.length,
+                    totalSkipped: 0,
+                    successful: 0,
+                    failed: chunk.files.length,
+                    durationMs: 0
+                  },
+                  photos: [],
+                  errors: chunk.files.map(f => ({ fileName: f.name, error: msg }))
+                };
+                return of(fallbackResponse);
+              })
+            );
+          }),
+          concatMap((res, batchIdx) => {
+            processedFilesCount += chunks[batchIdx].files.length;
+            const pct = Math.min(99, Math.round((processedFilesCount / eligible.length) * 100));
+            this.driveProgressPercent.set(pct);
+            return of(res);
+          }),
+          toArray()
+        ).subscribe({
+          next: (batchResults) => {
+            const allPhotos = batchResults.flatMap(r => r.photos || []);
+            const allErrors = batchResults.flatMap(r => r.errors || []);
+            const totalSuccessful = batchResults.reduce((acc, r) => acc + (r.summary?.successful || 0), 0);
+            const totalFailed = batchResults.reduce((acc, r) => acc + (r.summary?.failed || 0), 0);
+            const totalDurationMs = batchResults.reduce((acc, r) => acc + (r.summary?.durationMs || 0), 0);
+
+            this.isDriveImporting.set(false);
+            this.driveProgressText.set('');
+            this.driveProgressPercent.set(100);
+
+            if (totalSuccessful === 0 && allErrors.length > 0) {
+              this.driveError.set(allErrors[0].error || 'No se pudieron importar las fotos de Google Drive.');
+              return;
+            }
+
+            this.driveResult.set({
+              success: totalSuccessful > 0,
+              albumId: formVal.albumId,
+              folderId: listRes.folderId,
+              summary: {
+                totalFound: listRes.totalFound,
+                totalEligible: eligible.length,
+                totalSkipped: listRes.skippedFiles?.length || 0,
+                successful: totalSuccessful,
+                failed: totalFailed,
+                durationMs: totalDurationMs
+              },
+              photos: allPhotos,
+              errors: allErrors
+            });
+            this.loadAlbums();
+          },
+          error: (err) => {
+            this.isDriveImporting.set(false);
+            this.driveProgressText.set('');
+            this.driveError.set(this.extractErrorMessage(err, 'Error al conectar con el importador de Google Drive'));
+          }
+        });
       },
       error: (err) => {
         this.isDriveImporting.set(false);
+        this.driveProgressText.set('');
         this.driveError.set(this.extractErrorMessage(err, 'Error al conectar con el importador de Google Drive'));
       }
     });
@@ -2504,20 +2626,25 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     if (errorObj['status'] === 413) {
       return 'El lote supera el límite de tamaño permitido.';
     }
+    if (errorObj['status'] === 502 || errorObj['status'] === 504) {
+      return 'El servidor tardó demasiado en responder (502/504). Se reintentará en lotes más pequeños.';
+    }
     if (errorObj['status'] === 0) {
       return 'Error de red o tiempo de espera agotado al subir las fotos.';
     }
 
     const innerError = errorObj['error'];
 
-    // 1. err?.error?.error es string
-    if (
-      innerError &&
-      typeof innerError === 'object' &&
-      typeof (innerError as Record<string, unknown>)['error'] === 'string'
-    ) {
-      const msg = (innerError as Record<string, unknown>)['error'] as string;
-      if (msg.trim().length > 0) return msg.trim();
+    // 1. err?.error?.error es string o { message }
+    if (innerError && typeof innerError === 'object') {
+      const nested = (innerError as Record<string, unknown>)['error'];
+      if (typeof nested === 'string' && nested.trim().length > 0) {
+        return nested.trim();
+      }
+      if (nested && typeof nested === 'object' && typeof (nested as Record<string, unknown>)['message'] === 'string') {
+        const nestedMsg = ((nested as Record<string, unknown>)['message'] as string).trim();
+        if (nestedMsg.length > 0) return nestedMsg;
+      }
     }
 
     // 2. err?.error?.message es string

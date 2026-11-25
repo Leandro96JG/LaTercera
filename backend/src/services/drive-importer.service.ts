@@ -33,7 +33,7 @@ export class DefaultDriveHttpClient implements IDriveHttpClient {
     const fields = encodeURIComponent('files(id, name, mimeType, size)');
     const url = `https://www.googleapis.com/drive/v3/files?q=${query}&fields=${fields}&pageSize=1000&key=${apiKey}`;
 
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: AbortSignal.timeout(20000) });
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`Google Drive API error (${response.status}): ${errorText}`);
@@ -48,7 +48,7 @@ export class DefaultDriveHttpClient implements IDriveHttpClient {
       ? `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${apiKey}`
       : `https://drive.google.com/uc?export=download&id=${fileId}`;
 
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: AbortSignal.timeout(45000) });
     if (!response.ok) {
       throw new Error(`Error descargando archivo ${fileId} de Google Drive (${response.status})`);
     }
@@ -61,6 +61,10 @@ export class DefaultDriveHttpClient implements IDriveHttpClient {
 export interface ImportDriveOptions {
   albumId: string;
   driveUrl: string;
+  /** Subconjunto de archivos a procesar (cuando se invoca en modo por lotes) */
+  files?: DriveFileMetadata[];
+  /** Índice inicial global del lote para cálculo de muestras HD */
+  startIndex?: number;
   watermarkText?: string;
   /** Buffer del logo opcional para marca de agua en lote (se pre-procesa una sola vez para todo el lote) */
   watermarkLogoBuffer?: Buffer;
@@ -68,6 +72,13 @@ export interface ImportDriveOptions {
   markHdFirstN?: number;
   apiKey?: string;
   onProgress?: (progress: BatchProgress) => void;
+}
+
+export interface ListDriveResult {
+  folderId: string;
+  totalFound: number;
+  eligibleFiles: DriveFileMetadata[];
+  skippedFiles: SkippedFileItem[];
 }
 
 export interface ProcessedPhotoItem {
@@ -129,27 +140,10 @@ export class GoogleDriveImporterService {
     this.defaultApiKey = defaultApiKey || process.env.GOOGLE_DRIVE_API_KEY;
   }
 
-  async importFromDrive(options: ImportDriveOptions): Promise<ImportDriveResult> {
-    const {
-      albumId,
-      driveUrl,
-      watermarkText = 'LA TERCERA • MUESTRA',
-      concurrencyLimit = 3,
-      markHdFirstN = 2,
-      apiKey = this.defaultApiKey
-    } = options;
-
-    if (!albumId) {
-      throw new Error('El albumId es obligatorio');
-    }
-
-    // 1. Parseo y extracción del Folder ID
-    const folderId = extractGoogleDriveFolderId(driveUrl);
-
-    // 2. Consulta y listado de archivos en la carpeta de Drive
-    const allFiles = await this.httpClient.listFiles(folderId, apiKey);
-
-    // 3. Filtrar archivos por tipo MIME y extensión permitidos
+  private partitionDriveFiles(allFiles: DriveFileMetadata[]): {
+    eligibleFiles: DriveFileMetadata[];
+    skippedFiles: SkippedFileItem[];
+  } {
     const eligibleFiles: DriveFileMetadata[] = [];
     const skippedFiles: SkippedFileItem[] = [];
 
@@ -168,6 +162,52 @@ export class GoogleDriveImporterService {
         });
       }
     }
+
+    return { eligibleFiles, skippedFiles };
+  }
+
+  /**
+   * Lista y filtra los archivos de una carpeta de Google Drive sin descargar imágenes.
+   */
+  async listEligibleFiles(driveUrl: string, apiKey = this.defaultApiKey): Promise<ListDriveResult> {
+    const folderId = extractGoogleDriveFolderId(driveUrl);
+    const allFiles = await this.httpClient.listFiles(folderId, apiKey);
+    const { eligibleFiles, skippedFiles } = this.partitionDriveFiles(allFiles);
+
+    return {
+      folderId,
+      totalFound: allFiles.length,
+      eligibleFiles,
+      skippedFiles
+    };
+  }
+
+  async importFromDrive(options: ImportDriveOptions): Promise<ImportDriveResult> {
+    const {
+      albumId,
+      driveUrl,
+      files,
+      startIndex = 0,
+      watermarkText = 'LA TERCERA • MUESTRA',
+      concurrencyLimit = 3,
+      markHdFirstN = 2,
+      apiKey = this.defaultApiKey
+    } = options;
+
+    if (!albumId) {
+      throw new Error('El albumId es obligatorio');
+    }
+
+    // 1. Parseo y extracción del Folder ID
+    const folderId = extractGoogleDriveFolderId(driveUrl);
+
+    // 2. Usar lote pre-listado o consultar la carpeta completa en Drive
+    const allFiles = Array.isArray(files)
+      ? files
+      : await this.httpClient.listFiles(folderId, apiKey);
+
+    // 3. Filtrar archivos por tipo MIME y extensión permitidos
+    const { eligibleFiles, skippedFiles } = this.partitionDriveFiles(allFiles);
 
     const errors: Array<{ fileId: string; fileName: string; error: string }> = [];
     const photos: ProcessedPhotoItem[] = [];
@@ -204,8 +244,8 @@ export class GoogleDriveImporterService {
         const safeName = sanitizeFilename(file.name);
         const ext = path.extname(safeName) || (headerCheck.detectedMime === 'image/png' ? '.png' : '.jpg');
 
-        // c. Determinar si es foto HD de muestra (primeras N fotos del álbum)
-        const isHD = index < markHdFirstN;
+        // c. Determinar si es foto HD de muestra (primeras N fotos globales del álbum)
+        const isHD = (startIndex + index) < markHdFirstN;
 
         // d. Procesar con Sharp (redimensionar con fit: 'inside' respetando orientación y reutilizando logo)
         const processed = await processImageWithWatermark(rawBuffer, {

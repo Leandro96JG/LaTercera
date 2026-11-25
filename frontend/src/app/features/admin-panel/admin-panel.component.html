@@ -2025,8 +2025,8 @@
           </div>
         </div>
 
-        <!-- Botón de Envío -->
-        <div class="flex items-center justify-end gap-3 pt-2">
+        <!-- Botón de Envío y Progreso por Lotes -->
+        <div class="flex flex-col items-end gap-2 pt-2">
           <button
             type="submit"
             [disabled]="driveForm.invalid || isDriveImporting()"
@@ -2034,12 +2034,21 @@
           >
             @if (isDriveImporting()) {
               <span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-              <span>Descargando y procesando fotos con Sharp...</span>
+              <span>{{ driveProgressText() || 'Descargando y procesando fotos con Sharp...' }}</span>
             } @else {
               <span>Importar Fotos de Drive</span>
               <span>⚡</span>
             }
           </button>
+
+          @if (isDriveImporting()) {
+            <div class="w-full max-w-sm bg-zinc-200 rounded-full h-1.5 overflow-hidden">
+              <div
+                class="bg-zinc-950 h-full transition-all duration-300"
+                [style.width.%]="driveProgressPercent()"
+              ></div>
+            </div>
+          }
         </div>
       </form>
 
