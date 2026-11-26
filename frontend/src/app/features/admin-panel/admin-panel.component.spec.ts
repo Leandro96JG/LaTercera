@@ -32,6 +32,7 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
     getAlbumPhotos: ReturnType<typeof vi.fn>;
     updateAlbumPhoto: ReturnType<typeof vi.fn>;
     deleteAlbumPhoto: ReturnType<typeof vi.fn>;
+    bulkPhotosAction: ReturnType<typeof vi.fn>;
     reorderAlbumPhotos: ReturnType<typeof vi.fn>;
     getPromotions: ReturnType<typeof vi.fn>;
     updatePricingConfig: ReturnType<typeof vi.fn>;
@@ -160,6 +161,12 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
         success: true,
         photoId: 'photo-1',
         message: 'Foto eliminada correctamente'
+      })),
+      bulkPhotosAction: vi.fn().mockReturnValue(of({
+        success: true,
+        action: 'delete',
+        affected: 2,
+        message: 'Acción aplicada correctamente'
       })),
       reorderAlbumPhotos: vi.fn().mockReturnValue(of({
         success: true,
@@ -1026,6 +1033,72 @@ describe('AdminPanelComponent - Panel de Fotógrafa & Procesamiento Masivo', () 
       expect(component.selectedAlbumForPhotos()?.photosCount).toBe(47);
       expect(component.albums().find(a => a.id === 'album-1')?.photosCount).toBe(47);
       expect(component.photosModalFeedback()?.success).toBe(true);
+    });
+
+    it('debe seleccionar todas las fotos, dividir en lotes de hasta 100 al borrarlas y limpiar portada y conteo al quedar en 0', () => {
+      const largeAlbum: Album = {
+        ...initialMockAlbum,
+        id: 'album-250',
+        photosCount: 250,
+        coverUrl: 'https://cdn.example.com/large-1.webp'
+      };
+      component.albums.set([largeAlbum]);
+
+      const mock250Photos = Array.from({ length: 250 }, (_, idx) => ({
+        id: `large-${idx + 1}`,
+        albumId: 'album-250',
+        filename: `foto_${idx + 1}.jpg`,
+        originalPath: `originals/album-250/large-${idx + 1}.jpg`,
+        previewUrl: `https://cdn.example.com/large-${idx + 1}.webp`,
+        isSampleHd: idx < 2
+      }));
+      mockAdminService.getAlbumPhotos.mockReturnValueOnce(
+        of({ success: true, albumId: 'album-250', total: 250, photos: mock250Photos })
+      );
+      mockAdminService.bulkPhotosAction.mockImplementation((_albumId: string, action: 'delete', ids: string[]) =>
+        of({
+          success: true,
+          action,
+          affected: ids.length,
+          message: `Eliminadas ${ids.length}`
+        })
+      );
+
+      component.openPhotosModal(largeAlbum);
+      component.selectAllModalPhotos();
+      expect(component.selectedModalPhotoIds().size).toBe(250);
+
+      component.runBulkPhotoAction('delete');
+
+      expect(mockAdminService.bulkPhotosAction).toHaveBeenCalledTimes(3);
+      expect(mockAdminService.bulkPhotosAction).toHaveBeenNthCalledWith(
+        1,
+        'album-250',
+        'delete',
+        mock250Photos.slice(0, 100).map((p) => p.id)
+      );
+      expect(mockAdminService.bulkPhotosAction).toHaveBeenNthCalledWith(
+        3,
+        'album-250',
+        'delete',
+        mock250Photos.slice(200, 250).map((p) => p.id)
+      );
+      expect(component.albumPhotos().length).toBe(0);
+      expect(component.selectedModalPhotoIds().size).toBe(0);
+      expect(component.selectedAlbumForPhotos()?.photosCount).toBe(0);
+      expect(component.selectedAlbumForPhotos()?.coverUrl).toBe('');
+      expect(component.albums().find((a) => a.id === 'album-250')?.photosCount).toBe(0);
+      expect(component.albums().find((a) => a.id === 'album-250')?.coverUrl).toBe('');
+      expect(component.photosModalFeedback()?.success).toBe(true);
+    });
+
+    it('debe limpiar la selección de fotos al cerrar o cambiar de modal de álbum', () => {
+      component.openPhotosModal(initialMockAlbum);
+      component.selectAllModalPhotos();
+      expect(component.selectedModalPhotoIds().size).toBeGreaterThan(0);
+
+      component.closePhotosModal();
+      expect(component.selectedModalPhotoIds().size).toBe(0);
     });
 
     it('debe manejar errores HTTP en loadAlbumPhotos mostrando toast y guardando el mensaje en photosModalError sin romper el modal', () => {

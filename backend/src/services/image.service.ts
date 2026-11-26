@@ -71,9 +71,9 @@ export async function processImageWithWatermark(
 ): Promise<ProcessedImageResult> {
   const isCover = options.isCover ?? false;
   const isHD = options.isHD ?? false;
-  const targetWidth = options.targetWidth ?? (isCover ? 1000 : 800);
-  const targetHeight = options.targetHeight ?? (isCover ? 1000 : 800);
-  const quality = options.quality ?? (isCover ? 80 : (isHD ? 85 : 70));
+  const targetWidth = options.targetWidth ?? (isCover ? 1000 : 640);
+  const targetHeight = options.targetHeight ?? (isCover ? 1000 : 640);
+  const quality = options.quality ?? (isCover ? 80 : (isHD ? 82 : 68));
   const watermarkText = options.watermarkText ?? 'LA TERCERA • MUESTRA';
   const safeWatermarkText = escapeXml(watermarkText);
 
@@ -91,7 +91,7 @@ export async function processImageWithWatermark(
     // Si se especificó logoBuffer, estampar logo central proporcional a la muestra HD
     if (options.logoBuffer) {
       const minHdDim = Math.min(hdW, hdH);
-      const maxLogoSize = Math.max(80, Math.round(minHdDim * 0.40));
+      const maxLogoSize = Math.max(80, Math.round(minHdDim * 0.44));
       const { data: centeredHdLogo, info: lInfo } = await sharp(options.logoBuffer)
         .resize({ width: maxLogoSize, height: maxLogoSize, fit: 'inside' })
         .toBuffer({ resolveWithObject: true });
@@ -107,24 +107,32 @@ export async function processImageWithWatermark(
       });
     }
 
-    // Badge superior izquierdo + patrón diagonal sutil + marca central legible en claro/oscuro
+    // Badge superior izquierdo + líneas cruzadas X + patrón diagonal y sello central "MUESTRA SIN COMPRAR"
     const svgHdWatermark = Buffer.from(`
       <svg width="${hdW}" height="${hdH}" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <pattern id="hdWmPattern" width="320" height="170" patternUnits="userSpaceOnUse" patternTransform="rotate(-25)">
-            <text x="20" y="65" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="900" fill="rgba(255,255,255,0.42)" stroke="rgba(0,0,0,0.42)" stroke-width="1.2" paint-order="stroke" letter-spacing="2">
+          <pattern id="hdWmPattern" width="290" height="150" patternUnits="userSpaceOnUse" patternTransform="rotate(-25)">
+            <text x="16" y="55" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="900" fill="rgba(255,255,255,0.52)" stroke="rgba(0,0,0,0.52)" stroke-width="1.5" paint-order="stroke" letter-spacing="2">
               ${safeWatermarkText}
+            </text>
+            <text x="16" y="108" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="800" fill="rgba(253,184,19,0.48)" stroke="rgba(0,0,0,0.50)" stroke-width="1.2" paint-order="stroke" letter-spacing="1.5">
+              MUESTRA SIN COMPRAR
             </text>
           </pattern>
         </defs>
         <rect width="100%" height="100%" fill="url(#hdWmPattern)" />
+        <line x1="0" y1="0" x2="${hdW}" y2="${hdH}" stroke="rgba(255,255,255,0.28)" stroke-width="2" />
+        <line x1="${hdW}" y1="0" x2="0" y2="${hdH}" stroke="rgba(255,255,255,0.28)" stroke-width="2" />
         <rect x="20" y="20" width="225" height="40" rx="10" fill="rgba(0,0,0,0.72)" />
         <text x="35" y="45" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="bold" fill="#FDB813">
           ✦ LA TERCERA HD MASTER
         </text>
         <g transform="translate(${Math.round(hdW / 2)}, ${Math.round(hdH / 2)}) rotate(-25)">
-          <text text-anchor="middle" y="0" font-family="DejaVu Sans, Arial, sans-serif" font-size="${Math.max(30, Math.round(hdW / 24))}" font-weight="900" fill="rgba(255,255,255,0.55)" stroke="rgba(0,0,0,0.55)" stroke-width="2" paint-order="stroke" letter-spacing="4">
+          <text text-anchor="middle" y="0" font-family="DejaVu Sans, Arial, sans-serif" font-size="${Math.max(32, Math.round(hdW / 20))}" font-weight="900" fill="rgba(255,255,255,0.62)" stroke="rgba(0,0,0,0.62)" stroke-width="2.5" paint-order="stroke" letter-spacing="4">
             ${safeWatermarkText}
+          </text>
+          <text text-anchor="middle" y="28" font-family="DejaVu Sans, Arial, sans-serif" font-size="${Math.max(16, Math.round(hdW / 44))}" font-weight="900" fill="rgba(253,184,19,0.68)" stroke="rgba(0,0,0,0.62)" stroke-width="1.6" paint-order="stroke" letter-spacing="3">
+            FOTO SIN COMPRAR • PROHIBIDA SU COPIA
           </text>
         </g>
       </svg>
@@ -213,23 +221,28 @@ export async function processImageWithWatermark(
     });
   }
 
-  // SVG con marca diagonal repetida de alto contraste (borde oscuro + relleno luminoso) y sello central
+  // SVG con líneas cruzadas X + marca diagonal repetida de alto contraste y sello central
   const svgWatermark = Buffer.from(`
     <svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <pattern id="wmPattern" width="250" height="135" patternUnits="userSpaceOnUse" patternTransform="rotate(-25)">
-          <text x="16" y="48" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="900" fill="rgba(255,255,255,0.62)" stroke="rgba(0,0,0,0.52)" stroke-width="1.4" paint-order="stroke" letter-spacing="2">
+        <pattern id="wmPattern" width="220" height="120" patternUnits="userSpaceOnUse" patternTransform="rotate(-25)">
+          <text x="14" y="42" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="900" fill="rgba(255,255,255,0.68)" stroke="rgba(0,0,0,0.58)" stroke-width="1.5" paint-order="stroke" letter-spacing="2">
             ${safeWatermarkText}
           </text>
-          <text x="16" y="106" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="800" fill="rgba(253,184,19,0.54)" stroke="rgba(0,0,0,0.48)" stroke-width="1.2" paint-order="stroke" letter-spacing="1.5">
-            PROHIBIDA SU COPIA
+          <text x="14" y="96" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="900" fill="rgba(253,184,19,0.62)" stroke="rgba(0,0,0,0.55)" stroke-width="1.3" paint-order="stroke" letter-spacing="1.5">
+            MUESTRA SIN COMPRAR
           </text>
         </pattern>
       </defs>
       <rect width="100%" height="100%" fill="url(#wmPattern)" />
+      <line x1="0" y1="0" x2="${w}" y2="${h}" stroke="rgba(255,255,255,0.34)" stroke-width="2" />
+      <line x1="${w}" y1="0" x2="0" y2="${h}" stroke="rgba(255,255,255,0.34)" stroke-width="2" />
       <g transform="translate(${Math.round(w / 2)}, ${Math.round(h / 2)}) rotate(-25)">
-        <text text-anchor="middle" y="0" font-family="DejaVu Sans, Arial, sans-serif" font-size="${Math.max(22, Math.round(minDim / 18))}" font-weight="900" fill="rgba(255,255,255,0.50)" stroke="rgba(0,0,0,0.58)" stroke-width="2" paint-order="stroke" letter-spacing="3">
+        <text text-anchor="middle" y="0" font-family="DejaVu Sans, Arial, sans-serif" font-size="${Math.max(22, Math.round(minDim / 15))}" font-weight="900" fill="rgba(255,255,255,0.62)" stroke="rgba(0,0,0,0.65)" stroke-width="2.2" paint-order="stroke" letter-spacing="3">
           ${safeWatermarkText}
+        </text>
+        <text text-anchor="middle" y="22" font-family="DejaVu Sans, Arial, sans-serif" font-size="${Math.max(11, Math.round(minDim / 34))}" font-weight="900" fill="rgba(253,184,19,0.72)" stroke="rgba(0,0,0,0.65)" stroke-width="1.5" paint-order="stroke" letter-spacing="2">
+          FOTO SIN COMPRAR • PROHIBIDA SU COPIA
         </text>
       </g>
     </svg>

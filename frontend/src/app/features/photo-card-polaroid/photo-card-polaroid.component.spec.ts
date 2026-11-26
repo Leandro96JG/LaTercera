@@ -160,14 +160,27 @@ describe('PhotoCardPolaroidComponent', () => {
     expect(compiled.textContent).toContain('Muestra HD');
   });
 
-  it('no debe superponer la marca de agua HTML en el DOM porque viene grabada en los píxeles del WebP', () => {
+  it('debe renderizar el escudo retroactivo anti-captura en muestras pagas y ocultarlo en fotos gratuitas o compradas', () => {
     fixture.componentRef.setInput('photo', mockPhoto);
     fixture.componentRef.setInput('index', 0);
     fixture.componentRef.setInput('unitPrice', 1200);
+    fixture.componentRef.setInput('isFreeDownload', false);
+    fixture.componentRef.setInput('isPurchased', false);
+    component.onImageLoaded();
     fixture.detectChanges();
 
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.textContent).not.toContain('LA TERCERA • MUESTRA');
+    expect(compiled.querySelector('.watermark-shield')).not.toBeNull();
+    expect(compiled.textContent).toContain('MUESTRA SIN COMPRAR');
+
+    fixture.componentRef.setInput('isPurchased', true);
+    fixture.detectChanges();
+    expect(compiled.querySelector('.watermark-shield')).toBeNull();
+
+    fixture.componentRef.setInput('isPurchased', false);
+    fixture.componentRef.setInput('isFreeDownload', true);
+    fixture.detectChanges();
+    expect(compiled.querySelector('.watermark-shield')).toBeNull();
   });
 
   it('debe activar hasError y renderizar el placeholder estético de La Tercera si la imagen falla al cargar', () => {

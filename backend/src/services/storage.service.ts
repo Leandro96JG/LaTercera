@@ -57,6 +57,11 @@ export interface IStorageService {
     ext?: string
   ): Promise<void>;
 
+  deletePhotoFilesBatch?(
+    albumId: string,
+    photos: Array<{ photoId: string; ext?: string }>
+  ): Promise<void>;
+
   ensureBucketsExist?(): Promise<void>;
 }
 
@@ -278,6 +283,49 @@ export class SupabaseStorageService implements IStorageService {
     }
   }
 
+  public async deletePhotoFilesBatch(
+    albumId: string,
+    photos: Array<{ photoId: string; ext?: string }>
+  ): Promise<void> {
+    if (photos.length === 0) return;
+
+    const cleanAlbum = sanitizeId(albumId);
+    const previewPaths: string[] = [];
+    const originalPaths: string[] = [];
+
+    for (const item of photos) {
+      const cleanPhoto = sanitizeId(item.photoId);
+      const rawExt = item.ext || '.jpg';
+      const cleanExt = rawExt.startsWith('.') ? rawExt.toLowerCase() : `.${rawExt.toLowerCase()}`;
+      previewPaths.push(`${cleanAlbum}/${cleanPhoto}.webp`);
+      originalPaths.push(`${cleanAlbum}/${cleanPhoto}${cleanExt}`);
+    }
+
+    const CHUNK_SIZE = 100;
+    const tasks: Array<Promise<unknown>> = [];
+    for (let i = 0; i < previewPaths.length; i += CHUNK_SIZE) {
+      const previewChunk = previewPaths.slice(i, i + CHUNK_SIZE);
+      const originalChunk = originalPaths.slice(i, i + CHUNK_SIZE);
+
+      tasks.push(
+        this.supabase.storage
+          .from(SupabaseStorageService.BUCKET_PREVIEWS)
+          .remove(previewChunk)
+          .catch((err: unknown) => {
+            console.warn('[SupabaseStorage] Advertencia al eliminar lote de previews:', err);
+          }),
+        this.supabase.storage
+          .from(SupabaseStorageService.BUCKET_ORIGINALS)
+          .remove(originalChunk)
+          .catch((err: unknown) => {
+            console.warn('[SupabaseStorage] Advertencia al eliminar lote de originales:', err);
+          })
+      );
+    }
+
+    await Promise.allSettled(tasks);
+  }
+
   public async ensureBucketsExist(): Promise<void> {
     const { data: buckets, error } = await this.supabase.storage.listBuckets();
     if (error) {
@@ -422,6 +470,19 @@ export class LocalDiskStorageService implements IStorageService {
     await fs.unlink(originalPath).catch(() => {});
   }
 
+  public async deletePhotoFilesBatch(
+    albumId: string,
+    photos: Array<{ photoId: string; ext?: string }>
+  ): Promise<void> {
+    const CONCURRENCY = 20;
+    for (let i = 0; i < photos.length; i += CONCURRENCY) {
+      const slice = photos.slice(i, i + CONCURRENCY);
+      await Promise.allSettled(
+        slice.map((item) => this.deletePhotoFiles(albumId, item.photoId, item.ext || '.jpg'))
+      );
+    }
+  }
+
   public async ensureBucketsExist(): Promise<void> {
     await fs.mkdir(path.join(this.baseStorageDir, 'originals'), { recursive: true });
     await fs.mkdir(path.join(this.baseStorageDir, 'previews'), { recursive: true });
@@ -506,6 +567,15 @@ export class MemoryStorageService implements IStorageService {
     const cleanExt = ext.replace(/^\./, '');
     this.previews.delete(`${albumId}/${photoId}.webp`);
     this.originals.delete(`${albumId}/${photoId}.${cleanExt}`);
+  }
+
+  public async deletePhotoFilesBatch(
+    albumId: string,
+    photos: Array<{ photoId: string; ext?: string }>
+  ): Promise<void> {
+    for (const item of photos) {
+      await this.deletePhotoFiles(albumId, item.photoId, item.ext || '.jpg');
+    }
   }
 
   public async ensureBucketsExist(): Promise<void> {

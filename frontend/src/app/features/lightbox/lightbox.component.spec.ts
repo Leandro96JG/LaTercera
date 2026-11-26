@@ -40,17 +40,47 @@ describe('LightboxComponent (Visor Cinemático Táctil)', () => {
     expect(backdrop).toBeNull();
   });
 
-  it('debe renderizar la foto, el contador y no superponer marca de agua HTML cuando isOpen es verdadero', () => {
+  it('debe renderizar la foto, el contador y el escudo retroactivo anti-captura solo en fotos sin comprar', () => {
     fixture.componentRef.setInput('isOpen', true);
     fixture.componentRef.setInput('currentPhoto', mockPhoto);
     fixture.componentRef.setInput('currentIndex', 2);
     fixture.componentRef.setInput('totalCount', 10);
+    fixture.componentRef.setInput('isFreeDownload', false);
+    fixture.componentRef.setInput('isPurchased', false);
     fixture.detectChanges();
 
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.textContent).toContain('Foto 3 de 10');
     expect(compiled.textContent).toContain('Muestra HD Original');
-    expect(compiled.textContent).not.toContain('LA TERCERA • MUESTRA');
+    expect(compiled.querySelector('.watermark-shield')).not.toBeNull();
+    expect(compiled.textContent).toContain('FOTO SIN COMPRAR');
+
+    fixture.componentRef.setInput('isPurchased', true);
+    fixture.detectChanges();
+    expect(compiled.querySelector('.watermark-shield')).toBeNull();
+  });
+
+  it('debe activar privacyShieldActive al detectar PrintScreen o window:blur en muestras pagas y permitir reanudar', () => {
+    fixture.componentRef.setInput('isOpen', true);
+    fixture.componentRef.setInput('currentPhoto', mockPhoto);
+    fixture.componentRef.setInput('isFreeDownload', false);
+    fixture.componentRef.setInput('isPurchased', false);
+    fixture.detectChanges();
+
+    expect(component.privacyShieldActive()).toBe(false);
+
+    component.handleKeydown(new KeyboardEvent('keydown', { key: 'PrintScreen' }));
+    fixture.detectChanges();
+    expect(component.privacyShieldActive()).toBe(true);
+    expect(fixture.nativeElement.querySelector('.privacy-shield-overlay')).not.toBeNull();
+
+    component.dismissPrivacyShield();
+    fixture.detectChanges();
+    expect(component.privacyShieldActive()).toBe(false);
+
+    component.onWindowBlur();
+    fixture.detectChanges();
+    expect(component.privacyShieldActive()).toBe(true);
   });
 
   it('debe emitir close al hacer clic en el botón de cerrar o presionar Escape', () => {

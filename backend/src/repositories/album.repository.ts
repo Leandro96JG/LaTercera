@@ -148,7 +148,9 @@ export interface IAlbumRepository {
   getPhotosByAlbum?(albumId: string): Promise<PhotoDTO[]>;
   getPhotoById(albumId: string, photoId: string): Promise<PhotoDTO | null>;
   updatePhoto(albumId: string, photoId: string, updates: Partial<PhotoDTO>): Promise<PhotoDTO | null>;
+  updatePhotosBatch?(albumId: string, photoIds: string[], updates: Partial<PhotoDTO>): Promise<number>;
   deletePhoto(albumId: string, photoId: string): Promise<boolean>;
+  deletePhotosBatch?(albumId: string, photoIds: string[]): Promise<number>;
   reorderPhotos(albumId: string, orderedPhotoIds: string[]): Promise<boolean>;
   
   // Métodos de conveniencia / retrocompatibilidad
@@ -455,6 +457,45 @@ export class MemoryAlbumRepository implements IAlbumRepository {
       }
     }
     return true;
+  }
+
+  async updatePhotosBatch(albumId: string, photoIds: string[], updates: Partial<PhotoDTO>): Promise<number> {
+    const list = this.photos.get(albumId) || [];
+    const targetSet = new Set(photoIds);
+    let updatedCount = 0;
+
+    const updatedList = list.map((p) => {
+      if (!targetSet.has(p.id)) return p;
+      updatedCount += 1;
+      return { ...p, ...updates };
+    });
+
+    if (updatedCount > 0) {
+      this.photos.set(albumId, updatedList);
+    }
+    return updatedCount;
+  }
+
+  async deletePhotosBatch(albumId: string, photoIds: string[]): Promise<number> {
+    const list = this.photos.get(albumId) || [];
+    const targetSet = new Set(photoIds);
+    const deletedPhotos = list.filter((p) => targetSet.has(p.id));
+    if (deletedPhotos.length === 0) return 0;
+
+    const filtered = list.filter((p) => !targetSet.has(p.id));
+    this.photos.set(albumId, filtered);
+
+    const album = this.albums.get(albumId);
+    if (album) {
+      album.photosCount = filtered.length === 0
+        ? 0
+        : Math.max(0, (album.photosCount ?? list.length) - deletedPhotos.length);
+      if (deletedPhotos.some((p) => p.previewUrl === album.coverUrl) || filtered.length === 0) {
+        album.coverUrl = filtered[0]?.previewUrl || '';
+      }
+    }
+
+    return deletedPhotos.length;
   }
 
   async reorderPhotos(albumId: string, orderedPhotoIds: string[]): Promise<boolean> {
@@ -1570,6 +1611,101 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
     }
 
     return true;
+  }
+
+  async updatePhotosBatch(albumId: string, photoIds: string[], updates: Partial<PhotoDTO>): Promise<number> {
+    if (photoIds.length === 0) return 0;
+
+    const targetSet = new Set(photoIds);
+    const cached = this.localPhotosMap.get(albumId) || [];
+    let localUpdated = 0;
+    if (cached.length > 0) {
+      this.localPhotosMap.set(
+        albumId,
+        cached.map((p) => {
+          if (!targetSet.has(p.id)) return p;
+          localUpdated += 1;
+          return { ...p, ...updates };
+        })
+      );
+    }
+
+    await this.localFallback.updatePhotosBatch?.(albumId, photoIds, updates).catch(() => {});
+
+    const dbUpdates: Record<string, unknown> = {};
+    if (updates.isSampleHd !== undefined) dbUpdates.is_sample_hd = updates.isSampleHd;
+    if (updates.filename !== undefined) dbUpdates.filename = updates.filename;
+    if (updates.previewUrl !== undefined) dbUpdates.preview_url = updates.previewUrl;
+
+    let dbUpdated = 0;
+    if (Object.keys(dbUpdates).length > 0) {
+      const CHUNK_SIZE = 100;
+      for (let i = 0; i < photoIds.length; i += CHUNK_SIZE) {
+        const chunk = photoIds.slice(i, i + CHUNK_SIZE);
+        try {
+          const { data, error } = await this.supabase
+            .from('photos')
+            .update(dbUpdates)
+            .eq('album_id', albumId)
+            .in('id', chunk)
+            .select('id');
+
+          if (!error && Array.isArray(data)) {
+            dbUpdated += data.length;
+          }
+        } catch (err: unknown) {
+          console.warn('[SupabaseAlbumRepository] Error en updatePhotosBatch:', err);
+        }
+      }
+    }
+
+    return dbUpdated > 0 ? dbUpdated : localUpdated;
+  }
+
+  async deletePhotosBatch(albumId: string, photoIds: string[]): Promise<number> {
+    if (photoIds.length === 0) return 0;
+
+    const targetSet = new Set(photoIds);
+    const cached = this.localPhotosMap.get(albumId) || [];
+    const localDeleted = cached.filter((p) => targetSet.has(p.id)).length;
+    const filtered = cached.filter((p) => !targetSet.has(p.id));
+    this.localPhotosMap.set(albumId, filtered);
+
+    await this.localFallback.deletePhotosBatch?.(albumId, photoIds).catch(() => {});
+
+    let dbDeleted = 0;
+    const CHUNK_SIZE = 100;
+    for (let i = 0; i < photoIds.length; i += CHUNK_SIZE) {
+      const chunk = photoIds.slice(i, i + CHUNK_SIZE);
+      try {
+        const { data, error } = await this.supabase
+          .from('photos')
+          .delete()
+          .eq('album_id', albumId)
+          .in('id', chunk)
+          .select('id');
+
+        if (!error && Array.isArray(data)) {
+          dbDeleted += data.length;
+        }
+      } catch (err: unknown) {
+        console.warn('[SupabaseAlbumRepository] Error en deletePhotosBatch:', err);
+      }
+    }
+
+    try {
+      const { count, error: countError } = await this.supabase
+        .from('photos')
+        .select('id', { count: 'exact', head: true })
+        .eq('album_id', albumId);
+
+      const remainingCount = !countError && typeof count === 'number' ? count : filtered.length;
+      await this.updatePhotosCount(albumId, remainingCount);
+    } catch {
+      await this.updatePhotosCount(albumId, filtered.length).catch(() => {});
+    }
+
+    return dbDeleted > 0 ? dbDeleted : (localDeleted > 0 ? localDeleted : photoIds.length);
   }
 
   async reorderPhotos(albumId: string, orderedPhotoIds: string[]): Promise<boolean> {

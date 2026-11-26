@@ -19,14 +19,18 @@ import { AlbumService } from '../../core/services/album.service';
   imports: [CommonModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
-    '(window:keydown)': 'handleKeydown($event)'
+    '(window:keydown)': 'handleKeydown($event)',
+    '(window:blur)': 'onWindowBlur()',
+    '(window:focus)': 'onWindowFocus()',
+    '(document:visibilitychange)': 'onVisibilityChange()'
   },
   styles: [],
   template: `
     @if (isOpen() && currentPhoto()) {
       <div
-        class="fixed inset-0 z-50 bg-black/95 flex flex-col justify-between p-3 sm:p-6 select-none transition-opacity duration-300 animate-fadeIn"
+        class="anti-capture-zone fixed inset-0 z-50 bg-black/95 flex flex-col justify-between p-3 sm:p-6 select-none transition-opacity duration-300 animate-fadeIn"
         (click)="close.emit()"
+        (contextmenu)="$event.preventDefault()"
         (touchstart)="onTouchStart($event)"
         (touchmove)="onTouchMove($event)"
         (touchend)="onTouchEnd()"
@@ -183,10 +187,58 @@ import { AlbumService } from '../../core/services/album.service';
               [src]="currentPhoto()?.previewUrl"
               [alt]="currentPhoto()?.title"
               decoding="async"
-              class="max-h-[76vh] w-auto max-w-full object-contain rounded-2xl shadow-2xl prevent-save animate-lightbox-next"
+              class="max-h-[76vh] w-auto max-w-full object-contain rounded-2xl shadow-2xl prevent-save animate-lightbox-next transition duration-150"
+              [class.blur-xl]="privacyShieldActive()"
+              [class.opacity-30]="privacyShieldActive()"
               (contextmenu)="$event.preventDefault()"
               draggable="false"
             />
+
+            <!-- Escudo Anti-Captura Retroactivo (Malla X + Sello Central en muestras no compradas) -->
+            @if (showWatermarkShield() && !privacyShieldActive()) {
+              <div
+                class="watermark-shield absolute inset-0 z-10 pointer-events-none select-none overflow-hidden rounded-2xl"
+                aria-hidden="true"
+              >
+                <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="w-full h-full opacity-80">
+                  <line x1="0" y1="0" x2="100" y2="100" stroke="rgba(255,255,255,0.34)" stroke-width="0.6" />
+                  <line x1="100" y1="0" x2="0" y2="100" stroke="rgba(255,255,255,0.34)" stroke-width="0.6" />
+                  <line x1="0" y1="35" x2="100" y2="65" stroke="rgba(253,184,19,0.22)" stroke-width="0.4" />
+                  <line x1="0" y1="65" x2="100" y2="35" stroke="rgba(253,184,19,0.22)" stroke-width="0.4" />
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center -rotate-12 gap-1.5">
+                  <span class="px-4 py-1 rounded-lg bg-black/55 text-white/95 font-display font-black text-sm sm:text-lg tracking-[0.22em] uppercase border border-white/25 shadow-lg">
+                    LA TERCERA • MUESTRA
+                  </span>
+                  <span class="px-3 py-0.5 rounded bg-amber-400/90 text-zinc-950 font-black text-[10px] sm:text-xs tracking-widest uppercase shadow">
+                    FOTO SIN COMPRAR • PROHIBIDA SU COPIA
+                  </span>
+                </div>
+              </div>
+            }
+
+            <!-- Capa de Privacidad / Anti-Screenshot en PC al perder foco o detectar tecla de captura -->
+            @if (privacyShieldActive()) {
+              <div
+                class="privacy-shield-overlay absolute inset-0 z-30 bg-zinc-950/85 flex flex-col items-center justify-center p-6 text-center rounded-2xl border border-amber-400/40"
+                (click)="$event.stopPropagation()"
+              >
+                <span class="text-2xl mb-2">🔒</span>
+                <p class="font-display font-black text-white text-sm sm:text-base">
+                  Vista protegida — Muestra sin comprar
+                </p>
+                <p class="text-xs text-zinc-300 mt-1 max-w-xs">
+                  Descarga la fotografía original en máxima calidad 4K y sin marcas de agua agregándola al carrito.
+                </p>
+                <button
+                  type="button"
+                  (click)="dismissPrivacyShield($event)"
+                  class="mt-4 min-h-[40px] px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold text-xs transition"
+                >
+                  Continuar viendo muestra
+                </button>
+              </div>
+            }
           </div>
 
           <!-- Botón Foto Siguiente (Desktop / Tablet) -->
@@ -222,6 +274,12 @@ export class LightboxComponent {
   public readonly isSelected = input<boolean>(false);
   public readonly isFreeDownload = input<boolean>(false);
   public readonly isPurchased = input<boolean>(false);
+
+  public readonly showWatermarkShield = computed<boolean>(() => {
+    return !this.isFreeDownload() && !this.isPurchased();
+  });
+
+  public readonly privacyShieldActive = signal<boolean>(false);
 
   public readonly formattedSequenceNumber = computed<string>(() => {
     return '#' + String(this.currentIndex() + 1).padStart(3, '0');
@@ -378,17 +436,55 @@ export class LightboxComponent {
     }
   }
 
+  public onWindowBlur(): void {
+    if (this.isOpen() && this.showWatermarkShield()) {
+      this.privacyShieldActive.set(true);
+    }
+  }
+
+  public onWindowFocus(): void {
+    if (this.privacyShieldActive()) {
+      this.privacyShieldActive.set(false);
+    }
+  }
+
+  public onVisibilityChange(): void {
+    if (typeof document === 'undefined') return;
+    if (document.hidden && this.isOpen() && this.showWatermarkShield()) {
+      this.privacyShieldActive.set(true);
+    }
+  }
+
+  public dismissPrivacyShield(event?: Event): void {
+    event?.stopPropagation();
+    this.privacyShieldActive.set(false);
+  }
+
   public handleKeydown(event: KeyboardEvent): void {
     if (!this.isOpen()) return;
+    if (this.showWatermarkShield()) {
+      const keyLower = event.key.toLowerCase();
+      const isPrintScreen = event.key === 'PrintScreen';
+      const isSaveShortcut = (event.ctrlKey || event.metaKey) && keyLower === 's';
+      const isMacScreenshot = event.metaKey && event.shiftKey && ['3', '4', '5'].includes(keyLower);
+      if (isPrintScreen || isSaveShortcut || isMacScreenshot) {
+        event.preventDefault();
+        this.privacyShieldActive.set(true);
+        return;
+      }
+    }
     if (event.key === 'Escape') {
+      this.privacyShieldActive.set(false);
       this.resetZoom();
       this.close.emit();
     }
     if (event.key === 'ArrowRight') {
+      this.privacyShieldActive.set(false);
       this.resetZoom();
       this.next.emit();
     }
     if (event.key === 'ArrowLeft') {
+      this.privacyShieldActive.set(false);
       this.resetZoom();
       this.prev.emit();
     }

@@ -251,6 +251,8 @@ export interface BulkPhotoActionResponse {
   success: boolean;
   action: 'mark_hd' | 'unmark_hd' | 'delete';
   affected: number;
+  coverUrl?: string;
+  photosCount?: number;
   message: string;
 }
 

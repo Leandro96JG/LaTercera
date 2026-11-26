@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createServer, Server } from 'http';
 import sharp from 'sharp';
-import { app, adminAuthService, categoryRepository } from '../src/index';
+import { app, adminAuthService, categoryRepository, albumRepository } from '../src/index';
 
 describe('Admin Albums API Endpoints (/api/admin/albums)', () => {
   let server: Server;
@@ -696,6 +696,68 @@ describe('Admin Albums API Endpoints (/api/admin/albums)', () => {
       const checkData = await checkRes.json();
       expect(checkData.photos[0].id).toBe(targetPhotoIds[0]);
       expect(checkData.photos[1].id).toBe(targetPhotoIds[1]);
+    });
+
+    it('POST /api/admin/albums/:id/photos/bulk-action debe permitir seleccionar y eliminar todas las fotos incluso superando 200', async () => {
+      const createRes = await fetch(`${baseUrl}/api/admin/albums`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({
+          title: 'Álbum Borrado Masivo Completo',
+          category: 'futbol',
+          unitPrice: 1500,
+          fullAlbumPrice: 12000
+        })
+      });
+      expect(createRes.status).toBe(201);
+      const { album } = await createRes.json();
+
+      const totalPhotos = 250;
+      const seededPhotos = Array.from({ length: totalPhotos }, (_, idx) => ({
+        id: `bulk-del-${idx + 1}`,
+        albumId: album.id,
+        filename: `foto_${idx + 1}.jpg`,
+        originalPath: `originals/${album.id}/bulk-del-${idx + 1}.jpg`,
+        previewUrl: `https://cdn.example.com/bulk-del-${idx + 1}.webp`,
+        isSampleHd: idx < 2,
+        width: 1920,
+        height: 1080,
+        sizeBytes: 102400,
+        createdAt: new Date().toISOString()
+      }));
+      await albumRepository.addPhotosToAlbum(album.id, seededPhotos);
+      await albumRepository.updateAlbum(album.id, {
+        photosCount: totalPhotos,
+        coverUrl: seededPhotos[0].previewUrl
+      });
+
+      const allIds = seededPhotos.map((p) => p.id);
+      const bulkRes = await fetch(`${baseUrl}/api/admin/albums/${album.id}/photos/bulk-action`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({ action: 'delete', photoIds: allIds })
+      });
+
+      expect(bulkRes.status).toBe(200);
+      const bulkData = await bulkRes.json();
+      expect(bulkData.success).toBe(true);
+      expect(bulkData.affected).toBe(totalPhotos);
+
+      const getRes = await fetch(`${baseUrl}/api/admin/albums/${album.id}/photos`, {
+        headers: { Authorization: `Bearer ${adminToken}` }
+      });
+      const getData = await getRes.json();
+      expect(getData.photos).toEqual([]);
+
+      const updatedAlbum = await albumRepository.getAlbumById(album.id);
+      expect(updatedAlbum?.photosCount).toBe(0);
+      expect(updatedAlbum?.coverUrl).toBe('');
     });
   });
 });

@@ -42,7 +42,8 @@ import { AlbumService } from '../../core/services/album.service';
       <!-- CONTENEDOR DE LA IMAGEN CON PROPORCIÓN Y CAPA ANTI-DESCARGA -->
       <div
         (click)="onViewClicked($event)"
-        class="relative w-full aspect-[4/3] rounded-[20px] overflow-hidden bg-zinc-950 cursor-pointer select-none"
+        (contextmenu)="$event.preventDefault()"
+        class="anti-capture-zone relative w-full aspect-[4/3] rounded-[20px] overflow-hidden bg-zinc-950 cursor-pointer select-none"
         [style.user-select]="'none'"
         [style.-webkit-user-select]="'none'"
         tabindex="0"
@@ -95,6 +96,29 @@ import { AlbumService } from '../../core/services/album.service';
             (contextmenu)="$event.preventDefault()"
             draggable="false"
           />
+
+          <!-- ESCUDO RETROACTIVO ANTI-CAPTURA PARA ÁLBUMES NO GRATUITOS / NO COMPRADOS -->
+          @if (showWatermarkShield() && !isLoading()) {
+            <div
+              class="watermark-shield absolute inset-0 z-10 pointer-events-none select-none overflow-hidden"
+              aria-hidden="true"
+            >
+              <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="w-full h-full opacity-75">
+                <line x1="0" y1="0" x2="100" y2="100" stroke="rgba(255,255,255,0.28)" stroke-width="0.7" />
+                <line x1="100" y1="0" x2="0" y2="100" stroke="rgba(255,255,255,0.28)" stroke-width="0.7" />
+                <line x1="0" y1="0" x2="100" y2="100" stroke="rgba(0,0,0,0.22)" stroke-width="0.3" stroke-dasharray="2,2" />
+                <line x1="100" y1="0" x2="0" y2="100" stroke="rgba(0,0,0,0.22)" stroke-width="0.3" stroke-dasharray="2,2" />
+              </svg>
+              <div class="absolute inset-0 flex flex-col items-center justify-center -rotate-12 gap-1">
+                <span class="px-2.5 py-0.5 rounded bg-black/50 text-white/95 font-display font-black text-[10px] tracking-[0.18em] uppercase border border-white/20 shadow-sm">
+                  LA TERCERA
+                </span>
+                <span class="px-2 py-0.5 rounded bg-amber-400/85 text-zinc-950 font-black text-[8px] tracking-widest uppercase">
+                  MUESTRA SIN COMPRAR
+                </span>
+              </div>
+            </div>
+          }
         }
 
         <!-- BADGES SUPERIORES: NÚMERO SECUENCIAL E INSIGNIA HD -->
@@ -312,6 +336,10 @@ export class PhotoCardPolaroidComponent {
   public readonly albumId = input<string>();
   public readonly isSelected = input<boolean>(false);
   public readonly isPurchased = input<boolean>(false);
+
+  public readonly showWatermarkShield = computed<boolean>(() => {
+    return !this.isFreeDownload() && !this.isPurchased();
+  });
 
   public readonly freeDownloadUrl = computed<string>(() => {
     const albId = this.albumId();

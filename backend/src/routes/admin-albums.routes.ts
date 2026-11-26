@@ -1119,8 +1119,8 @@ export function createAdminAlbumsRouter(
       if (!action || !['mark_hd', 'unmark_hd', 'delete'].includes(action)) {
         return res.status(400).json({ success: false, error: 'Acción inválida (mark_hd | unmark_hd | delete)' });
       }
-      if (!Array.isArray(photoIds) || photoIds.length === 0 || photoIds.length > 200) {
-        return res.status(400).json({ success: false, error: 'Selecciona entre 1 y 200 fotografías.' });
+      if (!Array.isArray(photoIds) || photoIds.length === 0 || photoIds.length > 5000) {
+        return res.status(400).json({ success: false, error: 'Selecciona entre 1 y 5000 fotografías.' });
       }
 
       const album = await albumRepository.getAlbumById(albumId);
@@ -1131,43 +1131,82 @@ export function createAdminAlbumsRouter(
         return res.status(403).json({ success: false, error: 'No tienes permiso para modificar este álbum.' });
       }
 
-      let affected = 0;
       const uniqueIds = Array.from(new Set(photoIds));
-      let coverWasDeleted = false;
+      const allAlbumPhotos = await albumRepository.getPhotosByAlbumId(albumId);
+      const photoMap = new Map(allAlbumPhotos.map((p) => [p.id, p]));
+      const targetPhotos = uniqueIds
+        .map((id) => photoMap.get(id))
+        .filter((photo): photo is PhotoDTO => Boolean(photo));
+      const targetIds = targetPhotos.map((p) => p.id);
 
-      for (const photoId of uniqueIds) {
-        const photo = await albumRepository.getPhotoById(albumId, photoId);
-        if (!photo) continue;
+      let affected = 0;
+      let updatedCoverUrl: string | undefined;
+      let updatedPhotosCount: number | undefined;
 
+      if (targetIds.length > 0) {
         if (action === 'mark_hd' || action === 'unmark_hd') {
-          const updated = await albumRepository.updatePhoto(albumId, photoId, {
-            isSampleHd: action === 'mark_hd'
-          });
-          if (updated) affected += 1;
-        } else if (action === 'delete') {
-          if (album.coverUrl === photo.previewUrl) {
-            coverWasDeleted = true;
+          const isSampleHd = action === 'mark_hd';
+          if (albumRepository.updatePhotosBatch) {
+            affected = await albumRepository.updatePhotosBatch(albumId, targetIds, { isSampleHd });
+          } else {
+            const CHUNK = 20;
+            for (let i = 0; i < targetIds.length; i += CHUNK) {
+              const slice = targetIds.slice(i, i + CHUNK);
+              const results = await Promise.all(
+                slice.map((photoId) => albumRepository.updatePhoto(albumId, photoId, { isSampleHd }))
+              );
+              affected += results.filter(Boolean).length;
+            }
           }
-          if (storageService.deletePhotoFiles) {
+        } else if (action === 'delete') {
+          const coverWasDeleted = Boolean(
+            album.coverUrl && targetPhotos.some((p) => p.previewUrl === album.coverUrl)
+          );
+
+          const filesToDelete = targetPhotos.map((photo) => {
             const pathExtMatch = photo.originalPath?.match(/\.[a-zA-Z0-9]+$/);
             const nameExtMatch = photo.filename.match(/\.[a-zA-Z0-9]+$/);
             const ext = pathExtMatch ? pathExtMatch[0] : (nameExtMatch ? nameExtMatch[0] : '.jpg');
-            await storageService.deletePhotoFiles(albumId, photoId, ext);
-          }
-          await albumRepository.deletePhoto(albumId, photoId);
-          affected += 1;
-        }
-      }
+            return { photoId: photo.id, ext };
+          });
 
-      if (coverWasDeleted) {
-        const remaining = await albumRepository.getPhotosByAlbumId(albumId);
-        await albumRepository.updateAlbum(albumId, { coverUrl: remaining[0]?.previewUrl || '' });
+          if (storageService.deletePhotoFilesBatch) {
+            await storageService.deletePhotoFilesBatch(albumId, filesToDelete);
+          } else if (storageService.deletePhotoFiles) {
+            const CHUNK = 20;
+            for (let i = 0; i < filesToDelete.length; i += CHUNK) {
+              const slice = filesToDelete.slice(i, i + CHUNK);
+              await Promise.allSettled(
+                slice.map((item) => storageService.deletePhotoFiles!(albumId, item.photoId, item.ext))
+              );
+            }
+          }
+
+          if (albumRepository.deletePhotosBatch) {
+            affected = await albumRepository.deletePhotosBatch(albumId, targetIds);
+          } else {
+            for (const photoId of targetIds) {
+              const ok = await albumRepository.deletePhoto(albumId, photoId);
+              if (ok) affected += 1;
+            }
+          }
+
+          const remaining = await albumRepository.getPhotosByAlbumId(albumId);
+          updatedPhotosCount = remaining.length;
+
+          if (coverWasDeleted || remaining.length === 0) {
+            updatedCoverUrl = remaining[0]?.previewUrl || '';
+            await albumRepository.updateAlbum(albumId, { coverUrl: updatedCoverUrl });
+          }
+        }
       }
 
       return res.status(200).json({
         success: true,
         action,
         affected,
+        ...(updatedCoverUrl !== undefined ? { coverUrl: updatedCoverUrl } : {}),
+        ...(updatedPhotosCount !== undefined ? { photosCount: updatedPhotosCount } : {}),
         message: `Acción aplicada sobre ${affected} fotografía(s).`
       });
     } catch (error: unknown) {

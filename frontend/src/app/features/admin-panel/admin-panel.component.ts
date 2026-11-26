@@ -2361,6 +2361,7 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     this.isPhotosModalOpen.set(true);
     this.photosModalError.set(null);
     this.photosModalFeedback.set(null);
+    this.selectedModalPhotoIds.set(new Set());
     this.albumPhotos.set([]);
     this.loadAlbumPhotos(album.id);
   }
@@ -2369,6 +2370,7 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     this.isPhotosModalOpen.set(false);
     this.selectedAlbumForPhotos.set(null);
     this.albumPhotos.set([]);
+    this.selectedModalPhotoIds.set(new Set());
     this.photosModalError.set(null);
     this.photosModalFeedback.set(null);
     this.isPhotosOrderDirty.set(false);
@@ -3299,38 +3301,90 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     this.isBulkPhotoActionRunning.set(true);
     this.photosModalFeedback.set(null);
 
-    this.adminService.bulkPhotosAction(album.id, action, ids).subscribe({
-      next: (res) => {
+    const BATCH_SIZE = 100;
+    const chunks: string[][] = [];
+    for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+      chunks.push(ids.slice(i, i + BATCH_SIZE));
+    }
+
+    let totalAffected = 0;
+    const processedIds: string[] = [];
+    let lastServerCoverUrl: string | undefined;
+    let lastMessage = '';
+
+    const applyLocalChanges = (completedIds: string[]): void => {
+      if (completedIds.length === 0) return;
+      const completedSet = new Set(completedIds);
+
+      if (action === 'mark_hd' || action === 'unmark_hd') {
+        const isHd = action === 'mark_hd';
+        this.albumPhotos.update(list => list.map(p => (completedSet.has(p.id) ? { ...p, isSampleHd: isHd } : p)));
+      } else if (action === 'delete') {
+        const currentPhotos = this.albumPhotos();
+        const deletedPhotos = currentPhotos.filter(p => completedSet.has(p.id));
+        const remaining = currentPhotos.filter(p => !completedSet.has(p.id));
+        this.albumPhotos.set(remaining);
+
+        const newCount = remaining.length;
+        const deletedCover = deletedPhotos.some(p => p.previewUrl === album.coverUrl);
+        const newCover = lastServerCoverUrl !== undefined
+          ? lastServerCoverUrl
+          : (deletedCover || newCount === 0 ? (remaining[0]?.previewUrl || '') : album.coverUrl);
+
+        this.selectedAlbumForPhotos.set({ ...album, photosCount: newCount, coverUrl: newCover });
+        this.albums.update(list =>
+          list.map(a => (a.id === album.id ? { ...a, photosCount: newCount, coverUrl: newCover } : a))
+        );
+      }
+    };
+
+    const runNextChunk = (chunkIndex: number): void => {
+      if (chunkIndex >= chunks.length) {
         this.isBulkPhotoActionRunning.set(false);
         this.clearModalPhotoSelection();
-
-        if (action === 'mark_hd' || action === 'unmark_hd') {
-          const idSet = new Set(ids);
-          const isHd = action === 'mark_hd';
-          this.albumPhotos.update(list => list.map(p => (idSet.has(p.id) ? { ...p, isSampleHd: isHd } : p)));
-        } else if (action === 'delete') {
-          const idSet = new Set(ids);
-          const remaining = this.albumPhotos().filter(p => !idSet.has(p.id));
-          this.albumPhotos.set(remaining);
-          const newCount = remaining.length;
-          const newCover = remaining[0]?.previewUrl || '';
-          this.selectedAlbumForPhotos.set({ ...album, photosCount: newCount, coverUrl: album.coverUrl || newCover });
-          this.albums.update(list => list.map(a => (a.id === album.id ? { ...a, photosCount: newCount } : a)));
-        }
+        applyLocalChanges(processedIds);
 
         this.photosModalFeedback.set({
-          message: res.message || `Acción aplicada sobre ${res.affected} fotos.`,
+          message: chunks.length > 1
+            ? `Acción aplicada sobre ${totalAffected} fotografía(s).`
+            : (lastMessage || `Acción aplicada sobre ${totalAffected} fotografía(s).`),
           success: true
         });
-      },
-      error: (err) => {
-        this.isBulkPhotoActionRunning.set(false);
-        this.photosModalFeedback.set({
-          message: this.extractErrorMessage(err, 'Error al aplicar la acción en lote.'),
-          success: false
-        });
+        return;
       }
-    });
+
+      const currentChunk = chunks[chunkIndex];
+      this.adminService.bulkPhotosAction(album.id, action, currentChunk).subscribe({
+        next: (res) => {
+          totalAffected += res.affected ?? currentChunk.length;
+          processedIds.push(...currentChunk);
+          if (res.coverUrl !== undefined) {
+            lastServerCoverUrl = res.coverUrl;
+          }
+          if (res.message) {
+            lastMessage = res.message;
+          }
+          runNextChunk(chunkIndex + 1);
+        },
+        error: (err) => {
+          this.isBulkPhotoActionRunning.set(false);
+          if (processedIds.length > 0) {
+            applyLocalChanges(processedIds);
+            this.selectedModalPhotoIds.update((prev) => {
+              const next = new Set(prev);
+              for (const pid of processedIds) next.delete(pid);
+              return next;
+            });
+          }
+          this.photosModalFeedback.set({
+            message: this.extractErrorMessage(err, 'Error al aplicar la acción en lote.'),
+            success: false
+          });
+        }
+      });
+    };
+
+    runNextChunk(0);
   }
 
   public loadPhotographers(): void {
