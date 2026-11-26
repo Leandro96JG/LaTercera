@@ -20,6 +20,10 @@ import {
   TrashActionResponse,
   AdminOrdersResponse,
   RegenerateTokenResponse,
+  VerifyOrderMpResponse,
+  ResendOrderEmailResponse,
+  BulkPhotoActionResponse,
+  PhotographerItem,
   AdminAlbumPhoto,
   AdminAlbumPhotosResponse,
   UpdateAlbumPhotoRequest,
@@ -261,6 +265,67 @@ export class AdminService {
     return this.http.post<RegenerateTokenResponse>(
       `${this.baseUrl}/orders/${orderId}/regenerate-token`,
       {},
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  /**
+   * Verifica manualmente el estado de un cobro contra Mercado Pago
+   */
+  public verifyOrderMercadoPago(orderId: string, paymentId?: string): Observable<VerifyOrderMpResponse> {
+    return this.http.post<VerifyOrderMpResponse>(
+      `${this.baseUrl}/orders/${orderId}/verify-mp`,
+      paymentId ? { paymentId } : {},
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  /**
+   * Reenvía manualmente el correo de descarga al comprador
+   */
+  public resendOrderEmail(orderId: string): Observable<ResendOrderEmailResponse> {
+    return this.http.post<ResendOrderEmailResponse>(
+      `${this.baseUrl}/orders/${orderId}/resend-email`,
+      {},
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  /**
+   * Lista los fotógrafos registrados
+   */
+  public getPhotographers(): Observable<{ success: boolean; photographers: PhotographerItem[] }> {
+    return this.http.get<{ success: boolean; photographers: PhotographerItem[] }>(
+      `${this.baseUrl}/photographers`,
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  /**
+   * Activa o desactiva la cuenta de un fotógrafo colaborador
+   */
+  public togglePhotographerActive(
+    photographerId: string,
+    isActive: boolean
+  ): Observable<{ success: boolean; photographer: PhotographerItem }> {
+    return this.http.patch<{ success: boolean; photographer: PhotographerItem }>(
+      `${this.baseUrl}/photographers/${photographerId}/toggle-active`,
+      { isActive },
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  /**
+   * Ejecuta acciones en lote sobre fotos seleccionadas (marcar HD, desmarcar HD, eliminar)
+   */
+  public bulkPhotosAction(
+    albumId: string,
+    action: 'mark_hd' | 'unmark_hd' | 'delete',
+    photoIds: string[]
+  ): Observable<BulkPhotoActionResponse> {
+    return this.http.post<BulkPhotoActionResponse>(
+      `${this.baseUrl}/albums/${albumId}/photos/bulk-action`,
+      { action, photoIds },
       { headers: this.getAuthHeaders() }
     );
   }

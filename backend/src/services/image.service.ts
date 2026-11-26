@@ -44,7 +44,7 @@ export function escapeXml(unsafe: string): string {
 export async function prepareWatermarkLogo(
   logoBuffer: Buffer,
   maxDimension: number = 400,
-  opacity: number = 0.40
+  opacity: number = 0.58
 ): Promise<Buffer> {
   const safeOpacity = Math.max(0.05, Math.min(1, opacity));
   return await sharp(logoBuffer)
@@ -107,15 +107,23 @@ export async function processImageWithWatermark(
       });
     }
 
-    // Badge superior izquierdo + marca sutil diagonal centrada
+    // Badge superior izquierdo + patrón diagonal sutil + marca central legible en claro/oscuro
     const svgHdWatermark = Buffer.from(`
       <svg width="${hdW}" height="${hdH}" xmlns="http://www.w3.org/2000/svg">
-        <rect x="20" y="20" width="220" height="40" rx="10" fill="rgba(0,0,0,0.6)" />
-        <text x="35" y="46" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="bold" fill="#FDB813">
+        <defs>
+          <pattern id="hdWmPattern" width="320" height="170" patternUnits="userSpaceOnUse" patternTransform="rotate(-25)">
+            <text x="20" y="65" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="900" fill="rgba(255,255,255,0.42)" stroke="rgba(0,0,0,0.42)" stroke-width="1.2" paint-order="stroke" letter-spacing="2">
+              ${safeWatermarkText}
+            </text>
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#hdWmPattern)" />
+        <rect x="20" y="20" width="225" height="40" rx="10" fill="rgba(0,0,0,0.72)" />
+        <text x="35" y="45" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="bold" fill="#FDB813">
           ✦ LA TERCERA HD MASTER
         </text>
         <g transform="translate(${Math.round(hdW / 2)}, ${Math.round(hdH / 2)}) rotate(-25)">
-          <text text-anchor="middle" y="0" font-family="DejaVu Sans, Arial, sans-serif" font-size="${Math.max(24, Math.round(hdW / 32))}" font-weight="900" fill="rgba(255,255,255,0.32)" stroke="rgba(0,0,0,0.25)" stroke-width="1" letter-spacing="4">
+          <text text-anchor="middle" y="0" font-family="DejaVu Sans, Arial, sans-serif" font-size="${Math.max(30, Math.round(hdW / 24))}" font-weight="900" fill="rgba(255,255,255,0.55)" stroke="rgba(0,0,0,0.55)" stroke-width="2" paint-order="stroke" letter-spacing="4">
             ${safeWatermarkText}
           </text>
         </g>
@@ -185,11 +193,11 @@ export async function processImageWithWatermark(
 
   // -------------------------------------------------------------
   // CASO 2: FOTOS DE CATÁLOGO INTERNAS (VENTA Y PROTECCIÓN ESTRICTA)
-  // Logo central al 35% de opacidad + micro-patrón diagonal repetido.
+  // Logo central reforzado + micro-patrón diagonal de alto contraste y sello central.
   // -------------------------------------------------------------
   if (options.logoBuffer) {
-    // Escala del logo central limitada al 40% del lado menor para no desbordar en fotos verticales
-    const maxLogoSize = Math.max(64, Math.round(minDim * 0.40));
+    // Escala del logo central limitada al 46% del lado menor para proteger sin tapar en exceso
+    const maxLogoSize = Math.max(72, Math.round(minDim * 0.46));
     const { data: centeredLogo, info: lInfo } = await sharp(options.logoBuffer)
       .resize({ width: maxLogoSize, height: maxLogoSize, fit: 'inside' })
       .toBuffer({ resolveWithObject: true });
@@ -205,20 +213,25 @@ export async function processImageWithWatermark(
     });
   }
 
-  // SVG con marca diagonal repetida estampada en los píxeles con dimensiones idénticas
+  // SVG con marca diagonal repetida de alto contraste (borde oscuro + relleno luminoso) y sello central
   const svgWatermark = Buffer.from(`
     <svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <pattern id="wmPattern" width="260" height="140" patternUnits="userSpaceOnUse" patternTransform="rotate(-25)">
-          <text x="20" y="50" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="900" fill="rgba(255,255,255,0.45)" letter-spacing="2">
+        <pattern id="wmPattern" width="250" height="135" patternUnits="userSpaceOnUse" patternTransform="rotate(-25)">
+          <text x="16" y="48" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="900" fill="rgba(255,255,255,0.62)" stroke="rgba(0,0,0,0.52)" stroke-width="1.4" paint-order="stroke" letter-spacing="2">
             ${safeWatermarkText}
           </text>
-          <text x="20" y="110" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700" fill="rgba(253,184,19,0.35)" letter-spacing="1">
+          <text x="16" y="106" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="800" fill="rgba(253,184,19,0.54)" stroke="rgba(0,0,0,0.48)" stroke-width="1.2" paint-order="stroke" letter-spacing="1.5">
             PROHIBIDA SU COPIA
           </text>
         </pattern>
       </defs>
       <rect width="100%" height="100%" fill="url(#wmPattern)" />
+      <g transform="translate(${Math.round(w / 2)}, ${Math.round(h / 2)}) rotate(-25)">
+        <text text-anchor="middle" y="0" font-family="DejaVu Sans, Arial, sans-serif" font-size="${Math.max(22, Math.round(minDim / 18))}" font-weight="900" fill="rgba(255,255,255,0.50)" stroke="rgba(0,0,0,0.58)" stroke-width="2" paint-order="stroke" letter-spacing="3">
+          ${safeWatermarkText}
+        </text>
+      </g>
     </svg>
   `);
   compositeLayers.push({ input: svgWatermark, blend: 'over' });

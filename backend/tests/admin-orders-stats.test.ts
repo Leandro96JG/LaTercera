@@ -320,5 +320,77 @@ describe('Admin Orders & Real Stats Suite', () => {
       const updatedInRepo = await orderRepository.getOrderById(order.id);
       expect(updatedInRepo?.downloadToken).toBe(body.downloadToken);
     });
+
+    it('debe rechazar regeneración de token con 400 si la orden está en estado PENDING', async () => {
+      const pendingOrder = await orderRepository.createOrder({
+        id: 'ord_pending_no_renew',
+        albumId: 'album-1',
+        photoIds: ['foto_1'],
+        isFullAlbum: false,
+        photoCount: 1,
+        unitPrice: 1200,
+        subtotal: 1200,
+        discount: 0,
+        discountPercentage: 0,
+        totalAmount: 1200,
+        currency: 'ARS',
+        customer: { email: 'pending@test.com' },
+        status: 'PENDING',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+
+      const res = await fetch(`${baseUrl}/api/admin/orders/${pendingOrder.id}/regenerate-token`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${adminToken}` }
+      });
+
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('Phase 4 Admin Support & Photographers Endpoints', () => {
+    it('debe reenviar el correo de descarga para órdenes PAID via POST /orders/:orderId/resend-email', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/orders/ord_renew_test/resend-email`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${adminToken}` }
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.success).toBe(true);
+      expect(body.orderId).toBe('ord_renew_test');
+      expect(body.downloadToken).toBeTruthy();
+    });
+
+    it('debe listar fotógrafos sin exponer passwordHash y permitir activar/desactivar cuentas', async () => {
+      const created = await authService.registerPhotographerAsync({
+        email: 'colab@latercera.com.ar',
+        password: 'Password123!',
+        name: 'Colaborador Test',
+        role: 'photographer'
+      });
+
+      const listRes = await fetch(`${baseUrl}/api/admin/photographers`, {
+        headers: { Authorization: `Bearer ${adminToken}` }
+      });
+      expect(listRes.status).toBe(200);
+      const listBody = await listRes.json();
+      expect(listBody.success).toBe(true);
+      expect(listBody.photographers.some((p: any) => p.email === 'colab@latercera.com.ar')).toBe(true);
+      expect(listBody.photographers.every((p: any) => p.passwordHash === undefined)).toBe(true);
+
+      const toggleRes = await fetch(`${baseUrl}/api/admin/photographers/${created.id}/toggle-active`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({ isActive: false })
+      });
+      expect(toggleRes.status).toBe(200);
+      const toggleBody = await toggleRes.json();
+      expect(toggleBody.photographer.isActive).toBe(false);
+    });
   });
 });

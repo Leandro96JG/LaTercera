@@ -33,8 +33,9 @@ export class PaymentService {
     );
   }
 
-  public getOrderStatus(orderId: string): Observable<OrderStatusResponse> {
-    return this.http.get<OrderStatusResponse>(`${this.apiUrl}/orders/${orderId}`);
+  public getOrderStatus(orderId: string, statusNonce?: string): Observable<OrderStatusResponse> {
+    const qs = statusNonce ? `?nonce=${encodeURIComponent(statusNonce)}` : '';
+    return this.http.get<OrderStatusResponse>(`${this.apiUrl}/orders/${orderId}${qs}`);
   }
 
   /**

@@ -60,13 +60,19 @@ describe('Pricing Service - Cálculo de Precios y Packs', () => {
     expect(result.isFullAlbum).toBe(true);
   });
 
-  it('debe aplicar cupón de descuento adicional sobre el total si coupon es undefined (retrocompatibilidad)', () => {
+  it('debe aplicar cupón validado desde repositorio sobre el total', () => {
     const result = calculateCartTotal({
       photoCount: 1,
       unitPrice: UNIT_PRICE,
       fullAlbumPrice: FULL_ALBUM_PRICE,
       isFullAlbum: false,
-      couponCode: 'YUYO10'
+      couponCode: 'YUYO10',
+      coupon: {
+        code: 'YUYO10',
+        discountPercent: 10,
+        isActive: true,
+        usedCount: 0
+      }
     });
 
     // 1200 - 10% = 1080
@@ -75,7 +81,26 @@ describe('Pricing Service - Cálculo de Precios y Packs', () => {
     expect(result.couponApplied).toBe('YUYO10');
   });
 
-  it('NO debe aplicar cupón YUYO10 si req.coupon es null (fue buscado en repositorio y no existe o está inactivo)', () => {
+  it('debe aplicar el tope fullAlbumPrice ANTES del cupón para no anular ni desperdiciar el cupón', () => {
+    const result = calculateCartTotal({
+      photoCount: 15, // 15 * 1200 = 18000 -> -30% = 12600 -> cap a 9500 -> -10% cupón = 8550
+      unitPrice: UNIT_PRICE,
+      fullAlbumPrice: FULL_ALBUM_PRICE,
+      isFullAlbum: false,
+      couponCode: 'YUYO10',
+      coupon: {
+        code: 'YUYO10',
+        discountPercent: 10,
+        isActive: true,
+        usedCount: 0
+      }
+    });
+
+    expect(result.total).toBe(8550);
+    expect(result.couponApplied).toBe('YUYO10');
+  });
+
+  it('NO debe aplicar cupón YUYO10 si req.coupon es null o undefined (cero fallbacks hardcodeados)', () => {
     const result = calculateCartTotal({
       photoCount: 1,
       unitPrice: UNIT_PRICE,
@@ -85,9 +110,19 @@ describe('Pricing Service - Cálculo de Precios y Packs', () => {
       coupon: null
     });
 
-    // 1200 sin descuento
+    const resultUndefined = calculateCartTotal({
+      photoCount: 1,
+      unitPrice: UNIT_PRICE,
+      fullAlbumPrice: FULL_ALBUM_PRICE,
+      isFullAlbum: false,
+      couponCode: 'YUYO10'
+    });
+
+    // 1200 sin descuento en ambos casos
     expect(result.total).toBe(1200);
     expect(result.discount).toBe(0);
     expect(result.couponApplied).toBeUndefined();
+    expect(resultUndefined.total).toBe(1200);
+    expect(resultUndefined.couponApplied).toBeUndefined();
   });
 });

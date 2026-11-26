@@ -1073,62 +1073,46 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
       // Ignorar defensivamente si la columna aún no está creada
     }
 
-    // 2. Limpieza de archivos en Supabase Storage (previews y originals) tolerante a fallos
-    try {
-      const { data: previewFiles } = await this.supabase.storage.from('previews').list(id);
-      if (previewFiles && previewFiles.length > 0) {
-        const paths = previewFiles.map(f => `${id}/${f.name}`);
-        await this.supabase.storage.from('previews').remove(paths);
+    // 2. Limpieza paginada (>100 archivos) en Supabase Storage (previews y originals)
+    const removeBucketFolderPaginated = async (bucket: 'previews' | 'originals'): Promise<void> => {
+      try {
+        let offset = 0;
+        const pageSize = 100;
+        while (true) {
+          const { data: files, error: listErr } = await this.supabase.storage
+            .from(bucket)
+            .list(id, { limit: pageSize, offset });
+          if (listErr || !files || files.length === 0) break;
+          const paths = files.map(f => `${id}/${f.name}`);
+          await this.supabase.storage.from(bucket).remove(paths);
+          if (files.length < pageSize) break;
+          offset += pageSize;
+        }
+      } catch (err: unknown) {
+        console.warn(`[SupabaseAlbumRepository] Aviso al purgar archivos ${bucket} de álbum ${id}:`, err);
       }
-    } catch (err: unknown) {
-      console.warn(`[SupabaseAlbumRepository] Aviso al purgar archivos previews de álbum ${id}:`, err);
+    };
+
+    await removeBucketFolderPaginated('previews');
+    await removeBucketFolderPaginated('originals');
+
+    // 3. Preservar integridad contable: desvincular órdenes históricas (album_id = null) sin borrar ni reasignar órdenes pagadas
+    const { error: unlinkOrdersErr } = await this.supabase
+      .from('orders')
+      .update({ album_id: null })
+      .eq('album_id', id);
+
+    if (unlinkOrdersErr) {
+      throw new Error(
+        `[SupabaseAlbumRepository] No se puede eliminar el álbum permanentemente porque tiene órdenes vinculadas: ${unlinkOrdersErr.message}`
+      );
     }
 
-    try {
-      const { data: originalFiles } = await this.supabase.storage.from('originals').list(id);
-      if (originalFiles && originalFiles.length > 0) {
-        const paths = originalFiles.map(f => `${id}/${f.name}`);
-        await this.supabase.storage.from('originals').remove(paths);
-      }
-    } catch (err: unknown) {
-      console.warn(`[SupabaseAlbumRepository] Aviso al purgar archivos originals de álbum ${id}:`, err);
-    }
-
-    // 3. Eliminar explícitamente todas las fotos vinculadas en la tabla photos
+    // 4. Eliminar explícitamente todas las fotos vinculadas en la tabla photos
     try {
       await this.supabase.from('photos').delete().eq('album_id', id);
     } catch (err: unknown) {
       console.warn('[SupabaseAlbumRepository] Aviso al borrar fotos vinculadas:', err);
-    }
-
-    // 4. Desvincular órdenes históricas de este álbum
-    try {
-      const { error: unlinkOrdersErr } = await this.supabase
-        .from('orders')
-        .update({ album_id: null })
-        .eq('album_id', id);
-
-      if (unlinkOrdersErr && unlinkOrdersErr.message.includes('not-null constraint')) {
-        const { data: otherAlbums } = await this.supabase
-          .from('albums')
-          .select('id')
-          .neq('id', id)
-          .limit(1);
-
-        if (otherAlbums && otherAlbums.length > 0) {
-          await this.supabase.from('orders').update({ album_id: otherAlbums[0].id }).eq('album_id', id);
-        } else {
-          // Si no hay otro álbum y album_id tiene NOT NULL, limpiar órdenes de prueba para permitir el borrado
-          try {
-            await this.supabase.from('download_tokens').delete().eq('album_id', id);
-          } catch {}
-          try {
-            await this.supabase.from('orders').delete().eq('album_id', id);
-          } catch {}
-        }
-      }
-    } catch (err: unknown) {
-      console.warn('[SupabaseAlbumRepository] Aviso al desvincular órdenes históricas:', err);
     }
 
     // 5. Eliminar el álbum físicamente de la tabla albums

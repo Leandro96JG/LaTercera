@@ -67,10 +67,11 @@ export function validateMercadoPagoWebhook(input: WebhookValidationInput): Webho
     };
   }
 
-  // Construir manifest oficial según documentación de Mercado Pago
+  // Construir manifest oficial según documentación de Mercado Pago (v2)
   // Formato: id:[data.id];request-id:[x-request-id];ts:[ts];
-  // Importante: usar el tsStr original enviado por Mercado Pago en el manifest
-  const manifest = `id:${dataId};request-id:${xRequestId};ts:${tsStr};`;
+  // Si data.id es alfanumérico, la especificación exige minúsculas.
+  const normalizedDataId = /^[a-z0-9]+$/i.test(dataId) ? dataId.toLowerCase() : dataId;
+  const manifest = `id:${normalizedDataId};request-id:${xRequestId};ts:${tsStr};`;
 
   // Calcular HMAC-SHA256 con el secreto configurado
   const computedHash = crypto

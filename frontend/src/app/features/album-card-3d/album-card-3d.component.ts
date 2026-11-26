@@ -23,10 +23,7 @@ import { Album } from '../../core/models/album.model';
     '[style.animation-delay]': 'staggerDelay()',
     '(pointerenter)': 'onPointerEnter($event)',
     '(pointerleave)': 'onPointerLeave()',
-    '(pointermove)': 'onPointerMove($event)',
-    '(touchstart)': 'onTouchStart()',
-    '(touchend)': 'onTouchEnd()',
-    '(touchcancel)': 'onTouchEnd()'
+    '(pointermove)': 'onPointerMove($event)'
   },
   template: `
     <article
@@ -40,11 +37,10 @@ import { Album } from '../../core/models/album.model';
       role="button"
       [attr.aria-label]="'Carpeta 3D del álbum ' + album().title + (album().isPrivate && !isUnlocked() ? ' (Privado, requiere PIN)' : '')"
     >
-      <!-- CONTENEDOR 3D DE LA CARPETA CON PERSPECTIVA -->
+      <!-- CONTENEDOR 3D DE LA CARPETA CON PERSPECTIVA (2D GPU en móviles táctiles) -->
       <div
-        class="folder-container relative w-full aspect-[4/3] rounded-[30px] bg-zinc-950 border border-zinc-800/90 shadow-2xl transition-all duration-300 ease-out transform-gpu group-hover:shadow-amber-500/10 group-hover:border-zinc-700/80"
+        class="folder-container relative w-full aspect-[4/3] rounded-[30px] bg-zinc-950 border border-zinc-800/90 shadow-xl transition-transform duration-300 ease-out transform-gpu group-hover:border-zinc-700/80"
         [class.is-open]="isOpenState()"
-        [class.is-active-gpu]="isOpenState()"
         [style.--tilt-rx]="tiltRotateX() + 'deg'"
         [style.--tilt-ry]="tiltRotateY() + 'deg'"
       >
@@ -74,7 +70,7 @@ import { Album } from '../../core/models/album.model';
           </div>
 
           <!-- Categoría en Vertical con Tipografía Nítida -->
-          <span class="text-[9px] font-mono tracking-widest text-zinc-400 uppercase -rotate-90 whitespace-nowrap font-bold select-none my-2 drop-shadow">
+          <span class="text-[9px] font-mono tracking-widest text-zinc-400 uppercase -rotate-90 whitespace-nowrap font-bold select-none my-2">
             {{ album().category }}
           </span>
 
@@ -88,34 +84,31 @@ import { Album } from '../../core/models/album.model';
         <!-- INTERIOR DERECHO: EFECTO DE HOJAS / FOTOS APILADAS       -->
         <!-- ======================================================== -->
         <div class="absolute inset-0 left-9 sm:left-11 rounded-r-[30px] overflow-hidden bg-zinc-950 p-2.5 sm:p-3 pointer-events-none">
-          <!-- Hoja Apilada 1 -->
+          <!-- Hoja Apilada 1 (Solo desktop hover) -->
           <div
-            class="stacked-sheet sheet-1 absolute inset-3 rounded-2xl bg-zinc-800/80 border border-zinc-700/60 shadow-md transform-gpu transition-transform duration-500 ease-out origin-bottom-left"
+            class="stacked-sheet sheet-1 hidden sm:block absolute inset-3 rounded-2xl bg-zinc-800/80 border border-zinc-700/60 transform-gpu transition-transform duration-500 ease-out origin-bottom-left"
             [class.sheet-open]="isOpenState()"
           ></div>
 
-          <!-- Hoja Apilada 2 -->
+          <!-- Hoja Apilada 2 (Solo desktop hover) -->
           <div
-            class="stacked-sheet sheet-2 absolute inset-2.5 rounded-2xl bg-zinc-900 border border-zinc-700/80 shadow-lg transform-gpu transition-transform duration-500 ease-out origin-bottom-left"
+            class="stacked-sheet sheet-2 hidden sm:block absolute inset-2.5 rounded-2xl bg-zinc-900 border border-zinc-700/80 transform-gpu transition-transform duration-500 ease-out origin-bottom-left"
             [class.sheet-open]="isOpenState()"
           ></div>
 
-          <!-- Foto Principal Interior (Revelada al abrir la tapa) -->
-          <div class="relative w-full h-full rounded-2xl overflow-hidden bg-zinc-900 shadow-inner z-10">
+          <!-- Foto Principal Interior (Visible y nítida) -->
+          <div class="relative w-full h-full rounded-2xl overflow-hidden bg-zinc-900 z-10">
             <img
               [src]="album().coverUrl"
               [alt]="'Portada interior de ' + album().title"
               loading="lazy"
               decoding="async"
-              class="w-full h-full object-cover transform-gpu transition-transform duration-700 ease-out brightness-95 group-hover:scale-105 group-hover:brightness-105"
+              width="480"
+              height="360"
+              class="w-full h-full object-cover transform-gpu transition-transform duration-700 ease-out brightness-95 sm:group-hover:scale-105"
             />
             <!-- Gradiente de profundidad interior -->
             <div class="absolute inset-0 bg-gradient-to-t from-zinc-950/90 via-zinc-950/25 to-transparent"></div>
-
-            <!-- Contador de fotos en esquina interior (sin backdrop-blur para no degradar GPU móvil) -->
-            <div class="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-lg bg-black/90 border border-white/10 text-[10px] font-mono text-zinc-300">
-              {{ album().photosCount }} hojas
-            </div>
           </div>
         </div>
 
@@ -123,9 +116,8 @@ import { Album } from '../../core/models/album.model';
         <!-- TAPA FRONTAL ABATIBLE 3D (OPEN COVER & SPECULAR SHINE)    -->
         <!-- ======================================================== -->
         <div
-          class="cover-flap absolute inset-0 left-9 sm:left-11 rounded-r-[30px] bg-zinc-950/95 border-l border-white/10 p-4 sm:p-5 flex flex-col justify-between transition-all duration-500 ease-out origin-left z-20 shadow-xl overflow-hidden"
+          class="cover-flap absolute inset-0 left-9 sm:left-11 rounded-r-[30px] bg-gradient-to-t from-zinc-950 via-zinc-950/85 to-zinc-950/35 border-l border-white/10 p-4 sm:p-5 flex flex-col justify-between transition-transform duration-500 ease-out origin-left z-20 shadow-xl overflow-hidden"
           [class.flap-open]="isOpenState()"
-          [class.is-active-gpu]="isOpenState()"
           [style.--shine-x]="specularX() + '%'"
           [style.--shine-y]="specularY() + '%'"
         >
@@ -180,10 +172,10 @@ import { Album } from '../../core/models/album.model';
 
           <!-- Troquelado Central / Título y Metadatos del Evento -->
           <div class="relative z-10 my-auto py-2">
-            <h3 class="text-base sm:text-lg font-bold text-white tracking-tight line-clamp-2 min-h-[2.75rem] leading-snug group-hover:text-amber-400 transition-colors drop-shadow-md">
+            <h3 class="text-base sm:text-lg font-bold text-white tracking-tight line-clamp-2 min-h-[2.75rem] leading-snug group-hover:text-amber-400 transition-colors">
               {{ album().title }}
             </h3>
-            <p class="text-xs text-zinc-300 line-clamp-1 min-h-[1.125rem] font-medium mt-0.5 drop-shadow">
+            <p class="text-xs text-zinc-300 line-clamp-1 min-h-[1.125rem] font-medium mt-0.5">
               @if (album().subtitle) {
                 {{ album().subtitle }}
               } @else {
@@ -259,6 +251,8 @@ import { Album } from '../../core/models/album.model';
       perspective: 1000px;
       display: block;
       height: 100%;
+      content-visibility: auto;
+      contain-intrinsic-size: 320px;
     }
 
     .album-card-root {
@@ -270,18 +264,13 @@ import { Album } from '../../core/models/album.model';
       perspective: 1000px;
       transform-style: preserve-3d;
       transform: perspective(1000px) rotateX(var(--tilt-rx, 0deg)) rotateY(var(--tilt-ry, 0deg));
-      transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 400ms ease;
+      transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     @media (hover: hover) and (pointer: fine) {
       .album-card-root:hover .folder-container {
         transform: perspective(1000px) rotateX(var(--tilt-rx, 0deg)) rotateY(var(--tilt-ry, 0deg)) scale3d(1.02, 1.02, 1.02);
       }
-    }
-
-    .folder-container.is-active-gpu,
-    .cover-flap.is-active-gpu {
-      will-change: transform;
     }
 
     /* Solapa Frontal 3D */
@@ -292,27 +281,28 @@ import { Album } from '../../core/models/album.model';
       box-shadow: -4px 0 20px rgba(0, 0, 0, 0.4);
     }
 
-    /* Apertura 3D en Hover o Estado Abierto Activo */
+    /* Apertura 3D en Hover o Estado Abierto Activo (Solo Desktop con hover real) */
     .flap-open {
       transform: rotateY(-24deg) scale(0.985);
-      background-color: rgba(24, 24, 27, 0.85);
-      box-shadow: 12px 14px 28px rgba(0, 0, 0, 0.55);
     }
 
-    @media (max-width: 640px) {
-      .flap-open {
-        transform: rotateY(-18deg) scale(0.98);
-        box-shadow: 8px 10px 20px rgba(0, 0, 0, 0.45);
-      }
-    }
-
-    /* En celulares táctiles, deshabilitar inclinación continua 3D para scroll a 120fps */
+    /* En celulares táctiles, deshabilitar 3D preserve-3d y apertura de solapa para scroll a 120fps */
     @media (hover: none) and (pointer: coarse) {
-      .folder-container {
-        transform: none !important;
+      :host {
+        perspective: none;
+      }
+      .album-card-root,
+      .folder-container,
+      .cover-flap {
+        transform-style: flat !important;
         perspective: none !important;
       }
-      .specular-shine {
+      .folder-container,
+      .flap-open {
+        transform: none !important;
+      }
+      .specular-shine,
+      .stacked-sheet {
         display: none !important;
       }
     }
@@ -383,8 +373,7 @@ export class AlbumCard3dComponent {
 
   private cardRect: DOMRect | null = null;
   private animFrameId: number | null = null;
-  private pendingSpecularX = 50;
-  private pendingSpecularY = 50;
+  private lastMoveTimestamp = 0;
   private isCoarsePointer = false;
 
   // Inclinación reactiva suave de la carpeta (-5deg a +5deg)
@@ -400,7 +389,7 @@ export class AlbumCard3dComponent {
     return Number((factor * 5).toFixed(2));
   });
 
-  // Estado derivado para abrir la tapa (Desktop Hover, Mobile Viewport o Toque)
+  // Estado derivado para abrir la tapa (Desktop Hover o Toque explícito)
   public readonly isOpenState = computed<boolean>(() => {
     return this.isHovered() || this.isTouchActive() || this.isInViewportCenter();
   });
@@ -410,13 +399,13 @@ export class AlbumCard3dComponent {
       if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
         this.isCoarsePointer = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
       }
-      this.initMobileIntersectionObserver();
     });
   }
 
   public onPointerEnter(event?: PointerEvent): void {
+    if (event?.pointerType === 'touch' || this.isCoarsePointer) return;
     this.isHovered.set(true);
-    if (!this.isCoarsePointer && event) {
+    if (event) {
       const target = event.currentTarget as HTMLElement | null;
       if (target) {
         this.cardRect = target.getBoundingClientRect();
@@ -436,7 +425,11 @@ export class AlbumCard3dComponent {
   }
 
   public onPointerMove(event: PointerEvent): void {
-    if (!this.isHovered() || this.isCoarsePointer) return;
+    if (!this.isHovered() || this.isCoarsePointer || event.pointerType === 'touch') return;
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (this.lastMoveTimestamp > 0 && now - this.lastMoveTimestamp < 16) return;
+    this.lastMoveTimestamp = now;
+
     if (!this.cardRect && event.currentTarget) {
       const target = event.currentTarget as HTMLElement | null;
       if (target?.getBoundingClientRect) {
@@ -464,15 +457,6 @@ export class AlbumCard3dComponent {
     this.specularY.set(50);
   }
 
-  private scheduleShineUpdate(): void {
-    if (this.animFrameId) return;
-    this.animFrameId = requestAnimationFrame(() => {
-      this.specularX.set(Math.round(this.pendingSpecularX));
-      this.specularY.set(Math.round(this.pendingSpecularY));
-      this.animFrameId = null;
-    });
-  }
-
   public handleAction(event: Event): void {
     event.stopPropagation();
     const alb = this.album();
@@ -482,33 +466,5 @@ export class AlbumCard3dComponent {
     } else {
       this.selectAlbum.emit(alb);
     }
-  }
-
-  private initMobileIntersectionObserver(): void {
-    if (typeof window === 'undefined' || !('IntersectionObserver' in window)) return;
-
-    // Detectar si la pantalla es móvil/touch
-    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    if (!isTouchDevice) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          // Si el álbum se encuentra en el tercio central de la pantalla móvil
-          this.isInViewportCenter.set(entry.isIntersecting);
-        }
-      },
-      {
-        rootMargin: '-25% 0px -25% 0px',
-        threshold: 0.4
-      }
-    );
-
-    const el = this.elementRef.nativeElement;
-    observer.observe(el);
-
-    this.destroyRef.onDestroy(() => {
-      observer.disconnect();
-    });
   }
 }

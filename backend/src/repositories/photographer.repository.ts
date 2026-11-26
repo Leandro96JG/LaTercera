@@ -13,6 +13,9 @@ export interface CreatePhotographerInput {
 
 export interface IPhotographerRepository {
   findByEmail(email: string): Promise<PhotographerAccount | null>;
+  findById?(id: string): Promise<PhotographerAccount | null>;
+  listPhotographers?(): Promise<PhotographerAccount[]>;
+  setPhotographerActive?(id: string, isActive: boolean): Promise<PhotographerAccount | null>;
   createPhotographer(input: CreatePhotographerInput): Promise<PhotographerAccount>;
 }
 
@@ -63,6 +66,28 @@ export class MemoryPhotographerRepository implements IPhotographerRepository {
     this.photographers.set(normalizedEmail, newAccount);
     return { ...newAccount };
   }
+
+  async findById(id: string): Promise<PhotographerAccount | null> {
+    for (const acc of this.photographers.values()) {
+      if (acc.id === id) return { ...acc };
+    }
+    return null;
+  }
+
+  async listPhotographers(): Promise<PhotographerAccount[]> {
+    return Array.from(this.photographers.values()).map(p => ({ ...p }));
+  }
+
+  async setPhotographerActive(id: string, isActive: boolean): Promise<PhotographerAccount | null> {
+    for (const [key, acc] of this.photographers.entries()) {
+      if (acc.id === id) {
+        const updated = { ...acc, isActive };
+        this.photographers.set(key, updated);
+        return { ...updated };
+      }
+    }
+    return null;
+  }
 }
 
 export interface SupabasePhotographerRow {
@@ -109,10 +134,6 @@ export class SupabasePhotographerRepository implements IPhotographerRepository {
       .maybeSingle();
 
     if (error || !data) {
-      // Fallback para admin oficial si no fue inicializado en DB
-      if (email.trim().toLowerCase() === DEFAULT_ADMIN_ACCOUNT.email.toLowerCase()) {
-        return DEFAULT_ADMIN_ACCOUNT;
-      }
       return null;
     }
 
@@ -136,6 +157,48 @@ export class SupabasePhotographerRepository implements IPhotographerRepository {
 
     if (error) {
       throw new Error(`[Supabase Error createPhotographer] ${error.message}`);
+    }
+
+    return this.mapRowToPhotographer(data);
+  }
+
+  async findById(id: string): Promise<PhotographerAccount | null> {
+    const { data, error } = await this.supabase
+      .from('photographers')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return this.mapRowToPhotographer(data);
+  }
+
+  async listPhotographers(): Promise<PhotographerAccount[]> {
+    const { data, error } = await this.supabase
+      .from('photographers')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error || !data) {
+      return [];
+    }
+
+    return (data as SupabasePhotographerRow[]).map(r => this.mapRowToPhotographer(r));
+  }
+
+  async setPhotographerActive(id: string, isActive: boolean): Promise<PhotographerAccount | null> {
+    const { data, error } = await this.supabase
+      .from('photographers')
+      .update({ is_active: isActive, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .maybeSingle();
+
+    if (error || !data) {
+      return null;
     }
 
     return this.mapRowToPhotographer(data);

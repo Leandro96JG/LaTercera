@@ -1,10 +1,13 @@
 import crypto from 'crypto';
 import path from 'path';
 
+export type TokenScopeType = 'download' | 'album_access' | 'order_status';
+
 export interface DownloadTokenPayload {
   orderId: string;
   resourceType: 'photo' | 'album_zip';
   resourceId: string;
+  tokenType?: TokenScopeType;
   exp: number; // Unix epoch en segundos
   iat: number;
   nonce: string;
@@ -42,7 +45,8 @@ export class DownloadTokenService {
     orderId: string,
     resourceType: 'photo' | 'album_zip',
     resourceId: string,
-    durationSeconds: number = DownloadTokenService.DEFAULT_DURATION_SECONDS
+    durationSeconds: number = DownloadTokenService.DEFAULT_DURATION_SECONDS,
+    tokenType: TokenScopeType = 'download'
   ): string {
     const now = Math.floor(Date.now() / 1000);
     const sanitizedResource = this.sanitizeResourceId(resourceId);
@@ -51,6 +55,7 @@ export class DownloadTokenService {
       orderId,
       resourceType,
       resourceId: sanitizedResource,
+      tokenType,
       iat: now,
       exp: now + durationSeconds,
       nonce: crypto.randomBytes(16).toString('hex')
@@ -66,9 +71,23 @@ export class DownloadTokenService {
   }
 
   /**
-   * Valida la firma del token y su expiración temporal con prevención de timing attacks
+   * Genera un token exclusivo para acceso a álbum privado desbloqueado por PIN
    */
-  public verifyToken(token: string): TokenVerificationResult {
+  public generateAlbumAccessToken(albumId: string, durationSeconds: number = 24 * 3600): string {
+    return this.generateToken('pin_access', 'album_zip', albumId, durationSeconds, 'album_access');
+  }
+
+  /**
+   * Genera un nonce firmado para consultar el estado de una orden sin exponer IDOR
+   */
+  public generateStatusNonce(orderId: string, durationSeconds: number = 72 * 3600): string {
+    return this.generateToken(orderId, 'photo', orderId, durationSeconds, 'order_status');
+  }
+
+  /**
+   * Valida la firma del token, su expiración temporal y opcionalmente su alcance (tokenType)
+   */
+  public verifyToken(token: string, expectedType?: TokenScopeType): TokenVerificationResult {
     if (!token || typeof token !== 'string') {
       return { valid: false, error: 'Token no provisto o tipo inválido' };
     }
@@ -105,8 +124,15 @@ export class DownloadTokenService {
 
     // Validar expiración temporal
     const now = Math.floor(Date.now() / 1000);
-    if (now > payload.exp) {
+    if (typeof payload.exp !== 'number' || now > payload.exp) {
       return { valid: false, error: 'El enlace de descarga ha expirado (límite de 72 horas superado)' };
+    }
+
+    if (expectedType) {
+      const actualType: TokenScopeType = payload.tokenType || (payload.orderId === 'pin_access' ? 'album_access' : 'download');
+      if (actualType !== expectedType) {
+        return { valid: false, error: 'Tipo de token no autorizado para esta operación' };
+      }
     }
 
     return { valid: true, payload };

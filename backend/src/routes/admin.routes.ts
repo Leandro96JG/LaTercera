@@ -2,12 +2,18 @@ import { Router, Response } from 'express';
 import { AdminAuthService } from '../services/admin-auth.service';
 import {
   createRequireAdminAuth,
+  createRequireRole,
   AuthenticatedAdminRequest
 } from '../middleware/admin-auth.middleware';
 import { IOrderRepository, MemoryOrderRepository } from '../repositories/order.repository';
 import { IAlbumRepository, MemoryAlbumRepository } from '../repositories/album.repository';
+import { IPhotographerRepository } from '../repositories/photographer.repository';
 import { DownloadTokenService } from '../services/token.service';
 import { OrderService } from '../services/order.service';
+import {
+  EmailNotificationService,
+  IEmailNotificationService
+} from '../services/email.service';
 import {
   IPromotionRepository,
   MemoryPromotionRepository
@@ -20,6 +26,34 @@ import {
 import { adminLoginLimiter } from '../middleware/rate-limit.middleware';
 import { getPrimaryFrontendUrl } from '../config/env';
 
+export type VerifyPaymentFromMpFn = (
+  paymentId: string,
+  eventId: string
+) => Promise<{ success: boolean; alreadyProcessed?: boolean; fraudAlert?: boolean; error?: string }>;
+
+function extractTokenExpiry(token?: string): { tokenExpiresAt: string | null; isTokenExpired: boolean } {
+  if (!token) {
+    return { tokenExpiresAt: null, isTokenExpired: false };
+  }
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      return { tokenExpiresAt: null, isTokenExpired: false };
+    }
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8')) as { exp?: number };
+    if (typeof payload.exp !== 'number' || !Number.isFinite(payload.exp)) {
+      return { tokenExpiresAt: null, isTokenExpired: false };
+    }
+    const expMs = payload.exp * 1000;
+    return {
+      tokenExpiresAt: new Date(expMs).toISOString(),
+      isTokenExpired: expMs <= Date.now()
+    };
+  } catch {
+    return { tokenExpiresAt: null, isTokenExpired: false };
+  }
+}
+
 export function createAdminRouter(
   authService: AdminAuthService,
   orderRepository?: IOrderRepository,
@@ -27,14 +61,20 @@ export function createAdminRouter(
   tokenService?: DownloadTokenService,
   orderService?: OrderService,
   promotionRepository?: IPromotionRepository,
-  categoryRepository?: ICategoryRepository
+  categoryRepository?: ICategoryRepository,
+  emailService?: IEmailNotificationService,
+  photographerRepository?: IPhotographerRepository,
+  verifyPaymentFn?: VerifyPaymentFromMpFn
 ): Router {
   const router = Router();
   const requireAdminAuth = createRequireAdminAuth(authService);
+  const requireAdminOnly = createRequireRole('admin');
   const orderRepo = orderRepository || new MemoryOrderRepository();
   const albumRepo = albumRepository || new MemoryAlbumRepository();
   const promoRepo = promotionRepository || new MemoryPromotionRepository();
   const catRepo = categoryRepository || new MemoryCategoryRepository();
+  const emailSvc = emailService || new EmailNotificationService();
+  const photographerRepo = photographerRepository || authService.getRepository();
   const tokenSvc =
     tokenService ||
     new DownloadTokenService(
@@ -73,7 +113,7 @@ export function createAdminRouter(
   });
 
   // 3. Métricas y estadísticas administrativas calculadas en vivo
-  router.get('/stats', requireAdminAuth, async (req: AuthenticatedAdminRequest, res: Response) => {
+  router.get('/stats', requireAdminAuth, requireAdminOnly, async (req: AuthenticatedAdminRequest, res: Response) => {
     try {
       const orders = await orderRepo.listAllOrders();
       const paidOrders = orders.filter(o => o.status === 'PAID');
@@ -110,7 +150,7 @@ export function createAdminRouter(
   });
 
   // 4. Lista de órdenes y ventas administrativas
-  router.get('/orders', requireAdminAuth, async (req: AuthenticatedAdminRequest, res: Response) => {
+  router.get('/orders', requireAdminAuth, requireAdminOnly, async (req: AuthenticatedAdminRequest, res: Response) => {
     try {
       const orders = await orderRepo.listAllOrders();
       const allAlbums = await albumRepo.listAllAdmin();
@@ -118,33 +158,40 @@ export function createAdminRouter(
 
       const frontendUrl = getPrimaryFrontendUrl();
 
-      const enrichedOrders = orders.map(order => ({
-        id: order.id,
-        albumId: order.albumId,
-        albumTitle: albumMap.get(order.albumId) || order.albumId,
-        photoIds: order.photoIds,
-        isFullAlbum: order.isFullAlbum,
-        photoCount: order.photoCount,
-        unitPrice: order.unitPrice,
-        subtotal: order.subtotal,
-        discount: order.discount,
-        discountPercentage: order.discountPercentage,
-        totalAmount: order.totalAmount,
-        currency: order.currency,
-        customer: {
-          email: order.customer.email,
-          name: order.customer.name,
-          phone: order.customer.phone
-        },
-        couponApplied: order.couponApplied,
-        status: order.status,
-        preferenceId: order.preferenceId,
-        paymentId: order.paymentId,
-        downloadToken: order.downloadToken,
-        downloadUrl: order.downloadToken ? `${frontendUrl}/pago-exitoso?token=${order.downloadToken}` : null,
-        createdAt: order.createdAt,
-        updatedAt: order.updatedAt
-      }));
+      const enrichedOrders = orders.map(order => {
+        const { tokenExpiresAt, isTokenExpired } = extractTokenExpiry(order.downloadToken);
+        return {
+          id: order.id,
+          albumId: order.albumId,
+          albumTitle: albumMap.get(order.albumId) || order.albumId,
+          photoIds: order.photoIds,
+          isFullAlbum: order.isFullAlbum,
+          photoCount: order.photoCount,
+          unitPrice: order.unitPrice,
+          subtotal: order.subtotal,
+          discount: order.discount,
+          discountPercentage: order.discountPercentage,
+          totalAmount: order.totalAmount,
+          currency: order.currency,
+          customer: {
+            email: order.customer.email,
+            name: order.customer.name,
+            phone: order.customer.phone
+          },
+          couponApplied: order.couponApplied,
+          status: order.status,
+          preferenceId: order.preferenceId,
+          paymentId: order.paymentId,
+          downloadToken: order.downloadToken,
+          downloadUrl: order.downloadToken ? `${frontendUrl}/pago-exitoso?token=${order.downloadToken}` : null,
+          tokenExpiresAt,
+          isTokenExpired,
+          downloadCount: order.downloadCount ?? 0,
+          lastDownloadedAt: order.lastDownloadedAt ?? null,
+          createdAt: order.createdAt,
+          updatedAt: order.updatedAt
+        };
+      });
 
       return res.status(200).json({
         success: true,
@@ -156,8 +203,8 @@ export function createAdminRouter(
     }
   });
 
-  // 5. Regeneración de link criptográfico de descarga (72 horas)
-  router.post('/orders/:orderId/regenerate-token', requireAdminAuth, async (req: AuthenticatedAdminRequest, res: Response) => {
+  // 5. Regeneración de link criptográfico de descarga (72 horas) - Solo órdenes PAID
+  router.post('/orders/:orderId/regenerate-token', requireAdminAuth, requireAdminOnly, async (req: AuthenticatedAdminRequest, res: Response) => {
     try {
       const rawOrderId = req.params.orderId;
       const orderId = Array.isArray(rawOrderId) ? rawOrderId[0] : rawOrderId;
@@ -170,6 +217,12 @@ export function createAdminRouter(
       if (!order) {
         return res.status(404).json({
           error: 'Orden no encontrada'
+        });
+      }
+
+      if (order.status !== 'PAID') {
+        return res.status(400).json({
+          error: 'Solo se puede regenerar el enlace de descarga de órdenes ya pagadas (PAID).'
         });
       }
 
@@ -197,14 +250,179 @@ export function createAdminRouter(
 
       const frontendUrl = getPrimaryFrontendUrl();
       const downloadUrl = `${frontendUrl}/pago-exitoso?token=${downloadToken}`;
+      const { tokenExpiresAt, isTokenExpired } = extractTokenExpiry(downloadToken);
 
       return res.status(200).json({
         success: true,
         orderId: order.id,
         downloadToken,
         downloadUrl,
+        tokenExpiresAt,
+        isTokenExpired,
         expiresInHours: 72,
         order: updatedOrder || { ...order, downloadToken }
+      });
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 5b. Verificación manual de cobro contra API de Mercado Pago (Soporte admin)
+  router.post('/orders/:orderId/verify-mp', requireAdminAuth, requireAdminOnly, async (req: AuthenticatedAdminRequest, res: Response) => {
+    try {
+      const rawOrderId = req.params.orderId;
+      const orderId = Array.isArray(rawOrderId) ? rawOrderId[0] : rawOrderId;
+      const requestedPaymentId = typeof req.body?.paymentId === 'string' ? req.body.paymentId.trim() : '';
+
+      let order = await orderRepo.getOrderById(orderId);
+      if (!order && orderService) {
+        order = await orderService.getOrderAsync(orderId);
+      }
+
+      if (!order) {
+        return res.status(404).json({ error: 'Orden no encontrada' });
+      }
+
+      const paymentId = requestedPaymentId || order.paymentId || '';
+      if (!paymentId) {
+        return res.status(400).json({
+          error: 'La orden aún no tiene paymentId registrado. Ingresa el ID de operación de Mercado Pago.'
+        });
+      }
+
+      if (!verifyPaymentFn) {
+        return res.status(501).json({
+          error: 'Verificación directa con Mercado Pago no disponible en este entorno.'
+        });
+      }
+
+      const result = await verifyPaymentFn(paymentId, `admin_verify_${orderId}_${Date.now()}`);
+      if (!result.success && !result.alreadyProcessed) {
+        return res.status(400).json({
+          success: false,
+          error: result.error || 'Mercado Pago no confirmó el cobro para ese comprobante.'
+        });
+      }
+
+      const latestOrder = (await orderRepo.getOrderById(order.id)) || order;
+      return res.status(200).json({
+        success: true,
+        verified: true,
+        alreadyProcessed: result.alreadyProcessed,
+        order: latestOrder,
+        message: 'Pago verificado correctamente con Mercado Pago'
+      });
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 5c. Reenvío manual de correo con link de descarga (Soporte admin)
+  router.post('/orders/:orderId/resend-email', requireAdminAuth, requireAdminOnly, async (req: AuthenticatedAdminRequest, res: Response) => {
+    try {
+      const rawOrderId = req.params.orderId;
+      const orderId = Array.isArray(rawOrderId) ? rawOrderId[0] : rawOrderId;
+
+      let order = await orderRepo.getOrderById(orderId);
+      if (!order && orderService) {
+        order = await orderService.getOrderAsync(orderId);
+      }
+
+      if (!order) {
+        return res.status(404).json({ error: 'Orden no encontrada' });
+      }
+
+      if (order.status !== 'PAID') {
+        return res.status(400).json({
+          error: 'Solo se pueden reenviar fotos de órdenes pagadas (PAID).'
+        });
+      }
+
+      let downloadToken = order.downloadToken;
+      if (!downloadToken || !tokenSvc.verifyToken(downloadToken, 'download').valid) {
+        const resourceType = order.isFullAlbum ? 'album_zip' : 'photo';
+        const resourceId = order.isFullAlbum
+          ? `${order.albumId}_completo.zip`
+          : (order.photoIds && order.photoIds.length > 0 ? order.photoIds[0] : 'foto_seleccionada.jpg');
+        downloadToken = tokenSvc.generateToken(order.id, resourceType, resourceId);
+        await orderRepo.updateOrderStatus(order.id, order.status, order.paymentId, downloadToken);
+      }
+
+      const sendRes = await emailSvc.sendOrderReadyEmail(order, downloadToken);
+      if (!sendRes.success) {
+        return res.status(500).json({ error: sendRes.error || 'No se pudo enviar el correo' });
+      }
+
+      const frontendUrl = getPrimaryFrontendUrl();
+      return res.status(200).json({
+        success: true,
+        orderId: order.id,
+        downloadToken,
+        downloadUrl: `${frontendUrl}/pago-exitoso?token=${downloadToken}`,
+        simulated: sendRes.simulated,
+        message: `Correo enviado a ${order.customer.email}`
+      });
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 4. Listado y Registro de fotógrafos colaboradores (Escalabilidad multi-fotógrafo)
+  router.get('/photographers', requireAdminAuth, requireAdminOnly, async (_req: AuthenticatedAdminRequest, res: Response) => {
+    try {
+      const list = typeof photographerRepo.listPhotographers === 'function'
+        ? await photographerRepo.listPhotographers()
+        : [];
+      return res.status(200).json({
+        success: true,
+        photographers: list.map(p => ({
+          id: p.id,
+          email: p.email,
+          name: p.name,
+          role: p.role,
+          photographerId: p.photographerId,
+          isActive: p.isActive,
+          createdAt: p.createdAt
+        }))
+      });
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.patch('/photographers/:id/toggle-active', requireAdminAuth, requireAdminOnly, async (req: AuthenticatedAdminRequest, res: Response) => {
+    try {
+      const rawId = req.params.id;
+      const targetId = Array.isArray(rawId) ? rawId[0] : rawId;
+      const { isActive } = req.body as { isActive?: boolean };
+
+      if (typeof isActive !== 'boolean') {
+        return res.status(400).json({ error: 'El campo isActive debe ser booleano' });
+      }
+      if (req.adminUser?.sub === targetId && !isActive) {
+        return res.status(400).json({ error: 'No puedes desactivar tu propia cuenta de administradora activa' });
+      }
+
+      if (typeof photographerRepo.setPhotographerActive !== 'function') {
+        return res.status(501).json({ error: 'Operación no soportada por el repositorio actual' });
+      }
+
+      const updated = await photographerRepo.setPhotographerActive(targetId, isActive);
+      if (!updated) {
+        return res.status(404).json({ error: 'Fotógrafo no encontrado' });
+      }
+
+      return res.status(200).json({
+        success: true,
+        photographer: {
+          id: updated.id,
+          email: updated.email,
+          name: updated.name,
+          role: updated.role,
+          photographerId: updated.photographerId,
+          isActive: updated.isActive,
+          createdAt: updated.createdAt
+        }
       });
     } catch (error: any) {
       return res.status(500).json({ error: error.message });
@@ -252,7 +470,7 @@ export function createAdminRouter(
   });
 
   // 7. Gestión de Promociones y Cupones (Protegido por Admin Auth)
-  router.get('/promotions', requireAdminAuth, async (req: AuthenticatedAdminRequest, res: Response) => {
+  router.get('/promotions', requireAdminAuth, requireAdminOnly, async (req: AuthenticatedAdminRequest, res: Response) => {
     try {
       const config = await promoRepo.getConfig();
       const coupons = await promoRepo.listCoupons();
@@ -266,7 +484,7 @@ export function createAdminRouter(
     }
   });
 
-  router.put('/promotions/config', requireAdminAuth, async (req: AuthenticatedAdminRequest, res: Response) => {
+  router.put('/promotions/config', requireAdminAuth, requireAdminOnly, async (req: AuthenticatedAdminRequest, res: Response) => {
     try {
       const { enableTierDiscounts, tier3DiscountPercent, tier5DiscountPercent, capAtFullAlbumPrice } = req.body;
       const updates: any = {};
@@ -289,7 +507,7 @@ export function createAdminRouter(
     }
   });
 
-  router.post('/promotions/coupons', requireAdminAuth, async (req: AuthenticatedAdminRequest, res: Response) => {
+  router.post('/promotions/coupons', requireAdminAuth, requireAdminOnly, async (req: AuthenticatedAdminRequest, res: Response) => {
     try {
       const { code, discountPercent, albumId, maxUses, maxPhotos, expiresAt } = req.body;
       if (!code || typeof code !== 'string' || code.trim().length < 2) {
@@ -323,7 +541,7 @@ export function createAdminRouter(
     }
   });
 
-  router.patch('/promotions/coupons/:code', requireAdminAuth, async (req: AuthenticatedAdminRequest, res: Response) => {
+  router.patch('/promotions/coupons/:code', requireAdminAuth, requireAdminOnly, async (req: AuthenticatedAdminRequest, res: Response) => {
     try {
       const rawCode = req.params.code;
       const code = Array.isArray(rawCode) ? rawCode[0] : rawCode;
@@ -353,7 +571,7 @@ export function createAdminRouter(
     }
   });
 
-  router.delete('/promotions/coupons/:code', requireAdminAuth, async (req: AuthenticatedAdminRequest, res: Response) => {
+  router.delete('/promotions/coupons/:code', requireAdminAuth, requireAdminOnly, async (req: AuthenticatedAdminRequest, res: Response) => {
     try {
       const rawCode = req.params.code;
       const code = Array.isArray(rawCode) ? rawCode[0] : rawCode;
@@ -372,7 +590,7 @@ export function createAdminRouter(
   });
 
   // 12. Rutas de Gestión de Categorías Dinámicas (CRUD Admin)
-  router.get('/categories', requireAdminAuth, async (req: AuthenticatedAdminRequest, res: Response) => {
+  router.get('/categories', requireAdminAuth, requireAdminOnly, async (req: AuthenticatedAdminRequest, res: Response) => {
     try {
       const categories = await catRepo.listAllCategoriesAdmin();
       return res.status(200).json(categories);
@@ -381,7 +599,7 @@ export function createAdminRouter(
     }
   });
 
-  router.post('/categories', requireAdminAuth, async (req: AuthenticatedAdminRequest, res: Response) => {
+  router.post('/categories', requireAdminAuth, requireAdminOnly, async (req: AuthenticatedAdminRequest, res: Response) => {
     try {
       const { id, name, icon, badgeLabel, order, isActive } = req.body;
       if (!name || typeof name !== 'string' || !name.trim()) {
@@ -406,7 +624,7 @@ export function createAdminRouter(
     }
   });
 
-  router.put('/categories/:id', requireAdminAuth, async (req: AuthenticatedAdminRequest, res: Response) => {
+  router.put('/categories/:id', requireAdminAuth, requireAdminOnly, async (req: AuthenticatedAdminRequest, res: Response) => {
     try {
       const rawId = req.params.id;
       const id = Array.isArray(rawId) ? rawId[0] : rawId;
@@ -426,7 +644,7 @@ export function createAdminRouter(
     }
   });
 
-  router.delete('/categories/:id', requireAdminAuth, async (req: AuthenticatedAdminRequest, res: Response) => {
+  router.delete('/categories/:id', requireAdminAuth, requireAdminOnly, async (req: AuthenticatedAdminRequest, res: Response) => {
     try {
       const rawId = req.params.id;
       const id = Array.isArray(rawId) ? rawId[0] : rawId;

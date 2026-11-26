@@ -33,7 +33,7 @@ describe('Downloads API Routes (TDD)', () => {
       }
     };
 
-    const router = createDownloadsRouter(deliveryService, orderService);
+    const router = createDownloadsRouter(deliveryService, orderService, storageService, undefined, tokenService);
     // Ejecutar handler directamente
     const handler = (router as any).stack.find((s: any) => s.route?.path === '/:token/info')?.route?.stack[0]?.handle;
     await handler(req, res);
@@ -56,12 +56,22 @@ describe('Downloads API Routes (TDD)', () => {
       transactionAmount: order.totalAmount
     });
 
-    const router = createDownloadsRouter(deliveryService, orderService);
+    const router = createDownloadsRouter(deliveryService, orderService, storageService, undefined, tokenService);
     const handler = (router as any).stack.find((s: any) => s.route?.path === '/order/:orderId/status')?.route?.stack[0]?.handle;
 
+    // Sin nonce debe rechazar con 401 (anti-IDOR)
+    let unauthStatus = 200;
+    await handler(
+      { params: { orderId: order.id }, headers: {}, query: {} },
+      { status: (c: number) => { unauthStatus = c; return { json: () => {} }; } }
+    );
+    expect(unauthStatus).toBe(401);
+
+    // Con statusNonce válido debe responder 200
+    const nonce = tokenService.generateStatusNonce(order.id);
     let statusCode = 200;
     let jsonResult: any = null;
-    const req: any = { params: { orderId: order.id } };
+    const req: any = { params: { orderId: order.id }, headers: {}, query: { nonce } };
     const res: any = {
       status: (code: number) => {
         statusCode = code;

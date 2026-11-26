@@ -185,7 +185,7 @@
       @if (adminAuthStore.userRole() === 'admin') {
         <button
           type="button"
-          (click)="activeTab.set('photographers')"
+          (click)="activeTab.set('photographers'); loadPhotographers()"
           [class]="activeTab() === 'photographers'
             ? 'px-4 py-2.5 rounded-2xl bg-zinc-950 text-white font-bold text-xs shadow-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap shrink-0 active:scale-95'
             : 'px-4 py-2.5 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-600 font-medium text-xs border border-black/[0.04] transition-all duration-200 flex items-center gap-2 whitespace-nowrap shrink-0 active:scale-95'"
@@ -601,7 +601,7 @@
                       <span class="w-2.5 h-2.5 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
                     } @else {
                       <span>{{ album.isPublished !== false ? '🟢' : '⚪' }}</span>
-                      <span class="truncate">{{ album.isPublished !== false ? 'Publicar' : 'Ocultar' }}</span>
+                      <span class="truncate">{{ album.isPublished !== false ? 'Publicado' : 'Oculto' }}</span>
                     }
                   </button>
 
@@ -746,468 +746,56 @@
 
   <!-- PESTAÑA VENTAS & ENTREGAS (MERCADO PAGO & LINKS 72H) -->
   @else if (activeTab() === 'orders') {
-    <div class="space-y-6 animate-fadeIn">
-      <!-- Cabecera de la sección Ventas & Entregas -->
-      <div class="bg-white rounded-[32px] p-6 sm:p-8 border border-black/[0.05] shadow-bento flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div class="flex items-center gap-2 mb-1">
-            <span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px] uppercase tracking-wider">
-              💳 Ventas & Cobros
-            </span>
-            <span class="text-xs text-zinc-400 font-mono">• Mercado Pago Live</span>
-          </div>
-          <h3 class="font-display font-extrabold text-xl sm:text-2xl text-zinc-900 tracking-tight">
-            Ventas, Cobros & Entregas de Fotos
-          </h3>
-          <p class="text-xs text-zinc-500 mt-0.5">
-            Supervisa tus cobros en pesos argentinos, consulta los datos de los compradores y renueva los links de descarga de 72 horas en 1 clic.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          (click)="loadOrders()"
-          [disabled]="isLoadingOrders()"
-          class="px-5 py-3 rounded-2xl bg-zinc-950 hover:bg-zinc-800 text-white font-display font-extrabold text-xs shadow-md transition active:scale-95 disabled:opacity-50 flex items-center gap-2 self-start sm:self-auto"
-        >
-          @if (isLoadingOrders()) {
-            <span class="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-            <span>Sincronizando...</span>
-          } @else {
-            <span>🔄 Sincronizar Ventas</span>
-          }
-        </button>
-      </div>
-
-      <!-- Resumen Bento de Métricas de Ventas -->
-      <!-- Resumen Bento de Métricas de Ventas Sincronizadas -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="bg-white rounded-[24px] p-5 border border-black/[0.05] shadow-bento flex flex-col justify-between">
-          <span class="text-zinc-500 text-xs font-semibold">Total Recaudado (ARS)</span>
-          <div class="my-2">
-            <span class="font-display font-black text-2xl sm:text-3xl text-zinc-900">${{ totalPaidRevenue().toLocaleString('es-AR') }}</span>
-            <span class="text-xs text-zinc-400 block mt-0.5">cobrados netos en Mercado Pago</span>
-          </div>
-          <span class="text-[10px] text-emerald-600 font-bold">100% verificado sin bypass</span>
-        </div>
-
-        <div class="bg-white rounded-[24px] p-5 border border-black/[0.05] shadow-bento flex flex-col justify-between">
-          <span class="text-zinc-500 text-xs font-semibold">Órdenes Acreditadas</span>
-          <div class="my-2">
-            <div class="flex items-baseline gap-2">
-              <span class="font-display font-black text-2xl sm:text-3xl text-emerald-600">{{ paidMpOrdersCount() }}</span>
-              <span class="text-xs font-bold text-zinc-500">ventas cobradas</span>
-            </div>
-            @if (freeRedemptionOrdersCount() > 0) {
-              <div class="mt-1.5 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-violet-50 border border-violet-200/60 text-[11px] font-bold text-violet-700 shadow-sm">
-                <span>🎁</span>
-                <span>{{ freeRedemptionOrdersCount() }} sorteos canjeados ($0)</span>
-              </div>
-            } @else {
-              <span class="text-xs text-zinc-400 block mt-0.5">0 sorteos canjeados ($0)</span>
-            }
-          </div>
-          <span class="text-[10px] text-zinc-400">Total transacciones: {{ paidOrdersCount() }} pagadas de {{ orders().length }}</span>
-        </div>
-
-        <div class="bg-white rounded-[24px] p-5 border border-black/[0.05] shadow-bento flex flex-col justify-between">
-          <span class="text-zinc-500 text-xs font-semibold">Fotos Sueltas Vendidas</span>
-          <div class="my-2">
-            <span class="font-display font-black text-2xl sm:text-3xl text-zinc-900">{{ photosSold() }}</span>
-            <span class="text-xs text-zinc-400 block mt-0.5">archivos entregados en 4K</span>
-          </div>
-          <span class="text-[10px] text-zinc-400">Descargas individuales</span>
-        </div>
-
-        <div class="bg-white rounded-[24px] p-5 border border-black/[0.05] shadow-bento flex flex-col justify-between">
-          <span class="text-zinc-500 text-xs font-semibold">Packs Completos Vendidos</span>
-          <div class="my-2">
-            <span class="font-display font-black text-2xl sm:text-3xl text-amber-500">{{ albumsSold() }}</span>
-            <span class="text-xs text-zinc-400 block mt-0.5">álbumes empaquetados en ZIP</span>
-          </div>
-          <span class="text-[10px] text-zinc-400">Entregas de eventos completos</span>
-        </div>
-      </div>
-
-      <!-- Barra de Filtros y Búsqueda de Órdenes -->
-      <div class="bg-white rounded-[28px] p-4 sm:p-5 border border-black/[0.05] shadow-bento space-y-3.5">
-        <!-- Fila 1: Buscador Reactivo + Selector de Álbum -->
-        <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-          <div class="relative flex-1">
-            <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">🔍</span>
-            <input
-              type="text"
-              [value]="orderSearchQuery()"
-              (input)="orderSearchQuery.set($any($event.target).value)"
-              placeholder="Buscar por ID, email, nombre, álbum o teléfono..."
-              class="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200/80 text-xs text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-white transition"
-            />
-          </div>
-
-          <!-- Selector de Álbum -->
-          <div class="w-full md:w-64">
-            <select
-              [value]="ordersAlbumFilter()"
-              (change)="ordersAlbumFilter.set($any($event.target).value)"
-              class="w-full px-3.5 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-700 text-xs font-semibold focus:outline-none focus:border-zinc-950 transition"
-              aria-label="Filtrar ventas por álbum"
-            >
-              <option value="ALL">🌐 Todos los eventos / álbumes</option>
-              @for (alb of albums(); track alb.id) {
-                <option [value]="alb.id">{{ alb.title }}</option>
-              }
-            </select>
-          </div>
-        </div>
-
-        <!-- Fila 2: Filtros por Estado y Tipo de Entrega -->
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-zinc-100">
-          <!-- Filtros por Estado de Pago -->
-          <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
-            <button
-              type="button"
-              (click)="orderStatusFilter.set('ALL')"
-              [class]="orderStatusFilter() === 'ALL'
-                ? 'px-3 py-1.5 rounded-xl bg-zinc-950 text-white font-bold text-xs whitespace-nowrap'
-                : 'px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-600 font-medium text-xs whitespace-nowrap transition'"
-            >
-              Todas ({{ orders().length }})
-            </button>
-
-            <button
-              type="button"
-              (click)="orderStatusFilter.set('PAID')"
-              [class]="orderStatusFilter() === 'PAID'
-                ? 'px-3 py-1.5 rounded-xl bg-emerald-600 text-white font-bold text-xs whitespace-nowrap'
-                : 'px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-medium text-xs whitespace-nowrap transition'"
-            >
-              ✅ Pagadas ({{ paidOrdersCount() }})
-            </button>
-
-            <button
-              type="button"
-              (click)="orderStatusFilter.set('PENDING')"
-              [class]="orderStatusFilter() === 'PENDING'
-                ? 'px-3 py-1.5 rounded-xl bg-amber-500 text-white font-bold text-xs whitespace-nowrap'
-                : 'px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 font-medium text-xs whitespace-nowrap transition'"
-            >
-              ⏳ Pendientes
-            </button>
-          </div>
-
-          <!-- Filtros por Tipo de Entrega -->
-          <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
-            <button
-              type="button"
-              (click)="ordersDeliveryTypeFilter.set('ALL')"
-              [class]="ordersDeliveryTypeFilter() === 'ALL'
-                ? 'px-2.5 py-1.5 rounded-xl bg-zinc-900 text-white font-bold text-[11px] whitespace-nowrap'
-                : 'px-2.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-600 font-medium text-[11px] whitespace-nowrap transition'"
-            >
-              Cualquier Entrega
-            </button>
-
-            <button
-              type="button"
-              (click)="ordersDeliveryTypeFilter.set('FULL_ALBUM')"
-              [class]="ordersDeliveryTypeFilter() === 'FULL_ALBUM'
-                ? 'px-2.5 py-1.5 rounded-xl bg-amber-400 text-zinc-950 font-bold text-[11px] whitespace-nowrap'
-                : 'px-2.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-600 font-medium text-[11px] whitespace-nowrap transition'"
-            >
-              📦 Álbum Completo
-            </button>
-
-            <button
-              type="button"
-              (click)="ordersDeliveryTypeFilter.set('SINGLE_PHOTOS')"
-              [class]="ordersDeliveryTypeFilter() === 'SINGLE_PHOTOS'
-                ? 'px-2.5 py-1.5 rounded-xl bg-amber-400 text-zinc-950 font-bold text-[11px] whitespace-nowrap'
-                : 'px-2.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-600 font-medium text-[11px] whitespace-nowrap transition'"
-            >
-              🖼️ Fotos Sueltas
-            </button>
-
-            <button
-              type="button"
-              (click)="ordersDeliveryTypeFilter.set('FREE_REDEMPTION')"
-              [class]="ordersDeliveryTypeFilter() === 'FREE_REDEMPTION'
-                ? 'px-2.5 py-1.5 rounded-xl bg-purple-600 text-white font-bold text-[11px] whitespace-nowrap'
-                : 'px-2.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-800 font-medium text-[11px] whitespace-nowrap transition'"
-            >
-              🎁 Canje Sorteo 100%
-            </button>
-          </div>
-        </div>
-      </div>
-
-
-      <!-- Feedback de Renovación de Enlace -->
-      @if (renewFeedback(); as fb) {
-        <div
-          [class]="fb.success
-            ? 'p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center justify-between gap-3 animate-fadeIn'
-            : 'p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between gap-3 animate-fadeIn'"
-        >
-          <div class="flex items-center gap-2">
-            <span>{{ fb.success ? '✅' : '⚠️' }}</span>
-            <span class="font-medium">{{ fb.message }}</span>
-          </div>
-          <button
-            type="button"
-            (click)="renewFeedback.set(null)"
-            class="text-xs text-zinc-400 hover:text-zinc-600 font-bold"
-          >
-            ✕
-          </button>
-        </div>
-      }
-
-      <!-- Lista / Tarjetas Bento de Órdenes -->
-      @if (isLoadingOrders() && orders().length === 0) {
-        <div class="p-16 text-center text-zinc-400 text-xs bg-white rounded-[32px] border border-black/[0.05] shadow-bento">
-          <span class="inline-block w-8 h-8 border-2 border-zinc-900 border-t-transparent rounded-full animate-spin mb-3"></span>
-          <p class="font-medium text-zinc-600">Cargando ventas y órdenes registradas...</p>
-        </div>
-      } @else if (filteredOrders().length === 0) {
-        <div class="p-16 text-center text-zinc-400 text-xs bg-white rounded-[32px] border border-black/[0.05] shadow-bento">
-          <span class="text-4xl mb-3 block">💳</span>
-          <h4 class="font-display font-bold text-base text-zinc-800 mb-1">No se encontraron ventas</h4>
-          <p class="text-zinc-500 max-w-sm mx-auto">
-            @if (orderSearchQuery() || orderStatusFilter() !== 'ALL') {
-              No hay órdenes que coincidan con los filtros aplicados.
-            } @else {
-              Aún no hay compras registradas en la plataforma.
-            }
-          </p>
-          @if (orderSearchQuery() || orderStatusFilter() !== 'ALL') {
-            <button
-              type="button"
-              (click)="orderSearchQuery.set(''); orderStatusFilter.set('ALL')"
-              class="mt-4 px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-xs transition"
-            >
-              Limpiar Filtros
-            </button>
-          }
-        </div>
-      } @else {
-        <div class="space-y-4">
-          @for (order of paginatedAdminOrders(); track order.id) {
-            <div class="bg-white rounded-[28px] border border-black/[0.06] shadow-bento p-5 sm:p-6 space-y-4 hover:border-black/[0.12] transition">
-              <!-- Fila Superior: ID, Fecha y Badge de Estado -->
-              <div class="flex flex-wrap items-center justify-between gap-3 border-b border-black/[0.04] pb-3">
-                <div class="flex items-center gap-2">
-                  <span class="px-2.5 py-1 rounded-xl bg-zinc-100 text-zinc-800 font-mono text-[11px] font-bold">
-                    #{{ order.id.slice(0, 8) }}
-                  </span>
-                  <span class="text-xs text-zinc-400">
-                    {{ order.createdAt | date:'dd/MM/yyyy • HH:mm' }} hs
-                  </span>
-                </div>
-
-                <div>
-                  @if (order.status === 'PAID') {
-                    <span class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 flex items-center gap-1.5">
-                      <span>✅</span>
-                      <span>Pagado</span>
-                    </span>
-                  } @else if (order.status === 'PENDING') {
-                    <span class="px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200/80 flex items-center gap-1.5">
-                      <span>⏳</span>
-                      <span>Pendiente</span>
-                    </span>
-                  } @else if (order.status === 'FRAUD_ALERT_PRICE_MISMATCH') {
-                    <span class="px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200/80 flex items-center gap-1.5">
-                      <span>⚠️</span>
-                      <span>Discrepancia / Alerta</span>
-                    </span>
-                  } @else {
-                    <span class="px-3 py-1 rounded-full text-xs font-bold bg-zinc-100 text-zinc-600 border border-zinc-200 flex items-center gap-1">
-                      <span>•</span>
-                      <span>{{ order.status }}</span>
-                    </span>
-                  }
-                </div>
-              </div>
-
-              <!-- Bloque Principal Bento: Cliente, Álbum e Importe -->
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                <!-- Columna 1: Cliente -->
-                <div class="bg-zinc-50/70 rounded-2xl p-3.5 border border-black/[0.03] space-y-1">
-                  <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Datos del Cliente</span>
-                  <div class="font-bold text-zinc-900 text-sm">
-                    {{ order.customer.name || 'Cliente sin nombre' }}
-                  </div>
-                  <div class="text-zinc-600 font-mono text-[11px]">
-                    ✉️ {{ order.customer.email }}
-                  </div>
-                  <div class="pt-1">
-                    @if (order.customer.phone) {
-                      <button
-                        type="button"
-                        (click)="openCustomerWhatsApp(order.customer.phone)"
-                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-semibold text-[11px] border border-emerald-200/70 transition"
-                        title="Abrir chat de WhatsApp con el cliente"
-                      >
-                        <span>📱</span>
-                        <span>{{ order.customer.phone }}</span>
-                        <span class="text-[10px] text-emerald-600 underline ml-0.5">Chat ↗</span>
-                      </button>
-                    } @else {
-                      <span class="text-zinc-400 text-[11px] italic">Sin teléfono registrado</span>
-                    }
-                  </div>
-                </div>
-
-                <!-- Columna 2: Álbum y Contenido -->
-                <div class="bg-zinc-50/70 rounded-2xl p-3.5 border border-black/[0.03] space-y-1">
-                  <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Evento / Álbum</span>
-                  <div class="font-bold text-zinc-900 text-sm truncate" [title]="order.albumTitle || order.albumId || 'Álbum archivado / eliminado'">
-                    📁 {{ order.albumTitle || order.albumId || 'Álbum archivado / eliminado' }}
-                  </div>
-                  <div class="pt-1">
-                    @if (order.isFullAlbum) {
-                      <span class="inline-flex items-center gap-1 text-[11px] font-bold text-amber-900 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200/60">
-                        <span>🌟</span>
-                        <span>Pack Álbum Completo</span>
-                      </span>
-                    } @else {
-                      <span class="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-700 bg-zinc-100 px-2 py-0.5 rounded-lg border border-black/[0.04]">
-                        <span>📸</span>
-                        <span>{{ order.photoCount }} foto(s) individual(es)</span>
-                      </span>
-                    }
-                  </div>
-                </div>
-
-                <!-- Columna 3: Monto e Info de Pago -->
-                <div class="bg-zinc-50/70 rounded-2xl p-3.5 border border-black/[0.03] space-y-1">
-                  <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Monto Total</span>
-                  <div class="font-display font-black text-zinc-900 text-lg">
-                    ${{ order.totalAmount.toLocaleString('es-AR') }} <span class="text-xs font-normal text-zinc-500">ARS</span>
-                  </div>
-                  @if (order.paymentId) {
-                    <div class="text-[10px] text-zinc-400 font-mono">
-                      Mercado Pago: #{{ order.paymentId }}
-                    </div>
-                  }
-                  @if (order.couponApplied) {
-                    <div class="text-[10px] text-amber-600 font-semibold">
-                      🏷️ Descuento: {{ order.couponApplied }} (-{{ order.discountPercentage }}%)
-                    </div>
-                  }
-                </div>
-              </div>
-
-              <!-- Fila Inferior: Acciones Disponibles -->
-              <div class="pt-2">
-                @if (order.status === 'PAID') {
-                  <div class="flex flex-wrap items-center gap-2.5">
-                    <!-- Botón 1: Renovar 72h -->
-                    <button
-                      type="button"
-                      (click)="renewOrderToken(order)"
-                      [disabled]="renewingOrderId() === order.id"
-                      class="px-4 py-2.5 rounded-2xl bg-zinc-950 hover:bg-zinc-800 text-white font-bold text-xs shadow-sm transition active:scale-95 disabled:opacity-50 flex items-center gap-2"
-                      title="Genera un nuevo link de descarga válido por otras 72 horas y lo copia"
-                    >
-                      @if (renewingOrderId() === order.id) {
-                        <span class="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                        <span>Renovando...</span>
-                      } @else if (copiedTokenOrderId() === order.id) {
-                        <span>✅ ¡Copiado!</span>
-                      } @else {
-                        <span>🔄 Renovar 72h</span>
-                      }
-                    </button>
-
-                    <!-- Botón 2: Enviar Fotos por WhatsApp -->
-                    <button
-                      type="button"
-                      (click)="sendWhatsApp(order)"
-                      class="px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition active:scale-95 flex items-center gap-2"
-                      title="Abre WhatsApp con el mensaje pre-armado y el enlace directo de descarga"
-                    >
-                      <span>💬 Enviar Fotos por WhatsApp</span>
-                    </button>
-
-                    <!-- Botón 3: Copiar Link Actual -->
-                    @if (order.downloadToken) {
-                      <button
-                        type="button"
-                        (click)="copyDownloadLink(order)"
-                        class="px-3.5 py-2.5 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-700 font-semibold text-xs border border-black/[0.08] shadow-sm transition active:scale-95 flex items-center gap-1.5"
-                        title="Copiar enlace de descarga directa al portapapeles"
-                      >
-                        <span>📋</span>
-                        <span>Copiar Enlace</span>
-                      </button>
-                    }
-                  </div>
-                } @else if (order.status === 'PENDING') {
-                  <div class="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/50 text-amber-900 text-xs flex items-center gap-2">
-                    <span>⏳</span>
-                    <span>Esperando confirmación de cobro de Mercado Pago para habilitar la descarga y emisión del token.</span>
-                  </div>
-                } @else if (order.status === 'FRAUD_ALERT_PRICE_MISMATCH') {
-                  <div class="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
-                    <span>⚠️</span>
-                    <span><strong>Alerta de Discrepancia:</strong> El monto pagado en Mercado Pago no coincide con el total. Verifica el comprobante antes de emitir un enlace.</span>
-                  </div>
-                }
-              </div>
-            </div>
-          }
-
-          <!-- Paginación Bento de Órdenes -->
-          @if (ordersTotalPages() > 1) {
-            <div class="bg-white rounded-[24px] border border-black/[0.06] shadow-bento p-4 flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
-              <div class="text-xs text-zinc-500 font-medium">
-                Mostrando <strong class="text-zinc-900 font-bold">{{ ordersShowingFrom() }}</strong> a <strong class="text-zinc-900 font-bold">{{ ordersShowingTo() }}</strong> de <strong class="text-zinc-900 font-bold">{{ filteredOrders().length }}</strong> órdenes
-              </div>
-
-              <div class="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  (click)="prevOrdersPage()"
-                  [disabled]="ordersCurrentPage() === 1"
-                  class="p-2 rounded-xl border border-black/[0.08] bg-zinc-50 hover:bg-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed text-zinc-700 transition"
-                  aria-label="Página anterior de órdenes"
-                >
-                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                  </svg>
-                </button>
-
-                @for (p of ordersPaginationPages(); track p) {
-                  <button
-                    type="button"
-                    (click)="goToOrdersPage(p)"
-                    [class]="p === ordersCurrentPage()
-                      ? 'w-8 h-8 rounded-xl bg-zinc-900 text-white font-bold text-xs shadow-sm transition'
-                      : 'w-8 h-8 rounded-xl border border-black/[0.08] bg-white hover:bg-zinc-100 text-zinc-700 font-bold text-xs transition'"
-                    [attr.aria-label]="'Ir a página ' + p"
-                  >
-                    {{ p }}
-                  </button>
-                }
-
-                <button
-                  type="button"
-                  (click)="nextOrdersPage()"
-                  [disabled]="ordersCurrentPage() === ordersTotalPages()"
-                  class="p-2 rounded-xl border border-black/[0.08] bg-zinc-50 hover:bg-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed text-zinc-700 transition"
-                  aria-label="Página siguiente de órdenes"
-                >
-                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                  </svg>
-                </button>
-              </div>
-            </div>
-          }
-        </div>
-      }
-    </div>
+    <app-admin-orders-tab
+      [albums]="albums()"
+      [paginatedOrders]="paginatedAdminOrders()"
+      [filteredCount]="filteredOrders().length"
+      [totalOrdersCount]="orders().length"
+      [isLoadingOrders]="isLoadingOrders()"
+      [ordersError]="ordersError()"
+      [renewFeedback]="renewFeedback()"
+      [renewingOrderId]="renewingOrderId()"
+      [verifyingOrderId]="verifyingOrderId()"
+      [resendingEmailOrderId]="resendingEmailOrderId()"
+      [copiedTokenOrderId]="copiedTokenOrderId()"
+      [totalPaidRevenue]="totalPaidRevenue()"
+      [paidOrdersCount]="paidOrdersCount()"
+      [paidMpOrdersCount]="paidMpOrdersCount()"
+      [freeRedemptionOrdersCount]="freeRedemptionOrdersCount()"
+      [photosSold]="photosSold()"
+      [albumsSold]="albumsSold()"
+      [searchQuery]="orderSearchQuery()"
+      [albumFilter]="ordersAlbumFilter()"
+      [statusFilter]="orderStatusFilter()"
+      [deliveryTypeFilter]="ordersDeliveryTypeFilter()"
+      [dateFrom]="orderDateFrom()"
+      [dateTo]="orderDateTo()"
+      [hasActiveFilters]="hasActiveOrderFilters()"
+      [currentPage]="ordersCurrentPage()"
+      [totalPages]="ordersTotalPages()"
+      [showingFrom]="ordersShowingFrom()"
+      [showingTo]="ordersShowingTo()"
+      [paginationPages]="ordersPaginationPages()"
+      (syncOrders)="loadOrders()"
+      (exportCsv)="exportOrdersCsv()"
+      (searchQueryChange)="orderSearchQuery.set($event)"
+      (albumFilterChange)="ordersAlbumFilter.set($event)"
+      (statusFilterChange)="orderStatusFilter.set($event)"
+      (deliveryTypeFilterChange)="ordersDeliveryTypeFilter.set($event)"
+      (dateFromChange)="orderDateFrom.set($event)"
+      (dateToChange)="orderDateTo.set($event)"
+      (clearFilters)="clearOrderFilters()"
+      (dismissFeedback)="renewFeedback.set(null)"
+      (renewToken)="renewOrderToken($event)"
+      (verifyMp)="verifyOrderMp($event)"
+      (resendEmail)="resendOrderEmail($event)"
+      (sendWhatsApp)="sendWhatsApp($event)"
+      (copyLink)="copyDownloadLink($event)"
+      (openCustomerWhatsApp)="openCustomerWhatsApp($event)"
+      (prevPage)="prevOrdersPage()"
+      (nextPage)="nextOrdersPage()"
+      (goToPage)="goToOrdersPage($event)"
+    />
   }
 
   <!-- PESTAÑA DESCUENTOS & CUPONES PROMOCIONALES -->
@@ -2472,104 +2060,21 @@
     </div>
   }
 
-  <!-- PESTAÑA 3: REGISTRO DE FOTÓGRAFOS COLABORADORES -->
+  <!-- PESTAÑA 3: REGISTRO Y EQUIPO DE FOTÓGRAFOS COLABORADORES -->
   @else if (activeTab() === 'photographers' && adminAuthStore.userRole() === 'admin') {
-    <div class="bg-white rounded-[32px] p-6 sm:p-8 border border-black/[0.05] shadow-bento space-y-6 animate-fadeIn">
-      <div>
-        <h3 class="font-display font-extrabold text-xl text-zinc-900 tracking-tight">
-          Registro de Fotógrafos Colaboradores
-        </h3>
-        <p class="text-xs text-zinc-500 mt-0.5">
-          Permite crear cuentas para fotógrafos asistentes que cubren partidos adicionales. Cada fotógrafo tendrá credenciales privadas y acceso a sus propios álbumes.
-        </p>
-      </div>
-
-      <!-- Alerta de Éxito o Error -->
-      @if (photographerResult(); as res) {
-        <div class="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center justify-between animate-fadeIn">
-          <div class="flex items-center gap-2">
-            <span>✅</span>
-            <span>Fotógrafo <strong>{{ res.photographer.name }}</strong> ({{ res.photographer.email }}) registrado exitosamente.</span>
-          </div>
-          <span class="font-mono text-[10px] text-emerald-600">ID: {{ res.photographer.photographerId }}</span>
-        </div>
-      }
-
-      @if (photographerError()) {
-        <div class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
-          <span>⚠️</span>
-          <span>{{ photographerError() }}</span>
-        </div>
-      }
-
-      <!-- Formulario de Registro -->
-      <form [formGroup]="photographerForm" (ngSubmit)="submitRegisterPhotographer()" class="space-y-4 max-w-xl">
-        <div>
-          <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1.5">
-            Nombre Completo del Fotógrafo
-          </label>
-          <input
-            type="text"
-            formControlName="name"
-            placeholder="Ej: Lucas Martínez"
-            class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
-          />
-        </div>
-
-        <div>
-          <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1.5">
-            Correo Electrónico
-          </label>
-          <input
-            type="email"
-            formControlName="email"
-            placeholder="lucas@latercera.com.ar"
-            class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
-          />
-        </div>
-
-        <div>
-          <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1.5">
-            Contraseña Inicial
-          </label>
-          <input
-            type="password"
-            formControlName="password"
-            placeholder="Mínimo 8 caracteres"
-            class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs focus:outline-none focus:border-zinc-950 transition"
-          />
-        </div>
-
-        <div>
-          <label class="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1.5">
-            Rol del Sistema
-          </label>
-          <select
-            formControlName="role"
-            class="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-xs font-semibold focus:outline-none focus:border-zinc-950 transition"
-          >
-            <option value="photographer">Fotógrafo Colaborador</option>
-            <option value="admin">Co-Administrador</option>
-          </select>
-        </div>
-
-        <div class="pt-2">
-          <button
-            type="submit"
-            [disabled]="photographerForm.invalid || isRegisteringPhotographer()"
-            class="px-6 py-3.5 rounded-2xl bg-zinc-950 hover:bg-zinc-800 text-white font-display font-extrabold text-xs shadow-md transition active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center gap-2"
-          >
-            @if (isRegisteringPhotographer()) {
-              <span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-              <span>Registrando fotógrafo...</span>
-            } @else {
-              <span>Crear Cuenta de Fotógrafo</span>
-              <span>→</span>
-            }
-          </button>
-        </div>
-      </form>
-    </div>
+    <app-admin-photographers-tab
+      [photographers]="photographers()"
+      [isLoading]="isLoadingPhotographers()"
+      [togglingId]="togglingPhotographerId()"
+      [currentUserId]="adminAuthStore.user()?.id || null"
+      [photographerForm]="photographerForm"
+      [isRegistering]="isRegisteringPhotographer()"
+      [photographerResult]="photographerResult()"
+      [photographerError]="photographerError()"
+      (refreshList)="loadPhotographers()"
+      (toggleActive)="togglePhotographerActive($event)"
+      (submitRegister)="submitRegisterPhotographer()"
+    />
   }
 </div>
 
@@ -3404,6 +2909,57 @@
             </div>
           }
 
+          <!-- Barra de Acciones por Lote sobre Fotos Seleccionadas -->
+          <div class="mb-4 p-3 rounded-2xl bg-zinc-50 border border-black/[0.06] flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div class="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                (click)="selectAllModalPhotos()"
+                class="min-h-[36px] px-3 py-1 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-800 font-bold transition"
+              >
+                Seleccionar todas ({{ albumPhotos().length }})
+              </button>
+              @if (selectedModalPhotoIds().size > 0) {
+                <button
+                  type="button"
+                  (click)="clearModalPhotoSelection()"
+                  class="min-h-[36px] px-3 py-1 rounded-xl bg-zinc-200 hover:bg-zinc-300 text-zinc-800 font-semibold transition"
+                >
+                  Limpiar ({{ selectedModalPhotoIds().size }})
+                </button>
+              }
+            </div>
+
+            @if (selectedModalPhotoIds().size > 0) {
+              <div class="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  (click)="runBulkPhotoAction('mark_hd')"
+                  [disabled]="isBulkPhotoActionRunning()"
+                  class="min-h-[36px] px-3 py-1 rounded-xl bg-sky-100 hover:bg-sky-200 text-sky-900 font-bold transition disabled:opacity-50"
+                >
+                  ⭐ Marcar HD ({{ selectedModalPhotoIds().size }})
+                </button>
+                <button
+                  type="button"
+                  (click)="runBulkPhotoAction('unmark_hd')"
+                  [disabled]="isBulkPhotoActionRunning()"
+                  class="min-h-[36px] px-3 py-1 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-bold transition disabled:opacity-50"
+                >
+                  ☆ Quitar HD
+                </button>
+                <button
+                  type="button"
+                  (click)="runBulkPhotoAction('delete')"
+                  [disabled]="isBulkPhotoActionRunning()"
+                  class="min-h-[36px] px-3 py-1 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold transition disabled:opacity-50"
+                >
+                  🗑️ Eliminar ({{ selectedModalPhotoIds().size }})
+                </button>
+              </div>
+            }
+          </div>
+
           <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5 sm:gap-4">
             @for (photo of albumPhotos(); track photo.id; let i = $index) {
               <div
@@ -3413,15 +2969,24 @@
                 (drop)="onPhotoDrop($event, i)"
                 (dragend)="onPhotoDragEnd()"
                 class="bg-zinc-50 rounded-2xl border border-black/[0.06] overflow-hidden flex flex-col justify-between shadow-sm hover:shadow-md transition group cursor-grab active:cursor-grabbing relative"
-                [class.ring-2]="currentAlbum.coverUrl === photo.previewUrl"
+                [class.ring-2]="currentAlbum.coverUrl === photo.previewUrl || selectedModalPhotoIds().has(photo.id)"
                 [class.ring-amber-500]="currentAlbum.coverUrl === photo.previewUrl"
+                [class.ring-sky-500]="selectedModalPhotoIds().has(photo.id)"
                 [class.opacity-40]="draggedPhotoIndex() === i"
                 [class.border-amber-500]="dragOverPhotoIndex() === i"
-                [class.ring-2]="dragOverPhotoIndex() === i"
-                [class.ring-amber-400]="dragOverPhotoIndex() === i"
               >
                 <!-- Thumbnail con badges -->
                 <div class="relative aspect-square bg-zinc-200 overflow-hidden">
+                  <button
+                    type="button"
+                    (click)="toggleSelectModalPhoto(photo.id); $event.stopPropagation()"
+                    [attr.aria-label]="selectedModalPhotoIds().has(photo.id) ? 'Quitar de selección en lote' : 'Seleccionar foto para acción en lote'"
+                    [class]="selectedModalPhotoIds().has(photo.id)
+                      ? 'absolute bottom-2 right-2 z-10 w-7 h-7 rounded-lg bg-sky-600 text-white font-black text-xs shadow flex items-center justify-center'
+                      : 'absolute bottom-2 right-2 z-10 w-7 h-7 rounded-lg bg-black/55 hover:bg-black/80 text-white font-bold text-xs shadow flex items-center justify-center'"
+                  >
+                    {{ selectedModalPhotoIds().has(photo.id) ? '✓' : '+' }}
+                  </button>
                   <img
                     [src]="photo.previewUrl"
                     [alt]="photo.filename"

@@ -21,53 +21,11 @@ import { AlbumService } from '../../core/services/album.service';
   host: {
     '(window:keydown)': 'handleKeydown($event)'
   },
-  styles: [`
-    /* Capa de Oscurecimiento Real y Efecto Linterna / Spotlight acelerado por GPU */
-    .spotlight-darkness-layer {
-      background: rgba(9, 9, 11, 0.86);
-      transition: background 150ms ease-out;
-      transform: translateZ(0);
-      will-change: background;
-    }
-
-    .spotlight-darkness-layer.is-selected {
-      background: rgba(9, 9, 11, 0.25);
-    }
-
-    .spotlight-darkness-layer.is-spot-active {
-      background: radial-gradient(
-        circle 165px at var(--spot-x, 50%) var(--spot-y, 50%),
-        transparent 0%,
-        rgba(9, 9, 11, 0.20) 45%,
-        rgba(9, 9, 11, 0.90) 80%,
-        rgba(9, 9, 11, 0.95) 100%
-      );
-    }
-
-    .spotlight-darkness-layer.is-spot-active.is-selected {
-      background: radial-gradient(
-        circle 165px at var(--spot-x, 50%) var(--spot-y, 50%),
-        transparent 0%,
-        rgba(9, 9, 11, 0.10) 45%,
-        rgba(9, 9, 11, 0.20) 80%,
-        rgba(9, 9, 11, 0.25) 100%
-      );
-    }
-
-    .spotlight-rim {
-      width: 330px;
-      height: 330px;
-      left: calc(var(--spot-x, 50%) - 165px);
-      top: calc(var(--spot-y, 50%) - 165px);
-      border: 1.5px solid rgba(254, 240, 138, 0.45);
-      box-shadow: 0 0 25px 6px rgba(253, 184, 19, 0.25);
-      transform: translateZ(0);
-    }
-  `],
+  styles: [],
   template: `
     @if (isOpen() && currentPhoto()) {
       <div
-        class="fixed inset-0 z-50 bg-black/95 backdrop-blur-2xl flex flex-col justify-between p-3 sm:p-6 select-none transition-opacity duration-300 animate-fadeIn"
+        class="fixed inset-0 z-50 bg-black/95 flex flex-col justify-between p-3 sm:p-6 select-none transition-opacity duration-300 animate-fadeIn"
         (click)="close.emit()"
         (touchstart)="onTouchStart($event)"
         (touchmove)="onTouchMove($event)"
@@ -205,25 +163,12 @@ import { AlbumService } from '../../core/services/album.service';
             </svg>
           </button>
 
-          <!-- Contenedor Transformable de la Imagen con Desplazamiento Táctil en Vivo, Doble Clic Zoom y Spotlight GPU -->
+          <!-- Contenedor Transformable de la Imagen con Desplazamiento Táctil en Vivo y Doble Clic Zoom -->
           <div
-            (pointerenter)="onPointerEnter($event)"
-            (pointerleave)="onPointerLeave()"
-            (pointermove)="onPointerMove($event)"
-            (touchstart)="onPhotoTouchStart($event)"
-            (touchmove)="onPhotoTouchMove($event)"
-            (touchend)="onPhotoTouchEnd()"
-            (touchcancel)="onPhotoTouchEnd()"
             class="relative max-h-full max-w-full flex items-center justify-center transition-transform duration-200 ease-out select-none cursor-pointer overflow-hidden rounded-2xl"
-            [class.touch-none]="isMobileFlashlightEnabled()"
-            [style.touch-action]="isMobileFlashlightEnabled() ? 'none' : 'auto'"
             [class.cursor-zoom-in]="zoomScale() === 1"
             [class.cursor-zoom-out]="zoomScale() > 1"
             [style.transform]="touchTransform()"
-            [style.--spot-x]="spotX() + 'px'"
-            [style.--spot-y]="spotY() + 'px'"
-            [style.--spot-size]="'190px'"
-            [style.--spot-opacity]="isSpotActive() ? '1' : '0'"
             (dblclick)="toggleZoom($event)"
           >
             <!-- Insignia Visual Comercial #001 -->
@@ -233,28 +178,15 @@ import { AlbumService } from '../../core/services/album.service';
               </span>
             </div>
 
-            <!-- Imagen base -->
+            <!-- Imagen base nítida -->
             <img
               [src]="currentPhoto()?.previewUrl"
               [alt]="currentPhoto()?.title"
+              decoding="async"
               class="max-h-[76vh] w-auto max-w-full object-contain rounded-2xl shadow-2xl prevent-save animate-lightbox-next"
               (contextmenu)="$event.preventDefault()"
               draggable="false"
             />
-
-            <!-- Capa de Oscurecimiento Real y Spotlight / Haz de Luz -->
-            @if (isSpotlightEffectActive()) {
-              <div
-                class="spotlight-darkness-layer absolute inset-0 pointer-events-none rounded-2xl overflow-hidden"
-                [class.is-spot-active]="isSpotActive()"
-                [class.is-selected]="isSelected()"
-                aria-hidden="true"
-              >
-                @if (isSpotActive()) {
-                  <div class="spotlight-rim absolute rounded-full pointer-events-none"></div>
-                }
-              </div>
-            }
           </div>
 
           <!-- Botón Foto Siguiente (Desktop / Tablet) -->
@@ -290,22 +222,12 @@ export class LightboxComponent {
   public readonly isSelected = input<boolean>(false);
   public readonly isFreeDownload = input<boolean>(false);
   public readonly isPurchased = input<boolean>(false);
-  public readonly isMobileFlashlightActive = input<boolean>(false);
-  public readonly isMobileSpotlightActive = input<boolean>(false);
-
-  public readonly isMobileFlashlightEnabled = computed<boolean>(() => {
-    return this.isMobileFlashlightActive() || this.isMobileSpotlightActive();
-  });
 
   public readonly formattedSequenceNumber = computed<string>(() => {
     return '#' + String(this.currentIndex() + 1).padStart(3, '0');
   });
 
   public readonly albumId = input<string>();
-
-  public readonly isSpotlightEffectActive = computed<boolean>(() => {
-    return !this.isFreeDownload() && !this.isPurchased();
-  });
 
   public readonly freeDownloadUrl = computed<string>(() => {
     const albId = this.albumId();
@@ -320,18 +242,6 @@ export class LightboxComponent {
   public readonly prev = output<void>();
   public readonly toggleSelect = output<Photo>();
 
-  // Estado del Haz de Luz / Spotlight GPU
-  public readonly isHovering = signal<boolean>(false);
-  public readonly isSpotActive = signal<boolean>(false);
-  public readonly spotX = signal<number>(100);
-  public readonly spotY = signal<number>(100);
-
-  private containerRect: DOMRect | null = null;
-  private animFrameId: number | null = null;
-  private pendingX = 100;
-  private pendingY = 100;
-  private touchFadeTimeout: ReturnType<typeof setTimeout> | null = null;
-
   // Estado de Gestos Táctiles y Zoom Cinemático
   public readonly zoomScale = signal<number>(1);
   private lastTapTime = 0;
@@ -340,6 +250,7 @@ export class LightboxComponent {
   private touchCurrentX = 0;
   private touchCurrentY = 0;
   private isSwiping = false;
+  private swipeFrameId: number | null = null;
 
   public readonly touchDeltaX = signal<number>(0);
   public readonly touchDeltaY = signal<number>(0);
@@ -371,8 +282,8 @@ export class LightboxComponent {
   }
 
   public toggleZoom(event?: Event | MouseEvent | TouchEvent): void {
-    if (event && typeof (event as any).stopPropagation === 'function') {
-      (event as any).stopPropagation();
+    if (event && typeof (event as Event).stopPropagation === 'function') {
+      (event as Event).stopPropagation();
     }
     this.zoomScale.update((s) => (s > 1 ? 1 : 2.2));
     this.touchDeltaX.set(0);
@@ -410,13 +321,26 @@ export class LightboxComponent {
 
     const dx = this.touchCurrentX - this.touchStartX;
     const dy = this.touchCurrentY - this.touchStartY;
-    this.touchDeltaX.set(dx);
-    this.touchDeltaY.set(dy);
+    if (typeof requestAnimationFrame === 'function') {
+      if (this.swipeFrameId) return;
+      this.swipeFrameId = requestAnimationFrame(() => {
+        this.touchDeltaX.set(this.touchCurrentX - this.touchStartX);
+        this.touchDeltaY.set(this.touchCurrentY - this.touchStartY);
+        this.swipeFrameId = null;
+      });
+    } else {
+      this.touchDeltaX.set(dx);
+      this.touchDeltaY.set(dy);
+    }
   }
 
   public onTouchEnd(): void {
     if (!this.isSwiping) return;
     this.isSwiping = false;
+    if (this.swipeFrameId) {
+      cancelAnimationFrame(this.swipeFrameId);
+      this.swipeFrameId = null;
+    }
 
     const dx = this.touchCurrentX - this.touchStartX;
     const dy = this.touchCurrentY - this.touchStartY;
@@ -452,110 +376,6 @@ export class LightboxComponent {
     if (dy > 70) {
       this.close.emit();
     }
-  }
-
-  // --- Handlers de Efecto Linterna en Lightbox (0 getBoundingClientRect en move) ---
-
-  public onPointerEnter(event: PointerEvent): void {
-    if (!this.isSpotlightEffectActive()) return;
-    if (event.pointerType === 'touch' && !this.isMobileFlashlightEnabled()) return;
-
-    const target = event.currentTarget as HTMLElement | null;
-    if (target) {
-      this.containerRect = target.getBoundingClientRect();
-      this.isHovering.set(true);
-      this.isSpotActive.set(true);
-      this.pendingX = event.clientX - this.containerRect.left;
-      this.pendingY = event.clientY - this.containerRect.top;
-      this.scheduleSpotlightUpdate();
-    }
-  }
-
-  public onPointerMove(event: PointerEvent): void {
-    if (!this.isSpotlightEffectActive()) return;
-    if (event.pointerType === 'touch' && !this.isMobileFlashlightEnabled()) return;
-
-    if (!this.containerRect) {
-      const target = event.currentTarget as HTMLElement | null;
-      if (target) this.containerRect = target.getBoundingClientRect();
-    }
-    if (!this.containerRect) return;
-
-    this.isHovering.set(true);
-    this.isSpotActive.set(true);
-    this.pendingX = event.clientX - this.containerRect.left;
-    this.pendingY = event.clientY - this.containerRect.top;
-    this.scheduleSpotlightUpdate();
-  }
-
-  public onPointerLeave(): void {
-    if (this.touchFadeTimeout) return;
-    this.isHovering.set(false);
-    this.isSpotActive.set(false);
-    this.containerRect = null;
-    if (this.animFrameId) {
-      cancelAnimationFrame(this.animFrameId);
-      this.animFrameId = null;
-    }
-  }
-
-  public onPhotoTouchStart(event: TouchEvent): void {
-    if (!this.isSpotlightEffectActive() || !this.isMobileFlashlightEnabled()) return;
-    if (this.touchFadeTimeout) {
-      clearTimeout(this.touchFadeTimeout);
-      this.touchFadeTimeout = null;
-    }
-    const target = event.currentTarget as HTMLElement | null;
-    const touch = event.touches?.[0];
-    if (target && touch) {
-      this.containerRect = target.getBoundingClientRect();
-      this.isHovering.set(true);
-      this.isSpotActive.set(true);
-      this.pendingX = touch.clientX - this.containerRect.left;
-      this.pendingY = touch.clientY - this.containerRect.top - 40;
-      this.scheduleSpotlightUpdate();
-    }
-  }
-
-  public onPhotoTouchMove(event: TouchEvent): void {
-    if (!this.isSpotlightEffectActive() || !this.isMobileFlashlightEnabled()) return;
-    if (event.cancelable) event.preventDefault();
-    if (!this.containerRect) {
-      const target = event.currentTarget as HTMLElement | null;
-      if (target) this.containerRect = target.getBoundingClientRect();
-    }
-    if (!this.containerRect) return;
-    const touch = event.touches?.[0];
-    if (touch) {
-      this.isHovering.set(true);
-      this.isSpotActive.set(true);
-      this.pendingX = touch.clientX - this.containerRect.left;
-      this.pendingY = touch.clientY - this.containerRect.top - 40;
-      this.scheduleSpotlightUpdate();
-    }
-  }
-
-  public onPhotoTouchEnd(): void {
-    if (this.touchFadeTimeout) clearTimeout(this.touchFadeTimeout);
-    this.touchFadeTimeout = setTimeout(() => {
-      this.isHovering.set(false);
-      this.isSpotActive.set(false);
-      this.containerRect = null;
-      if (this.animFrameId) {
-        cancelAnimationFrame(this.animFrameId);
-        this.animFrameId = null;
-      }
-      this.touchFadeTimeout = null;
-    }, 600);
-  }
-
-  private scheduleSpotlightUpdate(): void {
-    if (this.animFrameId) return;
-    this.animFrameId = requestAnimationFrame(() => {
-      this.spotX.set(Math.round(this.pendingX));
-      this.spotY.set(Math.round(this.pendingY));
-      this.animFrameId = null;
-    });
   }
 
   public handleKeydown(event: KeyboardEvent): void {

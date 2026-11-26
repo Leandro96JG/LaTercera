@@ -100,7 +100,7 @@ describe('FloatingCartComponent', () => {
     expect(checkoutEmitted).toBe(true);
   });
 
-  it('debe renderizar la píldora verde de cortesía cuando isFreeAlbum es true y hay fotos gratuitas elegidas', () => {
+  it('debe renderizar descarga JPG directa para 1-4 fotos de cortesía y ZIP para >= 5', () => {
     fixture.componentRef.setInput('isFreeAlbum', true);
     fixture.componentRef.setInput('activeAlbumId', 'album-gratis');
     cartStore.clearFreeSelection();
@@ -109,10 +109,16 @@ describe('FloatingCartComponent', () => {
 
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.textContent).toContain('Cortesía Gratis');
+    expect(compiled.textContent).toContain('Descargar (.JPG)');
+
+    for (let i = 2; i <= 5; i++) {
+      cartStore.toggleFreePhoto({ ...mockPhoto, id: `photo-cart-${i}`, title: `Foto ${i}` });
+    }
+    fixture.detectChanges();
     expect(compiled.textContent).toContain('Descargar Selección (ZIP)');
   });
 
-  it('debe mostrar el drawer de cortesía con opciones de descarga ZIP al expandir', () => {
+  it('debe mostrar el drawer de cortesía con descarga JPG (<=4) o ZIP (>=5) y opción Todo el Álbum al expandir', () => {
     fixture.componentRef.setInput('isFreeAlbum', true);
     fixture.componentRef.setInput('activeAlbumId', 'album-gratis');
     cartStore.clearFreeSelection();
@@ -123,7 +129,7 @@ describe('FloatingCartComponent', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.textContent).toContain('Lote de Cortesía (1 fotos)');
     expect(compiled.textContent).toContain('Descargar Todo el Álbum (ZIP)');
-    expect(compiled.textContent).toContain('Descargar Selección (1 Fotos ZIP)');
+    expect(compiled.textContent).toContain('Descargar Foto (.JPG)');
 
     // Remover la foto libre
     component.removeFreePhoto(mockPhoto.id);

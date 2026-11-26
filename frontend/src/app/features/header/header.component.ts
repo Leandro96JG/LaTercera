@@ -60,6 +60,21 @@ import { Component, ChangeDetectionStrategy, output, input } from '@angular/core
           </button>
         }
 
+        <!-- Botón Acceso Directo a Fotos Listas (<72h) -->
+        @if (readyOrderLink(); as ready) {
+          @if (currentView() !== 'payment-success') {
+            <button
+              type="button"
+              (click)="openReadyOrder.emit(ready.token)"
+              class="min-h-[44px] px-3.5 py-2 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 flex items-center gap-2 text-emerald-900 text-xs font-bold shadow-xs transition active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-500"
+              [title]="'Descargar tus fotos de ' + ready.albumTitle"
+            >
+              <span>📥</span>
+              <span>Fotos Listas</span>
+            </button>
+          }
+        }
+
         <!-- Botón Recuperar Fotos Compradas (Mis Compras) -->
         <button
           type="button"
@@ -98,8 +113,10 @@ import { Component, ChangeDetectionStrategy, output, input } from '@angular/core
 export class HeaderComponent {
   public readonly currentView = input<'portfolio' | 'album' | 'admin' | 'admin-login' | 'payment-success'>('portfolio');
   public readonly isAuthenticated = input<boolean>(false);
+  public readonly readyOrderLink = input<{ orderId: string; albumTitle: string; token: string } | null>(null);
   public readonly goHome = output<void>();
   public readonly changeView = output<'portfolio' | 'admin'>();
   public readonly logout = output<void>();
   public readonly openRecoveryModal = output<void>();
+  public readonly openReadyOrder = output<string>();
 }

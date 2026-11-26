@@ -44,6 +44,8 @@ export interface Order {
   preferenceId?: string;
   paymentId?: string;
   downloadToken?: string;
+  downloadCount?: number;
+  lastDownloadedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -164,8 +166,10 @@ export class OrderService {
         }
       }
     } catch (err: unknown) {
-      if (err instanceof Error && err.message.includes('cupón')) {
-        throw err;
+      if (input.couponCode) {
+        throw err instanceof Error
+          ? err
+          : new Error('No se pudo validar el cupón de descuento en este momento');
       }
       console.warn(`[OrderService] Error recuperando promociones/cupones: ${err}`);
     }
@@ -272,15 +276,11 @@ export class OrderService {
   }
 
   public async getOrderAsync(id: string): Promise<Order | null> {
-    const cached = this.orders.get(id);
-    if (cached) return cached;
-
     const fromDb = await this.repository.findById(id);
     if (fromDb) {
-      this.orders.set(fromDb.id, fromDb);
       return fromDb;
     }
-    return null;
+    return this.orders.get(id) || null;
   }
 
   public updateOrderPreferenceId(orderId: string, preferenceId: string): void {
@@ -418,6 +418,18 @@ export class OrderService {
       return { success: true };
     }
 
+    // Verificar que el paymentId no haya sido usado para acreditar otra orden distinta (anti-replay)
+    if (payment.paymentId) {
+      const existingPaymentOrder = await this.repository.findByPaymentId(payment.paymentId);
+      if (existingPaymentOrder && existingPaymentOrder.id !== orderId) {
+        return {
+          success: false,
+          fraudAlert: true,
+          error: `Alerta de Fraude: El pago ${payment.paymentId} ya fue acreditado en otra orden`
+        };
+      }
+    }
+
     // Validación estricta de Moneda
     if (payment.currencyId !== 'ARS') {
       return {
@@ -456,7 +468,7 @@ export class OrderService {
       };
     }
 
-    // Transición a PAID y generación de token criptográfico de descarga (72h)
+    // Transición atómica PENDING/PROCESSING -> PAID y generación de token criptográfico (72h)
     const resourceType = order.isFullAlbum ? 'album_zip' : 'photo';
     const resourceId = order.isFullAlbum
       ? `${order.albumId}_completo.zip`
@@ -464,21 +476,39 @@ export class OrderService {
 
     const downloadToken = this.tokenService.generateToken(order.id, resourceType, resourceId);
 
-    order.status = 'PAID';
-    order.paymentId = payment.paymentId;
-    order.downloadToken = downloadToken;
-    order.updatedAt = new Date().toISOString();
-    this.orders.set(order.id, order);
+    let transitioned = await this.repository.transitionOrderToPaidIfPending(
+      order.id,
+      payment.paymentId,
+      downloadToken
+    );
 
-    await this.repository.updateStatus(order.id, 'PAID', payment.paymentId, downloadToken).catch(err => {
-      console.warn(`[Persistencia Warning] Error actualizando estado de pago: ${err.message}`);
-    });
-
-    if (order.couponApplied) {
-      await this.promotionRepository.incrementCouponUsage(order.couponApplied).catch(() => {});
+    if (!transitioned) {
+      // Verificar si otra petición concurrente ya completó esta orden en el repositorio
+      const latest = await this.repository.findById(order.id);
+      if (latest?.status === 'PAID') {
+        this.orders.set(latest.id, latest);
+        return { success: true };
+      }
+      // Fallback para tests unitarios síncronos que inyectan órdenes únicamente en memoria RAM
+      if (!latest && this.orders.has(order.id)) {
+        order.status = 'PAID';
+        order.paymentId = payment.paymentId;
+        order.downloadToken = downloadToken;
+        order.updatedAt = new Date().toISOString();
+        this.orders.set(order.id, order);
+        transitioned = order;
+      } else {
+        return { success: false, error: 'No fue posible acreditar la orden porque su estado cambió concurrentemente' };
+      }
     }
 
-    this.emailService.sendOrderReadyEmail(order, downloadToken).catch(err => {
+    this.orders.set(transitioned.id, transitioned);
+
+    if (transitioned.couponApplied) {
+      await this.promotionRepository.incrementCouponUsage(transitioned.couponApplied).catch(() => {});
+    }
+
+    this.emailService.sendOrderReadyEmail(transitioned, downloadToken).catch(err => {
       console.warn(`[Email Warning] Error enviando correo tras pago completado: ${err?.message || err}`);
     });
 
@@ -493,57 +523,66 @@ export class OrderService {
   public async processWebhookPaymentAsync(
     input: ProcessWebhookPaymentInput
   ): Promise<{ success: boolean; alreadyProcessed: boolean; fraudAlert?: boolean; error?: string }> {
-    // 1. Verificar idempotencia en memoria local
+    // 1. Verificar idempotencia en memoria local y reclamar evento en BD al INICIO
     if (this.processedEventIds.has(input.eventId)) {
       return { success: true, alreadyProcessed: true };
     }
 
-    // 2. Verificar idempotencia en base de datos remota
-    const isProcessedInDb = await this.repository.isEventProcessed(input.eventId);
-    if (isProcessedInDb) {
+    const claimed = await this.repository.tryClaimWebhookEvent(input.eventId, input.orderId);
+    if (!claimed) {
       this.processedEventIds.add(input.eventId);
       return { success: true, alreadyProcessed: true };
     }
 
-    // 3. Cargar la orden asíncronamente (desde memoria o Supabase tras reinicio de servidor)
-    const order = await this.getOrderAsync(input.orderId);
-    if (!order) {
-      return { success: false, alreadyProcessed: false, error: 'Orden no encontrada' };
+    try {
+      // 2. Cargar la orden asíncronamente desde repositorio fresco
+      const order = await this.getOrderAsync(input.orderId);
+      if (!order) {
+        await this.repository.releaseWebhookEventClaim(input.eventId).catch(() => {});
+        return { success: false, alreadyProcessed: false, error: 'Orden no encontrada' };
+      }
+
+      // 3. Si Mercado Pago notifica cancelación, reembolso o contracargo, validar paymentId antes de revocar
+      const normalizedStatus = (input.status || '').toLowerCase();
+      const isRevocation = ['refunded', 'charged_back', 'cancelled'].includes(normalizedStatus);
+      if (isRevocation) {
+        if (order.status === 'PAID' && order.paymentId && input.paymentId && order.paymentId !== input.paymentId) {
+          this.processedEventIds.add(input.eventId);
+          return { success: true, alreadyProcessed: true };
+        }
+        order.status = 'CANCELLED';
+        delete order.downloadToken;
+        this.orders.set(order.id, order);
+        await this.repository.updateOrderStatus(order.id, 'CANCELLED');
+        this.processedEventIds.add(input.eventId);
+        return { success: true, alreadyProcessed: false };
+      }
+
+      // 4. Si la orden ya está pagada (por una notificación previa concurrente)
+      if (order.status === 'PAID') {
+        this.processedEventIds.add(input.eventId);
+        return { success: true, alreadyProcessed: true };
+      }
+
+      // 5. Verificar y completar el pago asíncronamente
+      const result = await this.verifyAndCompletePaymentAsync(input.orderId, input);
+
+      if (result.success || result.fraudAlert) {
+        this.processedEventIds.add(input.eventId);
+      } else {
+        await this.repository.releaseWebhookEventClaim(input.eventId).catch(() => {});
+      }
+
+      return {
+        success: result.success,
+        alreadyProcessed: false,
+        fraudAlert: result.fraudAlert,
+        error: result.error
+      };
+    } catch (err) {
+      await this.repository.releaseWebhookEventClaim(input.eventId).catch(() => {});
+      throw err;
     }
-
-    // 4. Si Mercado Pago notifica cancelación, reembolso o contracargo, revocar orden y token
-    const normalizedStatus = (input.status || '').toLowerCase();
-    const isRevocation = ['refunded', 'charged_back', 'cancelled'].includes(normalizedStatus);
-    if (isRevocation) {
-      order.status = 'CANCELLED';
-      delete order.downloadToken;
-      await this.repository.updateOrderStatus(order.id, 'CANCELLED');
-      this.processedEventIds.add(input.eventId);
-      await this.repository.markEventProcessed(input.eventId, input.orderId).catch(() => {});
-      return { success: true, alreadyProcessed: false };
-    }
-
-    // 5. Si la orden ya está pagada (por una notificación previa concurrente)
-    if (order.status === 'PAID') {
-      this.processedEventIds.add(input.eventId);
-      await this.repository.markEventProcessed(input.eventId, input.orderId).catch(() => {});
-      return { success: true, alreadyProcessed: true };
-    }
-
-    // 6. Verificar y completar el pago asíncronamente
-    const result = await this.verifyAndCompletePaymentAsync(input.orderId, input);
-
-    if (result.success || result.fraudAlert) {
-      this.processedEventIds.add(input.eventId);
-      await this.repository.markEventProcessed(input.eventId, input.orderId).catch(() => {});
-    }
-
-    return {
-      success: result.success,
-      alreadyProcessed: false,
-      fraudAlert: result.fraudAlert,
-      error: result.error
-    };
   }
 
   /**
@@ -638,5 +677,16 @@ export class OrderService {
       downloadToken,
       expiresAt
     };
+  }
+
+  public async recordDownloadAsync(orderId: string): Promise<void> {
+    const memOrder = this.orders.get(orderId);
+    if (memOrder) {
+      memOrder.downloadCount = (memOrder.downloadCount || 0) + 1;
+      memOrder.lastDownloadedAt = new Date().toISOString();
+    }
+    if (typeof this.repository.incrementDownloadCount === 'function') {
+      await this.repository.incrementDownloadCount(orderId).catch(() => {});
+    }
   }
 }

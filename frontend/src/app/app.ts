@@ -13,7 +13,6 @@ import { AlbumCard3dComponent } from './features/album-card-3d/album-card-3d.com
 import { PhotoCardPolaroidComponent } from './features/photo-card-polaroid/photo-card-polaroid.component';
 import { PinUnlockModalComponent } from './features/pin-unlock/pin-unlock-modal.component';
 import { OrderRecoveryModalComponent } from './features/order-recovery/order-recovery-modal.component';
-import { SpotlightTutorialComponent } from './features/spotlight-tutorial/spotlight-tutorial.component';
 import { AlbumService } from './core/services/album.service';
 import { CartStore } from './core/state/cart.store';
 import { AdminAuthStore } from './core/state/admin-auth.store';
@@ -40,8 +39,7 @@ import { Photo } from './core/models/photo.model';
     AlbumCard3dComponent,
     PhotoCardPolaroidComponent,
     PinUnlockModalComponent,
-    OrderRecoveryModalComponent,
-    SpotlightTutorialComponent
+    OrderRecoveryModalComponent
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './app.html',
@@ -99,18 +97,13 @@ export class App implements OnInit, OnDestroy {
 
   // Splash Screen de Inicio
   public readonly showSplash = signal<boolean>(true);
-  private splashTimer: any = null;
-  private splashFallbackTimer: any = null;
+  public readonly renderSplash = signal<boolean>(true);
+  private splashTimer: ReturnType<typeof setTimeout> | null = null;
+  private splashUnmountTimer: ReturnType<typeof setTimeout> | null = null;
+  private splashFallbackTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly minSplashElapsed = signal<boolean>(false);
   private readonly albumsReceived = signal<boolean>(false);
   private readonly heroImageReceived = signal<boolean>(false);
-
-  // Efecto Linterna y Onboarding Tutorial
-  public readonly isSpotlightTutorialOpen = signal<boolean>(false);
-  public readonly isSpotlightTutorialManual = signal<boolean>(false);
-  public readonly isMobileFlashlightActive = signal<boolean>(false);
-  public readonly isMobileSpotlightActive = this.isMobileFlashlightActive;
-  public readonly isMobileFlashlightEnabled = computed<boolean>(() => this.isMobileFlashlightActive());
 
   // Estado de carga de álbumes públicos
   public readonly isLoadingPublicAlbums = signal<boolean>(true);
@@ -144,6 +137,10 @@ export class App implements OnInit, OnDestroy {
 
   // Estado del Modal de Recuperación de Órdenes
   public readonly isOrderRecoveryOpen = signal<boolean>(false);
+
+  // Enlace rápido de compra acreditada reciente (<72h) almacenada en localStorage
+  public readonly readyOrderLink = signal<{ orderId: string; albumTitle: string; token: string } | null>(null);
+  public readonly readyOrderToken = signal<string | undefined>(undefined);
 
   // Álbumes filtrados y búsqueda
   public readonly searchQuery = signal<string>('');
@@ -352,19 +349,7 @@ export class App implements OnInit, OnDestroy {
     // 2. Fotos presentes directamente en el modelo de álbum
     if (album.photos && album.photos.length > 0) return album.photos;
 
-    // 3. Fallback de fotos de demostración solo cuando ya terminó la carga y no hay fotos reales
-    if (this.albumPhotosLoaded() && this.activeAlbumPhotos().length === 0) {
-      return Array.from({ length: Math.min(album.photosCount, 24) }, (_, i) => ({
-        id: `${album.id}-photo-${i + 1}`,
-        albumId: album.id,
-        title: `${album.title} • Foto ${i + 1}`,
-        previewUrl: album.coverUrl,
-        originalWidth: 4000,
-        originalHeight: 3000,
-        isSampleHD: i < 3 // Primeras 3 fotos son muestras HD destacadas
-      }));
-    }
-
+    // Si el álbum no tiene fotos cargadas en backend, retornar vacío (evita clones repetidos de portada)
     return [];
   });
 
@@ -382,28 +367,20 @@ export class App implements OnInit, OnDestroy {
     return this.cartStore.isPhotoSelected(photoId);
   }
 
+  public readonly currentAlbumSelectedCount = computed<number>(() => {
+    const photos = this.currentPhotos();
+    const alb = this.currentAlbum();
+    if (!alb || photos.length === 0) return 0;
+    if (alb.isFreeDownload) {
+      return photos.filter(p => this.cartStore.isFreePhotoSelected(p.id)).length;
+    }
+    return photos.filter(p => this.cartStore.isPhotoSelected(p.id)).length;
+  });
+
   public readonly isCurrentLightboxPhotoSelected = computed<boolean>(() => {
     const p = this.currentLightboxPhoto();
     return p ? this.isPhotoSelected(p.id) : false;
   });
-
-  public openSpotlightTutorial(isManual = true): void {
-    this.isSpotlightTutorialManual.set(isManual);
-    this.isSpotlightTutorialOpen.set(true);
-  }
-
-  public closeSpotlightTutorial(): void {
-    this.isSpotlightTutorialOpen.set(false);
-    this.isSpotlightTutorialManual.set(false);
-  }
-
-  public toggleMobileSpotlight(): void {
-    this.isMobileFlashlightActive.update(v => !v);
-  }
-
-  public toggleMobileFlashlight(): void {
-    this.toggleMobileSpotlight();
-  }
 
   public dismissSplash(): void {
     if (this.splashTimer) {
@@ -415,6 +392,17 @@ export class App implements OnInit, OnDestroy {
       this.splashFallbackTimer = null;
     }
     this.showSplash.set(false);
+    if (typeof window !== 'undefined') {
+      if (this.splashUnmountTimer) {
+        clearTimeout(this.splashUnmountTimer);
+      }
+      this.splashUnmountTimer = setTimeout(() => {
+        this.renderSplash.set(false);
+        this.splashUnmountTimer = null;
+      }, 520);
+    } else {
+      this.renderSplash.set(false);
+    }
     if (typeof sessionStorage !== 'undefined') {
       try {
         sessionStorage.setItem('la_tercera_splash_seen', 'true');
@@ -444,6 +432,7 @@ export class App implements OnInit, OnDestroy {
         const seen = sessionStorage.getItem('la_tercera_splash_seen');
         if (seen === 'true') {
           this.showSplash.set(false);
+          this.renderSplash.set(false);
           return;
         }
       } catch {}
@@ -598,30 +587,63 @@ export class App implements OnInit, OnDestroy {
         });
       }
 
-      // Atajo administrativo discreto: Ctrl + Shift + A
-      window.addEventListener('keydown', (e: KeyboardEvent) => {
-        if (e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
-          e.preventDefault();
-          this.transitionView(() => {
-            if (this.adminAuthStore.isAuthenticated()) {
-              this.currentView.set(this.currentView() === 'admin' ? 'portfolio' : 'admin');
-            } else {
-              this.currentView.set(this.currentView() === 'admin-login' ? 'portfolio' : 'admin-login');
-            }
-          });
+      // Cargar acceso directo a descarga reciente (<72h) almacenada en el navegador
+      try {
+        const rawReady = window.localStorage.getItem('lt_ready_order');
+        if (rawReady) {
+          const parsed = JSON.parse(rawReady) as {
+            orderId?: string;
+            albumTitle?: string;
+            token?: string;
+            expiresAt?: string;
+          };
+          const expMs = parsed.expiresAt ? new Date(parsed.expiresAt).getTime() : 0;
+          if (parsed.token && parsed.orderId && (!expMs || expMs > Date.now())) {
+            this.readyOrderLink.set({
+              orderId: parsed.orderId,
+              albumTitle: parsed.albumTitle || 'Tus Fotos',
+              token: parsed.token
+            });
+          } else {
+            window.localStorage.removeItem('lt_ready_order');
+          }
         }
-      });
+      } catch {}
 
+      // Atajo administrativo discreto: Ctrl + Shift + A
+      window.addEventListener('keydown', this.onKeydown);
       window.addEventListener('popstate', this.onPopState);
     }
   }
+
+  private readonly onKeydown = (e: KeyboardEvent): void => {
+    if (e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+      e.preventDefault();
+      this.transitionView(() => {
+        if (this.adminAuthStore.isAuthenticated()) {
+          this.currentView.set(this.currentView() === 'admin' ? 'portfolio' : 'admin');
+        } else {
+          this.currentView.set(this.currentView() === 'admin-login' ? 'portfolio' : 'admin-login');
+        }
+      });
+    }
+  };
 
   ngOnDestroy(): void {
     if (this.splashTimer) {
       clearTimeout(this.splashTimer);
       this.splashTimer = null;
     }
+    if (this.splashFallbackTimer) {
+      clearTimeout(this.splashFallbackTimer);
+      this.splashFallbackTimer = null;
+    }
+    if (this.splashUnmountTimer) {
+      clearTimeout(this.splashUnmountTimer);
+      this.splashUnmountTimer = null;
+    }
     if (typeof window !== 'undefined') {
+      window.removeEventListener('keydown', this.onKeydown);
       window.removeEventListener('popstate', this.onPopState);
     }
   }
@@ -655,7 +677,6 @@ export class App implements OnInit, OnDestroy {
     this.isPinModalOpen.set(false);
     this.selectedPrivateAlbum.set(null);
     this.isOrderRecoveryOpen.set(false);
-    this.isSpotlightTutorialOpen.set(false);
   }
 
   private resetToPortfolio(reloadAlbums: boolean): void {
@@ -772,16 +793,6 @@ export class App implements OnInit, OnDestroy {
       this.cartStore.setAlbumPricing(album.id, album.fullAlbumPrice, album.unitPrice);
       this.activeAlbumPhotos.set([]); // Limpiar fotos anteriores
       this.currentView.set('album');
-
-      // Tutorial Onboarding automático si es álbum pago y el usuario nunca lo vio
-      if (!album.isFreeDownload && typeof localStorage !== 'undefined' && localStorage.getItem('la_tercera_spotlight_tutorial_v1') !== 'true') {
-        this.isSpotlightTutorialManual.set(false);
-        this.isSpotlightTutorialOpen.set(true);
-      } else {
-        this.isSpotlightTutorialOpen.set(false);
-        this.isSpotlightTutorialManual.set(false);
-        this.isMobileFlashlightActive.set(false);
-      }
     });
 
     // Cargar fotos reales del álbum desde el backend / Supabase
@@ -896,6 +907,15 @@ export class App implements OnInit, OnDestroy {
 
   public closeOrderRecovery(): void {
     this.isOrderRecoveryOpen.set(false);
+  }
+
+  public openReadyOrder(token: string): void {
+    if (!token) return;
+    this.readyOrderToken.set(token);
+    this.transitionView(() => this.currentView.set('payment-success'));
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }
 }
 

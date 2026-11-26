@@ -43,3 +43,28 @@ export function createRequireAdminAuth(authService: AdminAuthService) {
     return next();
   };
 }
+
+/**
+ * Middleware RBAC para restringir rutas administrativas según el rol del usuario autenticado
+ */
+export function createRequireRole(...allowedRoles: Array<'admin' | 'photographer'>) {
+  return function requireRole(
+    req: AuthenticatedAdminRequest,
+    res: Response,
+    next: NextFunction
+  ) {
+    if (!req.adminUser) {
+      return res.status(401).json({
+        error: 'Acceso no autorizado: Sesión requerida'
+      });
+    }
+
+    if (!allowedRoles.includes(req.adminUser.role)) {
+      return res.status(403).json({
+        error: 'Acceso restringido: No cuentas con permisos suficientes para esta operación'
+      });
+    }
+
+    return next();
+  };
+}

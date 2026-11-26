@@ -24,40 +24,27 @@ import { AlbumService } from '../../core/services/album.service';
   },
   template: `
     <article
-      class="polaroid-card group relative bg-white rounded-[26px] p-3 pb-4 border border-black/[0.06] shadow-md hover:shadow-2xl transition-all duration-300 ease-out flex flex-col justify-between cursor-pointer select-none overflow-hidden"
+      class="polaroid-card group relative bg-white rounded-[26px] p-3 pb-4 border border-black/[0.06] shadow-md sm:hover:shadow-2xl transition-transform duration-300 ease-out flex flex-col justify-between cursor-pointer select-none overflow-hidden"
       [class.is-selected]="isSelected()"
       [class.ring-2]="isSelected()"
       [class.ring-zinc-950]="isSelected()"
       [attr.aria-label]="photo().title || ('Foto #' + (index() + 1))"
       (click)="onCardClicked($event)"
     >
-      <!-- REFLEJO DE PAPEL FOTOGRÁFICO GLOSS EN HOVER / TOUCH -->
+      <!-- REFLEJO DE PAPEL FOTOGRÁFICO GLOSS EN HOVER (SOLO DESKTOP) -->
       <div
-        class="gloss-overlay absolute inset-0 rounded-[26px] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 overflow-hidden"
+        class="gloss-overlay hidden sm:block absolute inset-0 rounded-[26px] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 overflow-hidden"
         aria-hidden="true"
       >
         <div class="gloss-shine absolute inset-0 pointer-events-none"></div>
       </div>
 
-      <!-- CONTENEDOR DE LA IMAGEN CON PROPORCIÓN, SPOTLIGHT Y CAPA ANTI-DESCARGA -->
+      <!-- CONTENEDOR DE LA IMAGEN CON PROPORCIÓN Y CAPA ANTI-DESCARGA -->
       <div
         (click)="onViewClicked($event)"
-        (pointerenter)="onCardPointerEnter($event)"
-        (pointerleave)="onCardPointerLeave()"
-        (pointermove)="onCardPointerMove($event)"
-        (touchstart)="onTouchStart($event)"
-        (touchmove)="onTouchMove($event)"
-        (touchend)="onTouchEnd()"
-        (touchcancel)="onTouchEnd()"
         class="relative w-full aspect-[4/3] rounded-[20px] overflow-hidden bg-zinc-950 cursor-pointer select-none"
-        [class.touch-none]="isMobileFlashlightEnabled()"
-        [style.touch-action]="isMobileFlashlightEnabled() ? 'none' : 'auto'"
         [style.user-select]="'none'"
         [style.-webkit-user-select]="'none'"
-        [style.--spot-x]="spotX() + 'px'"
-        [style.--spot-y]="spotY() + 'px'"
-        [style.--spot-size]="'165px'"
-        [style.--spot-opacity]="isSpotActive() ? '1' : '0'"
         tabindex="0"
         (keydown.enter)="onViewClicked($event)"
         (keydown.space)="onViewClicked($event)"
@@ -80,7 +67,7 @@ import { AlbumService } from '../../core/services/album.service';
         <!-- PLACEHOLDER ELEGANTE CUANDO LA IMAGEN FALLA -->
         @if (hasError()) {
           <div class="absolute inset-0 bg-gradient-to-br from-zinc-900 via-zinc-950 to-zinc-900 flex flex-col items-center justify-center p-4 text-center select-none z-10 border border-zinc-800">
-            <svg class="w-8 h-8 text-amber-400/90 mb-1 filter drop-shadow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <svg class="w-8 h-8 text-amber-400/90 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/>
               <circle cx="12" cy="13" r="3"/>
             </svg>
@@ -92,34 +79,22 @@ import { AlbumService } from '../../core/services/album.service';
             </span>
           </div>
         } @else {
-          <!-- IMAGEN BASE -->
+          <!-- IMAGEN BASE NÍTIDA Y VISIBLE (PROTEGIDA CON MARCA DE AGUA EN PÍXELES) -->
           <img
             [src]="photo().previewUrl"
             [alt]="photo().title || ('Foto #' + (index() + 1))"
+            width="480"
+            height="360"
             loading="lazy"
             decoding="async"
             (load)="onImageLoaded()"
             (error)="onImageError()"
-            class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 prevent-save select-none"
+            class="w-full h-full object-cover sm:group-hover:scale-105 transition-transform duration-500 prevent-save select-none"
             [class.opacity-0]="isLoading()"
             [class.opacity-100]="!isLoading()"
             (contextmenu)="$event.preventDefault()"
             draggable="false"
           />
-
-          <!-- CAPA DE OSCURECIMIENTO AUTÉNTICA Y SPOTLIGHT / HAZ DE LUZ -->
-          @if (isSpotlightEffectActive() && !isLoading()) {
-            <div
-              class="spotlight-darkness-layer absolute inset-0 pointer-events-none rounded-[20px] overflow-hidden"
-              [class.is-spot-active]="isSpotActive()"
-              [class.is-selected]="isSelected()"
-              aria-hidden="true"
-            >
-              @if (isSpotActive()) {
-                <div class="spotlight-rim absolute rounded-full pointer-events-none"></div>
-              }
-            </div>
-          }
         }
 
         <!-- BADGES SUPERIORES: NÚMERO SECUENCIAL E INSIGNIA HD -->
@@ -137,8 +112,8 @@ import { AlbumService } from '../../core/services/album.service';
           }
         </div>
 
-        <!-- OVERLAY DE HOVER SUGIRIENDO EXPANDIR -->
-        <div class="absolute bottom-2 right-2 px-2.5 py-1 rounded-xl bg-black/60 backdrop-blur-md text-white/95 text-[11px] font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 pointer-events-none shadow-xs">
+        <!-- OVERLAY DE HOVER SUGIRIENDO EXPANDIR (SOLO DESKTOP) -->
+        <div class="hidden sm:flex absolute bottom-2 right-2 px-2.5 py-1 rounded-xl bg-black/75 text-white/95 text-[11px] font-medium opacity-0 group-hover:opacity-100 transition-opacity items-center gap-1.5 pointer-events-none shadow-xs">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="11" cy="11" r="8"/>
             <line x1="21" x2="16.65" y1="21" y2="16.65"/>
@@ -243,18 +218,17 @@ import { AlbumService } from '../../core/services/album.service';
   styles: [`
     :host {
       perspective: 1200px;
+      content-visibility: auto;
+      contain-intrinsic-size: 300px;
     }
 
     .polaroid-card {
       transform-style: preserve-3d;
       backface-visibility: hidden;
-      will-change: transform, box-shadow;
-      /* Rotación orgánica alternada por defecto */
       transform: perspective(1000px) rotate(var(--polaroid-rotation, 0deg)) translateZ(0);
-      transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 320ms ease;
+      transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
     }
 
-    /* Levitación 3D elevada al pasar el mouse en desktop (+ reflejo de papel fotográfico) */
     @media (hover: hover) and (pointer: fine) {
       .polaroid-card:hover {
         transform: perspective(1000px) rotate(0deg) translateZ(28px) scale(1.03) !important;
@@ -263,7 +237,19 @@ import { AlbumService } from '../../core/services/album.service';
       }
     }
 
-    /* Efecto de Reflejo Gloss de Papel Fotográfico Satinado */
+    @media (hover: none) and (pointer: coarse) {
+      :host {
+        perspective: none;
+      }
+      .polaroid-card {
+        transform-style: flat;
+        transform: none;
+      }
+      .gloss-overlay {
+        display: none !important;
+      }
+    }
+
     .gloss-overlay,
     .gloss-shine {
       pointer-events: none !important;
@@ -281,54 +267,11 @@ import { AlbumService } from '../../core/services/album.service';
       mix-blend-mode: overlay;
     }
 
-    /* Rebote Físico Elástico cuando pasa a isSelected */
     .polaroid-card.is-selected {
       transform: perspective(1000px) rotate(0deg) translateZ(12px) scale(1.01);
       border-color: #09090b;
       box-shadow: 0 14px 28px -6px rgba(0, 0, 0, 0.2);
       animation: polaroidBounce 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
-    }
-
-    /* Capa de Oscurecimiento Real y Efecto Linterna / Spotlight acelerado por GPU */
-    .spotlight-darkness-layer {
-      background: rgba(9, 9, 11, 0.86);
-      transition: background 150ms ease-out;
-      transform: translateZ(0);
-      will-change: background;
-    }
-
-    .spotlight-darkness-layer.is-selected {
-      background: rgba(9, 9, 11, 0.25);
-    }
-
-    .spotlight-darkness-layer.is-spot-active {
-      background: radial-gradient(
-        circle 135px at var(--spot-x, 50%) var(--spot-y, 50%),
-        transparent 0%,
-        rgba(9, 9, 11, 0.20) 45%,
-        rgba(9, 9, 11, 0.90) 80%,
-        rgba(9, 9, 11, 0.95) 100%
-      );
-    }
-
-    .spotlight-darkness-layer.is-spot-active.is-selected {
-      background: radial-gradient(
-        circle 135px at var(--spot-x, 50%) var(--spot-y, 50%),
-        transparent 0%,
-        rgba(9, 9, 11, 0.10) 45%,
-        rgba(9, 9, 11, 0.20) 80%,
-        rgba(9, 9, 11, 0.25) 100%
-      );
-    }
-
-    .spotlight-rim {
-      width: 270px;
-      height: 270px;
-      left: calc(var(--spot-x, 50%) - 135px);
-      top: calc(var(--spot-y, 50%) - 135px);
-      border: 1.5px solid rgba(254, 240, 138, 0.45);
-      box-shadow: 0 0 25px 6px rgba(253, 184, 19, 0.25);
-      transform: translateZ(0);
     }
 
     @keyframes polaroidBounce {
@@ -369,27 +312,6 @@ export class PhotoCardPolaroidComponent {
   public readonly albumId = input<string>();
   public readonly isSelected = input<boolean>(false);
   public readonly isPurchased = input<boolean>(false);
-  public readonly isMobileFlashlightActive = input<boolean>(false);
-  public readonly isMobileSpotlightActive = input<boolean>(false);
-
-  public readonly isMobileFlashlightEnabled = computed<boolean>(() => {
-    return this.isMobileFlashlightActive() || this.isMobileSpotlightActive();
-  });
-
-  public readonly isSpotlightEffectActive = computed<boolean>(() => {
-    return !this.isFreeDownload() && !this.isPurchased();
-  });
-
-  private cardRect: DOMRect | null = null;
-  private animFrameId: number | null = null;
-  private pendingX = 100;
-  private pendingY = 100;
-  private touchFadeTimeout: ReturnType<typeof setTimeout> | null = null;
-
-  public readonly isHovering = signal<boolean>(false);
-  public readonly isSpotActive = signal<boolean>(false);
-  public readonly spotX = signal<number>(100);
-  public readonly spotY = signal<number>(100);
 
   public readonly freeDownloadUrl = computed<string>(() => {
     const albId = this.albumId();
@@ -458,123 +380,5 @@ export class PhotoCardPolaroidComponent {
     event.stopPropagation();
     (event.currentTarget as HTMLElement | null)?.blur();
     this.toggleSelect.emit(this.photo());
-  }
-
-  // --- Handlers de Efecto Linterna (Zero getBoundingClientRect in move) ---
-
-  public onCardPointerEnter(event: PointerEvent): void {
-    if (!this.isSpotlightEffectActive()) return;
-    if (event.pointerType === 'touch' && !this.isMobileFlashlightEnabled()) return;
-
-    const target = event.currentTarget as HTMLElement | null;
-    if (target) {
-      this.cardRect = target.getBoundingClientRect();
-      this.isHovering.set(true);
-      this.isSpotActive.set(true);
-      this.pendingX = event.clientX - this.cardRect.left;
-      this.pendingY = event.clientY - this.cardRect.top;
-      this.scheduleSpotlightUpdate();
-    }
-  }
-
-  public onCardPointerMove(event: PointerEvent): void {
-    if (!this.isSpotlightEffectActive()) return;
-    if (event.pointerType === 'touch' && !this.isMobileFlashlightEnabled()) return;
-
-    if (!this.cardRect) {
-      const target = event.currentTarget as HTMLElement | null;
-      if (target) {
-        this.cardRect = target.getBoundingClientRect();
-      }
-    }
-    if (!this.cardRect) return;
-
-    this.isHovering.set(true);
-    this.isSpotActive.set(true);
-    this.pendingX = event.clientX - this.cardRect.left;
-    this.pendingY = event.clientY - this.cardRect.top;
-    this.scheduleSpotlightUpdate();
-  }
-
-  public onCardPointerLeave(): void {
-    if (this.touchFadeTimeout) return;
-    this.isHovering.set(false);
-    this.isSpotActive.set(false);
-    this.cardRect = null;
-    if (this.animFrameId) {
-      cancelAnimationFrame(this.animFrameId);
-      this.animFrameId = null;
-    }
-  }
-
-  public onTouchStart(event: TouchEvent): void {
-    if (!this.isSpotlightEffectActive() || !this.isMobileFlashlightEnabled()) return;
-    if (this.touchFadeTimeout) {
-      clearTimeout(this.touchFadeTimeout);
-      this.touchFadeTimeout = null;
-    }
-    const target = event.currentTarget as HTMLElement | null;
-    const touch = event.touches?.[0];
-    if (target && touch) {
-      this.cardRect = target.getBoundingClientRect();
-      this.isHovering.set(true);
-      this.isSpotActive.set(true);
-      this.pendingX = touch.clientX - this.cardRect.left;
-      this.pendingY = touch.clientY - this.cardRect.top - 40; // Offset vertical de -40px sobre la yema
-      this.scheduleSpotlightUpdate();
-    }
-  }
-
-  public onTouchMove(event: TouchEvent): void {
-    if (!this.isSpotlightEffectActive() || !this.isMobileFlashlightEnabled()) return;
-    if (event.cancelable) {
-      event.preventDefault();
-    }
-    if (!this.cardRect) {
-      const target = event.currentTarget as HTMLElement | null;
-      if (target) {
-        this.cardRect = target.getBoundingClientRect();
-      }
-    }
-    if (!this.cardRect) return;
-
-    const touch = event.touches?.[0];
-    if (touch) {
-      this.isHovering.set(true);
-      this.isSpotActive.set(true);
-      this.pendingX = touch.clientX - this.cardRect.left;
-      this.pendingY = touch.clientY - this.cardRect.top - 40;
-      this.scheduleSpotlightUpdate();
-    }
-  }
-
-  public onTouchEnd(): void {
-    if (this.touchFadeTimeout) {
-      clearTimeout(this.touchFadeTimeout);
-    }
-    this.touchFadeTimeout = setTimeout(() => {
-      this.isHovering.set(false);
-      this.isSpotActive.set(false);
-      this.cardRect = null;
-      if (this.animFrameId) {
-        cancelAnimationFrame(this.animFrameId);
-        this.animFrameId = null;
-      }
-      this.touchFadeTimeout = null;
-    }, 600);
-  }
-
-  // Backwards compatibility aliases
-  public onCardTouchStart(event: TouchEvent): void { this.onTouchStart(event); }
-  public onCardTouchMove(event: TouchEvent): void { this.onTouchMove(event); }
-  public onCardTouchEnd(): void { this.onTouchEnd(); }
-
-  private scheduleSpotlightUpdate(): void {
-    if (this.animFrameId) return;
-    this.animFrameId = requestAnimationFrame(() => {
-      this.spotX.set(Math.round(this.pendingX));
-      this.spotY.set(Math.round(this.pendingY));
-      this.animFrameId = null;
-    });
   }
 }

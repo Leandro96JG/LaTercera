@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, signal, computed, inject, DestroyRef, PLATFORM_ID, input, output } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, computed, inject, DestroyRef, PLATFORM_ID, ElementRef, afterNextRender, input, output } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { Album } from '../../core/models/album.model';
 
@@ -30,7 +30,8 @@ export interface ShowcaseSlide {
   `],
   template: `
     <section class="flex flex-col lg:grid lg:grid-cols-12 gap-4 lg:gap-6 mb-8 max-w-full overflow-x-hidden">
-      <!-- 1. CAJA PRINCIPAL DE PRESENTACIÓN (Blanca) - 7 Columnas en Desktop -->
+      @if (section() === 'all' || section() === 'hero') {
+        <!-- 1. CAJA PRINCIPAL DE PRESENTACIÓN (Blanca) - 7 Columnas en Desktop -->
       <div class="lg:col-span-7 bg-white rounded-[28px] sm:rounded-[32px] p-5 sm:p-7 lg:p-8 border border-black/[0.05] shadow-bento flex flex-col justify-between h-full relative overflow-hidden animate-stagger-fade-in">
         <div>
           <!-- Badge Superior: Disponibilidad en La Rioja -->
@@ -46,6 +47,9 @@ export interface ShowcaseSlide {
               <img
                 src="assets/branding/fotografa.jpg"
                 alt="Fotógrafa Jenifer 'Yuyo' Espeche"
+                width="144"
+                height="144"
+                decoding="async"
                 class="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-500 ease-out"
                 (load)="onHeroImageLoaded()"
                 (error)="onHeroImageLoaded()"
@@ -157,7 +161,11 @@ export interface ShowcaseSlide {
             <img
               [src]="slide.url"
               [alt]="slide.title"
-              class="w-full h-full object-cover transition-transform duration-[4000ms] ease-out will-change-transform"
+              width="640"
+              height="420"
+              decoding="async"
+              class="w-full h-full object-cover transition-transform duration-[4000ms] ease-out"
+              [class.will-change-transform]="currentSlideIndex() === idx"
               [class.scale-105]="currentSlideIndex() === idx"
               [class.scale-100]="currentSlideIndex() !== idx"
               [attr.loading]="idx === 0 ? 'eager' : 'lazy'"
@@ -201,9 +209,11 @@ export interface ShowcaseSlide {
             }
           </div>
         </div>
-      </div>
+        </div>
+      }
 
-      <!-- 3. BLOQUE OSCURO DE COBERTURAS (#111111) - 12 Columnas en Desktop -->
+      @if (section() === 'all' || section() === 'coverage') {
+        <!-- 3. BLOQUE OSCURO DE COBERTURAS (#111111) - 12 Columnas en Desktop -->
       <div class="lg:col-span-12 bg-[#111111] text-white rounded-[28px] sm:rounded-[32px] p-5 sm:p-6 lg:p-7 shadow-bento border border-white/5 relative overflow-hidden animate-stagger-fade-in">
         <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-3 border-b border-white/10">
           <div>
@@ -428,11 +438,15 @@ export interface ShowcaseSlide {
             <span>Pedir presupuesto para mi evento</span>
           </a>
         </div>
-      </div>
+        </div>
+      }
     </section>
   `
 })
 export class HeroComponent {
+  // Controla si se muestra la cabecera completa, solo el hero o solo la grilla de coberturas
+  readonly section = input<'hero' | 'coverage' | 'all'>('all');
+
   // Rotador de categorías dinámico
   readonly rotatingCategories: readonly string[] = [
     'Fútbol',
@@ -514,19 +528,38 @@ export class HeroComponent {
 
   // Tabs de Coberturas en Móvil (< 1024px)
   readonly selectedCoverageTab = signal<'deportivos' | 'sociales'>('deportivos');
+  private readonly isHeroVisible = signal<boolean>(true);
 
   constructor() {
     const platformId = inject(PLATFORM_ID);
     const destroyRef = inject(DestroyRef);
+    const elementRef = inject(ElementRef<HTMLElement>);
 
     if (isPlatformBrowser(platformId)) {
-      // Rotador de texto cada 2.5s (2500ms)
+      afterNextRender(() => {
+        if (typeof window !== 'undefined' && 'IntersectionObserver' in window) {
+          const observer = new IntersectionObserver(
+            (entries) => {
+              for (const entry of entries) {
+                this.isHeroVisible.set(entry.isIntersecting);
+              }
+            },
+            { threshold: 0.05 }
+          );
+          observer.observe(elementRef.nativeElement);
+          destroyRef.onDestroy(() => observer.disconnect());
+        }
+      });
+
+      // Rotador de texto cada 2.5s (pausado fuera de viewport o con pestaña oculta)
       const rotatorInterval = setInterval(() => {
+        if (!this.isHeroVisible() || (typeof document !== 'undefined' && document.hidden)) return;
         this.currentCategoryIndex.update(idx => (idx + 1) % this.rotatingCategories.length);
       }, 2500);
 
-      // Carrusel de imágenes cada 3.5s (3500ms)
+      // Carrusel de imágenes cada 3.5s (pausado fuera de viewport o con pestaña oculta)
       const carouselInterval = setInterval(() => {
+        if (!this.isHeroVisible() || (typeof document !== 'undefined' && document.hidden)) return;
         const total = this.slides().length;
         if (total > 0) {
           this.currentSlideIndex.update(idx => (idx + 1) % total);

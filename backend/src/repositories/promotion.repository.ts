@@ -500,17 +500,24 @@ export class SupabasePromotionRepository implements IPromotionRepository {
     await this.localFallback.incrementCouponUsage(normalizedCode);
 
     try {
+      const { error: rpcError } = await this.supabase.rpc('increment_coupon_usage_atomic', {
+        p_code: normalizedCode
+      });
+      if (!rpcError) return;
+
+      // Fallback condicional si el RPC aún no fue migrado en Supabase
       const { data } = await this.supabase
         .from('coupons')
-        .select('used_count')
+        .select('used_count, max_uses')
         .eq('code', normalizedCode)
         .maybeSingle();
 
-      if (data) {
+      if (data && (data.max_uses == null || Number(data.used_count) < Number(data.max_uses))) {
         await this.supabase
           .from('coupons')
           .update({ used_count: (Number(data.used_count) || 0) + 1 })
-          .eq('code', normalizedCode);
+          .eq('code', normalizedCode)
+          .eq('used_count', Number(data.used_count) || 0);
       }
     } catch (err: unknown) {
       console.warn('[SupabasePromotionRepository] Advertencia al incrementar used_count de cupón:', err);
@@ -525,47 +532,90 @@ export class SupabasePromotionRepository implements IPromotionRepository {
   ): Promise<{ success: boolean; coupon?: CouponDTO; error?: string }> {
     const normalizedCode = code.trim().toUpperCase();
 
-    const syncBeforeCheck = async (): Promise<CouponDTO | null> => {
-      try {
-        const { data, error } = await this.supabase
-          .from('coupons')
-          .select('*')
-          .eq('code', normalizedCode)
-          .maybeSingle();
+    try {
+      const { data, error } = await this.supabase.rpc('consume_coupon_atomic', {
+        p_code: normalizedCode,
+        p_album_id: albumId || null,
+        p_photo_count: photoCount ?? null,
+        p_is_full_album: Boolean(isFullAlbum)
+      });
 
-        if (!error && data) {
-          return {
-            code: data.code,
-            discountPercent: Number(data.discount_percent) || 10,
-            isActive: Boolean(data.is_active),
-            albumId: data.album_id || null,
-            maxUses: data.max_uses ? Number(data.max_uses) : null,
-            usedCount: Number(data.used_count) || 0,
-            maxPhotos: data.max_photos ? Number(data.max_photos) : null,
-            expiresAt: data.expires_at || null,
-            createdAt: data.created_at
-          };
+      if (!error && Array.isArray(data) && data.length > 0) {
+        const row = data[0];
+        if (row.error_reason) {
+          return { success: false, error: row.error_reason };
         }
-      } catch (err: unknown) {
-        console.warn('[SupabasePromotionRepository] Advertencia al sincronizar cupón en lock:', err);
+        const coupon: CouponDTO = {
+          code: row.code,
+          discountPercent: Number(row.discount_percent) || 10,
+          isActive: Boolean(row.is_active),
+          albumId: row.album_id || null,
+          maxUses: row.max_uses ? Number(row.max_uses) : null,
+          usedCount: Number(row.used_count) || 0,
+          maxPhotos: row.max_photos ? Number(row.max_photos) : null,
+          expiresAt: row.expires_at || null,
+          createdAt: row.created_at
+        };
+        this.localFallback.upsertMemoryCoupon(coupon);
+        return { success: true, coupon };
       }
-      return null;
+
+      // Si el RPC no existe aún en la base de datos (42883), usar fallback con update condicional estricto
+      if (error && !error.message?.includes('consume_coupon_atomic') && error.code !== '42883') {
+        return {
+          success: false,
+          error: `Error verificando cupón en base de datos: ${error.message}`
+        };
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!msg.includes('consume_coupon_atomic')) {
+        return { success: false, error: `Error de base de datos al validar cupón: ${msg}` };
+      }
+    }
+
+    // Fallback optimista estricto (solo si el RPC aún no fue aplicado en Supabase)
+    const syncBeforeCheck = async (): Promise<CouponDTO | null> => {
+      const { data, error } = await this.supabase
+        .from('coupons')
+        .select('*')
+        .eq('code', normalizedCode)
+        .maybeSingle();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+      if (!data) return null;
+
+      return {
+        code: data.code,
+        discountPercent: Number(data.discount_percent) || 10,
+        isActive: Boolean(data.is_active),
+        albumId: data.album_id || null,
+        maxUses: data.max_uses ? Number(data.max_uses) : null,
+        usedCount: Number(data.used_count) || 0,
+        maxPhotos: data.max_photos ? Number(data.max_photos) : null,
+        expiresAt: data.expires_at || null,
+        createdAt: data.created_at
+      };
     };
 
-    const res = await this.localFallback.tryConsumeCoupon(
-      normalizedCode,
-      albumId,
-      photoCount,
-      isFullAlbum,
-      syncBeforeCheck
-    );
+    try {
+      const res = await this.localFallback.tryConsumeCoupon(
+        normalizedCode,
+        albumId,
+        photoCount,
+        isFullAlbum,
+        syncBeforeCheck
+      );
 
-    if (res.success && res.coupon) {
-      try {
+      if (res.success && res.coupon) {
+        const previousUsed = Math.max(0, res.coupon.usedCount - 1);
         let updateQuery = this.supabase
           .from('coupons')
           .update({ used_count: res.coupon.usedCount })
-          .eq('code', res.coupon.code);
+          .eq('code', res.coupon.code)
+          .eq('used_count', previousUsed);
 
         if (res.coupon.maxUses != null) {
           updateQuery = updateQuery.lt('used_count', res.coupon.maxUses);
@@ -573,20 +623,26 @@ export class SupabasePromotionRepository implements IPromotionRepository {
 
         const { data, error } = await updateQuery.select('code, used_count');
         if (error) {
-          console.warn('[SupabasePromotionRepository] Advertencia al persistir used_count en Supabase:', error);
-        } else if (res.coupon.maxUses != null && (!data || data.length === 0)) {
-          // Si ninguna fila fue actualizada, se alcanzó concurrentemente el límite maxUses en la base de datos
-          res.coupon.usedCount = Math.max(0, res.coupon.usedCount - 1);
+          res.coupon.usedCount = previousUsed;
+          this.localFallback.upsertMemoryCoupon(res.coupon);
+          return {
+            success: false,
+            error: `No se pudo registrar el uso del cupón: ${error.message}`
+          };
+        }
+        if (!data || data.length === 0) {
+          res.coupon.usedCount = previousUsed;
           this.localFallback.upsertMemoryCoupon(res.coupon);
           return {
             success: false,
             error: 'Este cupón ha alcanzado el límite máximo de usos disponibles'
           };
         }
-      } catch (err: unknown) {
-        console.warn('[SupabasePromotionRepository] Advertencia al persistir used_count en Supabase:', err);
       }
+      return res;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error validando cupón';
+      return { success: false, error: msg };
     }
-    return res;
   }
 }

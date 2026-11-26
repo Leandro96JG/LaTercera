@@ -2,13 +2,14 @@ import { Router, Request, Response, NextFunction } from 'express';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import multer from 'multer';
+import sharp from 'sharp';
 import {
   GoogleDriveImporterService,
   DefaultDriveHttpClient
 } from '../services/drive-importer.service';
 import { BulkUploadService } from '../services/bulk-upload.service';
 import { createStorageService } from '../services/storage.service';
-import { buildAlbumPhotoTitle } from '../services/mime-validator.service';
+import { buildAlbumPhotoTitle, validateImageBufferHeader } from '../services/mime-validator.service';
 import {
   AdminDriveImportRequest,
   AdminDriveImportResponse,
@@ -28,10 +29,10 @@ import { IAlbumRepository, AlbumDTO, PhotoDTO, generateAlbumSlug, normalizePrevi
 import { ICategoryRepository } from '../repositories/category.repository';
 import { createAlbumRepository } from '../repositories';
 import { AdminAuthService } from '../services/admin-auth.service';
-import { createRequireAdminAuth } from '../middleware/admin-auth.middleware';
+import { createRequireAdminAuth, AuthenticatedAdminRequest } from '../middleware/admin-auth.middleware';
 
 export function createAdminAlbumsRouter(
-  authService?: AdminAuthService,
+  authService: AdminAuthService,
   albumRepo?: IAlbumRepository,
   categoryRepo?: ICategoryRepository
 ): Router {
@@ -45,7 +46,16 @@ export function createAdminAlbumsRouter(
 
   const requireAdminAuth = authService
     ? createRequireAdminAuth(authService)
-    : (_req: Request, _res: Response, next: NextFunction) => next();
+    : (_req: Request, res: Response, _next: NextFunction) =>
+        res.status(401).json({ error: 'Servicio de autenticación no configurado' });
+
+  function isAlbumOwnerOrAdmin(req: Request, album: AlbumDTO): boolean {
+    const user = (req as AuthenticatedAdminRequest).adminUser;
+    if (!user) return false;
+    if (user.role === 'admin') return true;
+    const albumOwner = (album as AlbumDTO & { photographerId?: string }).photographerId;
+    return !albumOwner || albumOwner === user.photographerId;
+  }
 
   // Configuración de Multer para subida múltiple en memoria (hasta 100 fotos de 50MB)
   const upload = multer({
@@ -507,14 +517,33 @@ export function createAdminAlbumsRouter(
           return Buffer.from(raw, 'base64');
         }
         if (targetUrl.startsWith('http://') || targetUrl.startsWith('https://')) {
-          try {
-            const fetchRes = await fetch(targetUrl, { signal: AbortSignal.timeout(5000) });
-            if (fetchRes.ok) {
-              const arrayBuf = await fetchRes.arrayBuffer();
-              return Buffer.from(arrayBuf);
+          const configuredSupabase = process.env.SUPABASE_URL?.trim();
+          let isAllowedSupabasePublicUrl = false;
+          if (configuredSupabase) {
+            try {
+              const allowedHost = new URL(configuredSupabase).hostname;
+              const targetParsed = new URL(targetUrl);
+              isAllowedSupabasePublicUrl =
+                targetParsed.protocol === 'https:' &&
+                targetParsed.hostname === allowedHost &&
+                targetParsed.pathname.startsWith('/storage/v1/object/public/');
+            } catch {
+              isAllowedSupabasePublicUrl = false;
             }
-          } catch (netErr) {
-            console.warn(`[AdminAlbums] Error fetch red para '${targetUrl}', probando fallback local:`, netErr);
+          }
+
+          if (isAllowedSupabasePublicUrl) {
+            try {
+              const fetchRes = await fetch(targetUrl, { signal: AbortSignal.timeout(5000) });
+              if (fetchRes.ok) {
+                const arrayBuf = await fetchRes.arrayBuffer();
+                return Buffer.from(arrayBuf);
+              }
+            } catch (netErr) {
+              console.warn(`[AdminAlbums] Error fetch Storage para '${targetUrl}', probando fallback local:`, netErr);
+            }
+          } else {
+            console.warn(`[AdminAlbums] URL externa bloqueada por política anti-SSRF: '${targetUrl}'`);
           }
         }
         // Fallback directo desde storage si targetUrl apunta a branding
@@ -714,27 +743,53 @@ export function createAdminAlbumsRouter(
     });
   };
 
+  const handleSingleLogoUpload = (req: Request, res: Response, next: NextFunction) => {
+    upload.single('logo')(req, res, (err: unknown) => {
+      if (err) {
+        return res.status(400).json({
+          success: false,
+          error: err instanceof Error ? err.message : 'Error al recibir el archivo de logo'
+        });
+      }
+      next();
+    });
+  };
+
   /**
    * POST /api/admin/albums/upload-watermark-logo
-   * Permite subir un logo o escudo PNG/WebP desde la PC o celular de forma remota
+   * Permite subir un logo PNG/WebP/JPG validado (sin SVG crudo) y re-encodeado con Sharp
    */
-  router.post('/upload-watermark-logo', requireAdminAuth, upload.single('logo'), async (req: Request, res: Response) => {
+  router.post('/upload-watermark-logo', requireAdminAuth, handleSingleLogoUpload, async (req: Request, res: Response) => {
     try {
       const file = req.file;
       if (!file) {
         return res.status(400).json({ success: false, error: 'No se envió ningún archivo en el campo "logo"' });
       }
 
-      const validMimes = ['image/png', 'image/webp', 'image/jpeg', 'image/svg+xml'];
-      if (!validMimes.includes(file.mimetype) && !file.originalname.match(/\.(png|webp|jpe?g|svg)$/i)) {
+      const validMimes = ['image/png', 'image/webp', 'image/jpeg'];
+      if (!validMimes.includes(file.mimetype) || file.originalname.match(/\.svg$/i)) {
         return res.status(400).json({
           success: false,
           error: 'Formato no admitido. Selecciona un archivo PNG, WebP o JPG.'
         });
       }
 
+      const headerCheck = validateImageBufferHeader(file.buffer);
+      if (!headerCheck.valid) {
+        return res.status(400).json({
+          success: false,
+          error: 'El contenido del archivo no corresponde a una imagen PNG, WebP o JPG válida.'
+        });
+      }
+
+      // Re-encodear con Sharp para sanitizar metadatos/código embebido manteniendo transparencia PNG
+      const sanitizedPngBuffer = await sharp(file.buffer)
+        .resize({ width: 1000, height: 1000, fit: 'inside', withoutEnlargement: true })
+        .png({ compressionLevel: 9 })
+        .toBuffer();
+
       const logoId = 'logo_' + uuidv4().substring(0, 8);
-      const saved = await storageService.savePreview('branding', logoId, file.buffer);
+      const saved = await storageService.savePreview('branding', logoId, sanitizedPngBuffer);
 
       return res.status(200).json({
         success: true,
@@ -1019,10 +1074,11 @@ export function createAdminAlbumsRouter(
         });
       }
 
-      // Eliminar de Storage
+      // Eliminar de Storage usando extensión real de originalPath (o filename como fallback)
       if (storageService.deletePhotoFiles) {
-        const extMatch = photo.filename.match(/\.[a-zA-Z0-9]+$/);
-        const ext = extMatch ? extMatch[0] : '.jpg';
+        const pathExtMatch = photo.originalPath?.match(/\.[a-zA-Z0-9]+$/);
+        const nameExtMatch = photo.filename.match(/\.[a-zA-Z0-9]+$/);
+        const ext = pathExtMatch ? pathExtMatch[0] : (nameExtMatch ? nameExtMatch[0] : '.jpg');
         await storageService.deletePhotoFiles(albumId, photoId, ext);
       }
 
@@ -1043,6 +1099,79 @@ export function createAdminAlbumsRouter(
       });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Error al eliminar foto del álbum';
+      return res.status(500).json({ success: false, error: message });
+    }
+  });
+
+  /**
+   * POST /api/admin/albums/:id/photos/bulk-action
+   * Acciones por lote sobre fotos seleccionadas (marcar HD, desmarcar HD o eliminar)
+   */
+  router.post('/:id/photos/bulk-action', requireAdminAuth, async (req: Request, res: Response) => {
+    try {
+      const rawId = req.params.id;
+      const albumId = Array.isArray(rawId) ? rawId[0] : rawId;
+      const { action, photoIds } = req.body as {
+        action?: 'mark_hd' | 'unmark_hd' | 'delete';
+        photoIds?: string[];
+      };
+
+      if (!action || !['mark_hd', 'unmark_hd', 'delete'].includes(action)) {
+        return res.status(400).json({ success: false, error: 'Acción inválida (mark_hd | unmark_hd | delete)' });
+      }
+      if (!Array.isArray(photoIds) || photoIds.length === 0 || photoIds.length > 200) {
+        return res.status(400).json({ success: false, error: 'Selecciona entre 1 y 200 fotografías.' });
+      }
+
+      const album = await albumRepository.getAlbumById(albumId);
+      if (!album) {
+        return res.status(404).json({ success: false, error: 'Álbum no encontrado' });
+      }
+      if (!isAlbumOwnerOrAdmin(req, album)) {
+        return res.status(403).json({ success: false, error: 'No tienes permiso para modificar este álbum.' });
+      }
+
+      let affected = 0;
+      const uniqueIds = Array.from(new Set(photoIds));
+      let coverWasDeleted = false;
+
+      for (const photoId of uniqueIds) {
+        const photo = await albumRepository.getPhotoById(albumId, photoId);
+        if (!photo) continue;
+
+        if (action === 'mark_hd' || action === 'unmark_hd') {
+          const updated = await albumRepository.updatePhoto(albumId, photoId, {
+            isSampleHd: action === 'mark_hd'
+          });
+          if (updated) affected += 1;
+        } else if (action === 'delete') {
+          if (album.coverUrl === photo.previewUrl) {
+            coverWasDeleted = true;
+          }
+          if (storageService.deletePhotoFiles) {
+            const pathExtMatch = photo.originalPath?.match(/\.[a-zA-Z0-9]+$/);
+            const nameExtMatch = photo.filename.match(/\.[a-zA-Z0-9]+$/);
+            const ext = pathExtMatch ? pathExtMatch[0] : (nameExtMatch ? nameExtMatch[0] : '.jpg');
+            await storageService.deletePhotoFiles(albumId, photoId, ext);
+          }
+          await albumRepository.deletePhoto(albumId, photoId);
+          affected += 1;
+        }
+      }
+
+      if (coverWasDeleted) {
+        const remaining = await albumRepository.getPhotosByAlbumId(albumId);
+        await albumRepository.updateAlbum(albumId, { coverUrl: remaining[0]?.previewUrl || '' });
+      }
+
+      return res.status(200).json({
+        success: true,
+        action,
+        affected,
+        message: `Acción aplicada sobre ${affected} fotografía(s).`
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al ejecutar acción por lote';
       return res.status(500).json({ success: false, error: message });
     }
   });

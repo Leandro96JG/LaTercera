@@ -155,7 +155,7 @@ export class CartStore {
     if (isFull) {
       const fullPrice = this._fullAlbumPrice();
       let couponDiscount = 0;
-      const discountPct = this._couponDiscountPercent() ?? (coupon === 'YUYO10' ? 10 : 0);
+      const discountPct = this._couponDiscountPercent() ?? 0;
       if (discountPct > 0) {
         couponDiscount = Math.round(fullPrice * (discountPct / 100));
         couponDiscount = Math.min(fullPrice, Math.max(0, couponDiscount));
@@ -189,24 +189,22 @@ export class CartStore {
     const baseDiscountAmount = Math.round(rawSubtotal * (baseDiscountPercentage / 100));
     const subtotalAfterBase = Math.max(0, rawSubtotal - baseDiscountAmount);
 
-    let couponDiscountAmount = 0;
-    const discountPct = this._couponDiscountPercent() ?? (coupon === 'YUYO10' ? 10 : 0);
-    if (discountPct > 0) {
-      couponDiscountAmount = Math.round(subtotalAfterBase * (discountPct / 100));
-      couponDiscountAmount = Math.min(subtotalAfterBase, Math.max(0, couponDiscountAmount));
-    }
-
-    let totalDiscount = baseDiscountAmount + couponDiscountAmount;
-    let finalTotal = Math.max(0, rawSubtotal - totalDiscount);
-
-    // Tope automático: comprar fotos sueltas nunca cuesta más que fullAlbumPrice
+    // Tope automático ANTES del cupón: nunca paga más que fullAlbumPrice antes de aplicar el cupón
     const fullPrice = this._fullAlbumPrice();
-    if (capAtFullAlbumPrice && fullPrice > 0 && finalTotal > fullPrice) {
-      finalTotal = fullPrice;
-      totalDiscount = Math.max(0, rawSubtotal - finalTotal);
+    const cappedSubtotal =
+      capAtFullAlbumPrice && fullPrice > 0 && subtotalAfterBase > fullPrice
+        ? fullPrice
+        : subtotalAfterBase;
+
+    let couponDiscountAmount = 0;
+    const discountPct = this._couponDiscountPercent() ?? 0;
+    if (discountPct > 0) {
+      couponDiscountAmount = Math.round(cappedSubtotal * (discountPct / 100));
+      couponDiscountAmount = Math.min(cappedSubtotal, Math.max(0, couponDiscountAmount));
     }
 
-    totalDiscount = Math.min(rawSubtotal, Math.max(0, totalDiscount));
+    let finalTotal = Math.max(0, cappedSubtotal - couponDiscountAmount);
+    let totalDiscount = Math.min(rawSubtotal, Math.max(0, rawSubtotal - finalTotal));
     finalTotal = Math.max(0, rawSubtotal - totalDiscount);
 
     return {

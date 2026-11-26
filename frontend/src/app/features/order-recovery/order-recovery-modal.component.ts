@@ -58,7 +58,7 @@ import { RecoveredOrder } from '../../core/models/order.model';
           </div>
 
           <p class="text-xs text-zinc-400 mb-6 leading-relaxed">
-            ¿Pagaste tus fotos pero cerraste la ventana o no pudiste guardarlas? Ingresa el correo electrónico que utilizaste en Mercado Pago para recuperar tus enlaces de descarga activos (últimas 72 horas).
+            ¿Pagaste tus fotos pero cerraste la ventana o no pudiste guardarlas? Ingresa el correo electrónico que ingresaste en nuestra web al comprar para recuperar tus enlaces de descarga activos (últimas 72 horas).
           </p>
 
           <!-- Formulario de Búsqueda -->
@@ -112,6 +112,15 @@ import { RecoveredOrder } from '../../core/models/order.model';
                 <span>Buscar</span>
               }
             </button>
+
+            @if (successMessage()) {
+              <div class="p-3.5 bg-emerald-500/10 border border-emerald-500/25 rounded-xl text-xs text-emerald-300 flex items-start gap-2.5">
+                <svg class="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                <span>{{ successMessage() }}</span>
+              </div>
+            }
 
             @if (errorMessage()) {
               <div class="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs text-rose-300 flex items-center gap-2 animate-shake">
@@ -202,6 +211,7 @@ export class OrderRecoveryModalComponent {
   public readonly isLoading = signal<boolean>(false);
   public readonly searched = signal<boolean>(false);
   public readonly errorMessage = signal<string | null>(null);
+  public readonly successMessage = signal<string | null>(null);
   public readonly recoveredOrders = signal<readonly RecoveredOrder[]>([]);
 
   public onBackdropClick(event: MouseEvent): void {
@@ -214,6 +224,7 @@ export class OrderRecoveryModalComponent {
     this.emailInput = '';
     this.paymentIdInput = '';
     this.errorMessage.set(null);
+    this.successMessage.set(null);
     this.searched.set(false);
     this.recoveredOrders.set([]);
     this.close.emit();
@@ -230,6 +241,7 @@ export class OrderRecoveryModalComponent {
 
     this.isLoading.set(true);
     this.errorMessage.set(null);
+    this.successMessage.set(null);
 
     const req$ = cleanPaymentId
       ? this.paymentService.recoverOrdersByEmail(email, cleanPaymentId)
@@ -241,6 +253,11 @@ export class OrderRecoveryModalComponent {
         this.searched.set(true);
         if (res.success && res.orders && res.orders.length > 0) {
           this.recoveredOrders.set(res.orders);
+        } else if (res.success && res.sentToEmail) {
+          this.recoveredOrders.set([]);
+          this.successMessage.set(
+            res.message || 'Si existen compras vigentes asociadas a este correo en las últimas 72 horas, enviamos los enlaces de descarga a tu casilla.'
+          );
         } else {
           this.recoveredOrders.set([]);
           this.errorMessage.set(

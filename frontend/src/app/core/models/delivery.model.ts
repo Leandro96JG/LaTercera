@@ -1,3 +1,5 @@
+export const ZIP_DOWNLOAD_THRESHOLD = 5;
+
 export interface PhotoDownloadItem {
   id: string;
   filename: string;

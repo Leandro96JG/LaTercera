@@ -27,6 +27,14 @@ export interface IOrderRepository {
   ): Promise<Order | null>;
   isEventProcessed(eventId: string): Promise<boolean>;
   markEventProcessed(eventId: string, orderId: string): Promise<void>;
+  tryClaimWebhookEvent(eventId: string, orderId: string): Promise<boolean>;
+  releaseWebhookEventClaim(eventId: string): Promise<void>;
+  transitionOrderToPaidIfPending(
+    id: string,
+    paymentId: string,
+    downloadToken: string
+  ): Promise<Order | null>;
+  incrementDownloadCount?(orderId: string): Promise<void>;
 }
 
 /**
@@ -123,6 +131,42 @@ export class MemoryOrderRepository implements IOrderRepository {
   async markEventProcessed(eventId: string, orderId: string): Promise<void> {
     this.processedEvents.set(eventId, orderId);
   }
+
+  async tryClaimWebhookEvent(eventId: string, orderId: string): Promise<boolean> {
+    if (this.processedEvents.has(eventId)) {
+      return false;
+    }
+    this.processedEvents.set(eventId, orderId);
+    return true;
+  }
+
+  async releaseWebhookEventClaim(eventId: string): Promise<void> {
+    this.processedEvents.delete(eventId);
+  }
+
+  async transitionOrderToPaidIfPending(
+    id: string,
+    paymentId: string,
+    downloadToken: string
+  ): Promise<Order | null> {
+    const order = this.orders.get(id);
+    if (!order || (order.status !== 'PENDING' && order.status !== 'PROCESSING')) {
+      return null;
+    }
+    order.status = 'PAID';
+    order.paymentId = paymentId;
+    order.downloadToken = downloadToken;
+    order.updatedAt = new Date().toISOString();
+    return { ...order, photoIds: [...order.photoIds] };
+  }
+
+  async incrementDownloadCount(orderId: string): Promise<void> {
+    const order = this.orders.get(orderId);
+    if (order) {
+      order.downloadCount = (order.downloadCount || 0) + 1;
+      order.lastDownloadedAt = new Date().toISOString();
+    }
+  }
 }
 
 export interface SupabaseOrderRow {
@@ -145,6 +189,8 @@ export interface SupabaseOrderRow {
   preference_id?: string | null;
   payment_id?: string | null;
   download_token?: string | null;
+  download_count?: number | null;
+  last_downloaded_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -184,6 +230,8 @@ export class SupabaseOrderRepository implements IOrderRepository {
       preferenceId: row.preference_id || undefined,
       paymentId: row.payment_id || undefined,
       downloadToken: row.download_token || undefined,
+      downloadCount: typeof row.download_count === 'number' ? row.download_count : 0,
+      lastDownloadedAt: row.last_downloaded_at || undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };
@@ -515,5 +563,93 @@ export class SupabaseOrderRepository implements IOrderRepository {
         event_id: eventId,
         order_id: orderId
       });
+  }
+
+  async tryClaimWebhookEvent(eventId: string, orderId: string): Promise<boolean> {
+    const { error } = await this.supabase
+      .from('processed_webhook_events')
+      .insert({
+        event_id: eventId,
+        order_id: orderId
+      });
+
+    if (error) {
+      // Conflicto de clave primaria (23505): ya fue reclamado por otra petición/instancia
+      if (error.code === '23505') {
+        return false;
+      }
+      throw new Error(`[Supabase Error tryClaimWebhookEvent] ${error.message}`);
+    }
+    return true;
+  }
+
+  async releaseWebhookEventClaim(eventId: string): Promise<void> {
+    await this.supabase
+      .from('processed_webhook_events')
+      .delete()
+      .eq('event_id', eventId);
+  }
+
+  async transitionOrderToPaidIfPending(
+    id: string,
+    paymentId: string,
+    downloadToken: string
+  ): Promise<Order | null> {
+    const { data, error } = await this.supabase
+      .from('orders')
+      .update({
+        status: 'PAID',
+        payment_id: paymentId,
+        download_token: downloadToken,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .in('status', ['PENDING', 'PROCESSING'])
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`[Supabase Error transitionOrderToPaidIfPending] ${error.message}`);
+    }
+    if (!data) {
+      return null;
+    }
+
+    const isFullAlbum = Boolean(data.is_full_album);
+    const resourceType = isFullAlbum ? 'album_zip' : 'photo';
+    const expiresAt = new Date(Date.now() + 72 * 3600 * 1000).toISOString();
+    await this.supabase
+      .from('download_tokens')
+      .upsert({
+        token_hash: downloadToken,
+        order_id: id,
+        resource_type: resourceType,
+        expires_at: expiresAt
+      });
+
+    return this.getOrderById(id);
+  }
+
+  async incrementDownloadCount(orderId: string): Promise<void> {
+    const { error } = await this.supabase.rpc('increment_order_download_count', {
+      p_order_id: orderId
+    });
+    if (!error) return;
+
+    // Fallback when RPC migration has not yet been applied
+    const { data } = await this.supabase
+      .from('orders')
+      .select('download_count')
+      .eq('id', orderId)
+      .maybeSingle();
+
+    const nextCount = Number((data as { download_count?: number } | null)?.download_count ?? 0) + 1;
+    await this.supabase
+      .from('orders')
+      .update({
+        download_count: nextCount,
+        last_downloaded_at: new Date().toISOString()
+      })
+      .eq('id', orderId);
   }
 }

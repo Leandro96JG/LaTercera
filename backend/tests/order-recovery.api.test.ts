@@ -37,7 +37,7 @@ describe('POST /api/orders/recover (TDD)', () => {
     expect(data.message).toContain('Debes ingresar un correo electrónico válido');
   });
 
-  it('debe responder success: false si no existen órdenes pagadas para ese correo en las últimas 72 horas', async () => {
+  it('debe responder genéricamente con sentToEmail: true sin filtrar si el correo tiene compras cuando no se envía paymentId', async () => {
     const res = await fetch(`${baseUrl}/api/orders/recover`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -46,11 +46,13 @@ describe('POST /api/orders/recover (TDD)', () => {
 
     const data = await res.json() as any;
     expect(res.status).toBe(200);
-    expect(data.success).toBe(false);
-    expect(data.message).toContain('No se encontraron compras vigentes asociadas a este correo en las últimas 72 horas.');
+    expect(data.success).toBe(true);
+    expect(data.sentToEmail).toBe(true);
+    expect(data.orders).toBeUndefined();
+    expect(data.message).toContain('enviamos los enlaces de descarga');
   });
 
-  it('debe recuperar órdenes pagadas vigentes con coincidencia case-insensitive y generar URL directa a /pago-exitoso', async () => {
+  it('cuando solo se envía email, debe enviar el correo en segundo plano pero NO exponer downloadToken ni redirectUrl en el JSON HTTP', async () => {
     const now = new Date();
     const token = tokenService.generateToken('ord_rec_1', 'album_zip', 'alb_1_completo.zip', 72 * 3600);
 
@@ -77,7 +79,6 @@ describe('POST /api/orders/recover (TDD)', () => {
 
     await orderRepository.createOrder(testOrder);
 
-    // Búsqueda con mayúsculas y espacios para verificar case-insensitivity y trim
     const res = await fetch(`${baseUrl}/api/orders/recover`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -87,18 +88,11 @@ describe('POST /api/orders/recover (TDD)', () => {
     const data = await res.json() as any;
     expect(res.status).toBe(200);
     expect(data.success).toBe(true);
-    expect(Array.isArray(data.orders)).toBe(true);
-    expect(data.orders.length).toBeGreaterThanOrEqual(1);
-
-    const found = data.orders.find((o: any) => o.orderId === 'ord_rec_1');
-    expect(found).toBeDefined();
-    expect(found.albumTitle).toBe('Semifinal Riojana 2026');
-    expect(found.isFullAlbum).toBe(true);
-    expect(found.downloadToken).toBe(token);
-    expect(found.redirectUrl).toContain('/pago-exitoso?token=');
+    expect(data.sentToEmail).toBe(true);
+    expect(data.orders).toBeUndefined();
   });
 
-  it('debe ignorar órdenes con estado distinto a PAID (ej. PENDING o REJECTED)', async () => {
+  it('debe ignorar órdenes con estado distinto a PAID (ej. PENDING o REJECTED) incluso enviando paymentId', async () => {
     const pendingOrder: Order = {
       id: 'ord_pending_test',
       albumId: 'alb_1',
@@ -114,6 +108,7 @@ describe('POST /api/orders/recover (TDD)', () => {
       currency: 'ARS',
       customer: { email: 'otro.cliente@gmail.com' },
       status: 'PENDING',
+      paymentId: 'MP_PENDING_999',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -123,7 +118,7 @@ describe('POST /api/orders/recover (TDD)', () => {
     const res = await fetch(`${baseUrl}/api/orders/recover`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'otro.cliente@gmail.com' })
+      body: JSON.stringify({ email: 'otro.cliente@gmail.com', paymentId: 'MP_PENDING_999' })
     });
 
     const data = await res.json() as any;

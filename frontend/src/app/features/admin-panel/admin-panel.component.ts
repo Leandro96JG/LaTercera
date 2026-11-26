@@ -23,15 +23,18 @@ import {
   AdminOrder,
   AdminOrderStatus,
   AdminAlbumPhoto,
+  PhotographerItem,
   PricingTierConfig,
   CouponDTO,
   CreateCouponRequest
 } from '../../core/models/admin.model';
+import { AdminOrdersTabComponent } from './tabs/admin-orders-tab.component';
+import { AdminPhotographersTabComponent } from './tabs/admin-photographers-tab.component';
 
 @Component({
   selector: 'app-admin-panel',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, AdminOrdersTabComponent, AdminPhotographersTabComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './admin-panel.component.html',
   styleUrl: './admin-panel.component.css'
@@ -82,12 +85,27 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
   public readonly isLoadingOrders = signal<boolean>(false);
   public readonly ordersError = signal<string | null>(null);
   public readonly renewingOrderId = signal<string | null>(null);
+  public readonly verifyingOrderId = signal<string | null>(null);
+  public readonly resendingEmailOrderId = signal<string | null>(null);
   public readonly copiedTokenOrderId = signal<string | null>(null);
   public readonly renewFeedback = signal<{ orderId: string; message: string; success: boolean } | null>(null);
   public readonly orderStatusFilter = signal<'ALL' | AdminOrderStatus>('ALL');
   public readonly orderSearchQuery = signal<string>('');
   public readonly ordersAlbumFilter = signal<string>('ALL');
   public readonly ordersDeliveryTypeFilter = signal<'ALL' | 'FULL_ALBUM' | 'SINGLE_PHOTOS' | 'FREE_REDEMPTION'>('ALL');
+  public readonly orderDateFrom = signal<string>('');
+  public readonly orderDateTo = signal<string>('');
+
+  public readonly hasActiveOrderFilters = computed<boolean>(() => {
+    return Boolean(
+      this.orderSearchQuery().trim() ||
+      this.orderStatusFilter() !== 'ALL' ||
+      this.ordersAlbumFilter() !== 'ALL' ||
+      this.ordersDeliveryTypeFilter() !== 'ALL' ||
+      this.orderDateFrom().trim() ||
+      this.orderDateTo().trim()
+    );
+  });
 
   // Paginación de ventas y entregas (6 órdenes por página)
   public readonly ordersCurrentPage = signal<number>(1);
@@ -99,6 +117,8 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     const query = this.orderSearchQuery().toLowerCase().trim();
     const albumFilter = this.ordersAlbumFilter();
     const deliveryFilter = this.ordersDeliveryTypeFilter();
+    const fromStr = this.orderDateFrom().trim();
+    const toStr = this.orderDateTo().trim();
 
     if (filter !== 'ALL') {
       list = list.filter(o => o.status === filter);
@@ -116,13 +136,29 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
       list = list.filter(o => (o.totalAmount || 0) === 0);
     }
 
+    if (fromStr) {
+      const fromMs = new Date(`${fromStr}T00:00:00`).getTime();
+      if (Number.isFinite(fromMs)) {
+        list = list.filter(o => new Date(o.createdAt).getTime() >= fromMs);
+      }
+    }
+
+    if (toStr) {
+      const toMs = new Date(`${toStr}T23:59:59.999`).getTime();
+      if (Number.isFinite(toMs)) {
+        list = list.filter(o => new Date(o.createdAt).getTime() <= toMs);
+      }
+    }
+
     if (query) {
       list = list.filter(o =>
         o.id.toLowerCase().includes(query) ||
         o.customer.email.toLowerCase().includes(query) ||
         (o.customer.name && o.customer.name.toLowerCase().includes(query)) ||
         (o.albumTitle && o.albumTitle.toLowerCase().includes(query)) ||
-        (o.customer.phone && o.customer.phone.includes(query))
+        (o.customer.phone && o.customer.phone.includes(query)) ||
+        (o.paymentId && o.paymentId.toLowerCase().includes(query)) ||
+        (o.preferenceId && o.preferenceId.toLowerCase().includes(query))
       );
     }
 
@@ -406,16 +442,25 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
   public readonly updatingAlbumId = signal<string | null>(null);
   public readonly updateFeedback = signal<{ albumId: string; message: string; success: boolean } | null>(null);
 
-  // Estadísticas en vivo
+  // Estadísticas en vivo (inicializadas en cero hasta recibir /api/admin/stats)
   public readonly stats = signal<AdminStats>({
-    photosSold: 43,
-    albumsSold: 3,
-    revenueARS: 64200,
+    photosSold: 0,
+    albumsSold: 0,
+    revenueARS: 0,
     storageUsedGB: 0,
     storageLimitGB: 10,
-    activeAlbumsCount: 4,
+    activeAlbumsCount: 0,
     lastUpdated: new Date().toISOString()
   });
+
+  // Fotógrafos colaboradores & gestión de accesos
+  public readonly photographers = signal<readonly PhotographerItem[]>([]);
+  public readonly isLoadingPhotographers = signal<boolean>(false);
+  public readonly togglingPhotographerId = signal<string | null>(null);
+
+  // Selección en lote dentro del modal de fotos
+  public readonly selectedModalPhotoIds = signal<ReadonlySet<string>>(new Set());
+  public readonly isBulkPhotoActionRunning = signal<boolean>(false);
 
   // Estados de carga de operaciones
   public readonly isDriveImporting = signal<boolean>(false);
@@ -690,6 +735,8 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
       this.orderSearchQuery();
       this.ordersAlbumFilter();
       this.ordersDeliveryTypeFilter();
+      this.orderDateFrom();
+      this.orderDateTo();
       untracked(() => {
         this.ordersCurrentPage.set(1);
       });
@@ -743,6 +790,10 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     }
     if (this.deletePhotoTimer) {
       clearTimeout(this.deletePhotoTimer);
+    }
+    if (this.deleteCategoryTimer) {
+      clearTimeout(this.deleteCategoryTimer);
+      this.deleteCategoryTimer = null;
     }
   }
 
@@ -1102,6 +1153,134 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
         }, 3000);
       }).catch(() => {});
     }
+  }
+
+  public clearOrderFilters(): void {
+    this.orderSearchQuery.set('');
+    this.orderStatusFilter.set('ALL');
+    this.ordersAlbumFilter.set('ALL');
+    this.ordersDeliveryTypeFilter.set('ALL');
+    this.orderDateFrom.set('');
+    this.orderDateTo.set('');
+    this.ordersCurrentPage.set(1);
+  }
+
+  public verifyOrderMp(order: AdminOrder): void {
+    if (!this.adminService.verifyOrderMercadoPago) return;
+    this.verifyingOrderId.set(order.id);
+    this.renewFeedback.set(null);
+
+    this.adminService.verifyOrderMercadoPago(order.id, order.paymentId).subscribe({
+      next: (res) => {
+        this.verifyingOrderId.set(null);
+        if (res.success && res.order) {
+          this.orders.update(list => list.map(o => (o.id === order.id ? { ...o, ...res.order! } : o)));
+          this.renewFeedback.set({
+            orderId: order.id,
+            message: 'Pago verificado directamente en Mercado Pago y orden actualizada.',
+            success: true
+          });
+        }
+      },
+      error: (err) => {
+        this.verifyingOrderId.set(null);
+        this.renewFeedback.set({
+          orderId: order.id,
+          message: this.extractErrorMessage(err, 'No se pudo confirmar el cobro en Mercado Pago.'),
+          success: false
+        });
+      }
+    });
+  }
+
+  public resendOrderEmail(order: AdminOrder): void {
+    if (!this.adminService.resendOrderEmail) return;
+    this.resendingEmailOrderId.set(order.id);
+    this.renewFeedback.set(null);
+
+    this.adminService.resendOrderEmail(order.id).subscribe({
+      next: (res) => {
+        this.resendingEmailOrderId.set(null);
+        if (res.success) {
+          this.orders.update(list =>
+            list.map(o =>
+              o.id === order.id
+                ? { ...o, downloadToken: res.downloadToken, downloadUrl: res.downloadUrl, isTokenExpired: false }
+                : o
+            )
+          );
+          this.renewFeedback.set({
+            orderId: order.id,
+            message: res.message || `Correo con enlace de descarga reenviado a ${order.customer.email}.`,
+            success: true
+          });
+        }
+      },
+      error: (err) => {
+        this.resendingEmailOrderId.set(null);
+        this.renewFeedback.set({
+          orderId: order.id,
+          message: this.extractErrorMessage(err, 'No se pudo reenviar el correo de descarga.'),
+          success: false
+        });
+      }
+    });
+  }
+
+  public exportOrdersCsv(): void {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    const rows = this.filteredOrders();
+    if (rows.length === 0) return;
+
+    const escapeCsv = (val: unknown): string => {
+      const s = String(val ?? '').replace(/"/g, '""');
+      return `"${s}"`;
+    };
+
+    const header = [
+      'ID Orden',
+      'Fecha',
+      'Estado',
+      'Album',
+      'Email',
+      'Nombre',
+      'Telefono',
+      'Tipo',
+      'Fotos',
+      'Total ARS',
+      'Cupon',
+      'Payment ID',
+      'Descargas'
+    ].join(',');
+
+    const lines = rows.map(o =>
+      [
+        o.id,
+        o.createdAt,
+        o.status,
+        o.albumTitle || o.albumId,
+        o.customer.email,
+        o.customer.name || '',
+        o.customer.phone || '',
+        o.isFullAlbum ? 'Album Completo' : 'Fotos Individuales',
+        o.photoCount,
+        o.totalAmount,
+        o.couponApplied || '',
+        o.paymentId || '',
+        o.downloadCount ?? 0
+      ]
+        .map(escapeCsv)
+        .join(',')
+    );
+
+    const csv = `\uFEFF${header}\n${lines.join('\n')}`;
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `la-tercera-ventas-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   // --- Gestión de Promociones & Cupones ---
@@ -3091,6 +3270,108 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     uploadNextBatch(0);
   }
 
+  public toggleSelectModalPhoto(photoId: string): void {
+    this.selectedModalPhotoIds.update((prev) => {
+      const next = new Set(prev);
+      if (next.has(photoId)) {
+        next.delete(photoId);
+      } else {
+        next.add(photoId);
+      }
+      return next;
+    });
+  }
+
+  public selectAllModalPhotos(): void {
+    const allIds = this.albumPhotos().map(p => p.id);
+    this.selectedModalPhotoIds.set(new Set(allIds));
+  }
+
+  public clearModalPhotoSelection(): void {
+    this.selectedModalPhotoIds.set(new Set());
+  }
+
+  public runBulkPhotoAction(action: 'mark_hd' | 'unmark_hd' | 'delete'): void {
+    const album = this.selectedAlbumForPhotos();
+    const ids = Array.from(this.selectedModalPhotoIds());
+    if (!album || ids.length === 0 || !this.adminService.bulkPhotosAction) return;
+
+    this.isBulkPhotoActionRunning.set(true);
+    this.photosModalFeedback.set(null);
+
+    this.adminService.bulkPhotosAction(album.id, action, ids).subscribe({
+      next: (res) => {
+        this.isBulkPhotoActionRunning.set(false);
+        this.clearModalPhotoSelection();
+
+        if (action === 'mark_hd' || action === 'unmark_hd') {
+          const idSet = new Set(ids);
+          const isHd = action === 'mark_hd';
+          this.albumPhotos.update(list => list.map(p => (idSet.has(p.id) ? { ...p, isSampleHd: isHd } : p)));
+        } else if (action === 'delete') {
+          const idSet = new Set(ids);
+          const remaining = this.albumPhotos().filter(p => !idSet.has(p.id));
+          this.albumPhotos.set(remaining);
+          const newCount = remaining.length;
+          const newCover = remaining[0]?.previewUrl || '';
+          this.selectedAlbumForPhotos.set({ ...album, photosCount: newCount, coverUrl: album.coverUrl || newCover });
+          this.albums.update(list => list.map(a => (a.id === album.id ? { ...a, photosCount: newCount } : a)));
+        }
+
+        this.photosModalFeedback.set({
+          message: res.message || `Acción aplicada sobre ${res.affected} fotos.`,
+          success: true
+        });
+      },
+      error: (err) => {
+        this.isBulkPhotoActionRunning.set(false);
+        this.photosModalFeedback.set({
+          message: this.extractErrorMessage(err, 'Error al aplicar la acción en lote.'),
+          success: false
+        });
+      }
+    });
+  }
+
+  public loadPhotographers(): void {
+    if (!this.adminService.getPhotographers) return;
+    this.isLoadingPhotographers.set(true);
+    this.adminService.getPhotographers().subscribe({
+      next: (res) => {
+        this.isLoadingPhotographers.set(false);
+        if (res.success && Array.isArray(res.photographers)) {
+          this.photographers.set(res.photographers);
+        }
+      },
+      error: () => {
+        this.isLoadingPhotographers.set(false);
+      }
+    });
+  }
+
+  public togglePhotographerActive(person: PhotographerItem): void {
+    if (!this.adminService.togglePhotographerActive) return;
+    this.togglingPhotographerId.set(person.id);
+    this.adminService.togglePhotographerActive(person.id, !person.isActive).subscribe({
+      next: (res) => {
+        this.togglingPhotographerId.set(null);
+        if (res.success && res.photographer) {
+          this.photographers.update(list =>
+            list.map(p => (p.id === person.id ? res.photographer : p))
+          );
+          this.showToast(
+            `${res.photographer.name} ${res.photographer.isActive ? 'reactivado' : 'desactivado'} correctamente.`,
+            'success'
+          );
+        }
+      },
+      error: (err) => {
+        this.togglingPhotographerId.set(null);
+        this.showToast(this.extractErrorMessage(err, 'No se pudo actualizar el estado del fotógrafo.'), 'error');
+      }
+    });
+  }
+
   public submitRegisterPhotographer(): void {
     if (this.photographerForm.invalid) {
       this.photographerForm.markAllAsTouched();
@@ -3118,6 +3399,7 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
           password: '',
           role: 'photographer'
         });
+        this.loadPhotographers();
       },
       error: (err) => {
         this.isRegisteringPhotographer.set(false);

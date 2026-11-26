@@ -216,17 +216,17 @@ import { AlbumAccessStore } from '../../core/state/album-access.store';
                 </svg>
               </div>
               <h4 class="font-display font-black text-lg text-zinc-950">
-                ¡Preferencia Generada!
+                ¡Todo listo para pagar!
               </h4>
               <p class="text-xs text-zinc-600 mt-1 mb-5">
-                Haz clic a continuación para abonar con Mercado Pago en pesos argentinos:
+                Haz clic abajo para abonar de forma segura en Mercado Pago:
               </p>
 
               <a
                 [href]="initPointUrl()"
                 class="w-full min-h-[44px] py-3.5 px-4 rounded-2xl bg-[#009EE3] hover:bg-[#0081B8] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition active:scale-98 mb-3 focus-visible:ring-2 focus-visible:ring-sky-500 group"
               >
-                <span>Ir a Mercado Pago Checkout Pro</span>
+                <span>Pagar ahora en Mercado Pago</span>
                 <svg class="w-4 h-4 text-white shrink-0 group-hover:translate-x-1 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="m9 18 6-6-6-6"/>
                 </svg>
@@ -365,6 +365,19 @@ export class CheckoutModalComponent implements OnInit {
 
         this.preferenceCreated.set(true);
         this.initPointUrl.set(resp.initPoint || '');
+        if (typeof window !== 'undefined' && resp.orderId) {
+          try {
+            window.localStorage.setItem(
+              'lt_pending_order',
+              JSON.stringify({
+                orderId: resp.orderId,
+                statusNonce: resp.statusNonce,
+                email,
+                createdAt: Date.now()
+              })
+            );
+          } catch {}
+        }
         if (resp.initPoint && typeof window !== 'undefined') {
           window.location.href = resp.initPoint;
         }

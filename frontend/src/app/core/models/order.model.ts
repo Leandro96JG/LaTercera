@@ -27,6 +27,7 @@ export interface CreatePreferenceResponse {
   readonly isFreeRedemption?: boolean;
   readonly downloadToken?: string;
   readonly redirectUrl?: string;
+  readonly statusNonce?: string;
 }
 
 export type OrderPaymentStatus = 'PENDING' | 'PAID' | 'REJECTED' | 'FRAUD_ALERT_PRICE_MISMATCH';
@@ -55,6 +56,7 @@ export interface RecoveredOrder {
 
 export interface RecoverOrdersResponse {
   readonly success: boolean;
+  readonly sentToEmail?: boolean;
   readonly orders?: readonly RecoveredOrder[];
   readonly message?: string;
 }

@@ -76,11 +76,11 @@ describe('CartStore - Lógica Reactiva de Precios y Descuentos con Signals', () 
     expect(p.finalTotal).toBe(4200);
   });
 
-  it('debe aplicar cupón YUYO10 con 10% adicional acumulativo sobre el total descontado', () => {
+  it('debe aplicar cupón validado con porcentaje adicional sobre el total descontado', () => {
     for (let i = 1; i <= 5; i++) {
       store.togglePhoto(createDummyPhoto(`foto-${i}`));
     }
-    store.applyCoupon('YUYO10');
+    store.applyCoupon('YUYO10', 10);
 
     const p = store.pricing();
     // 6000 - 30% (1800) = 4200
@@ -102,14 +102,26 @@ describe('CartStore - Lógica Reactiva de Precios y Descuentos con Signals', () 
     expect(p.finalTotal).toBe(9500);
   });
 
-  it('debe aplicar cupón YUYO10 al Álbum Completo ($9.500 - 10% = $8.550)', () => {
+  it('debe aplicar cupón al Álbum Completo ($9.500 - 10% = $8.550)', () => {
     store.setFullAlbumMode('album-tesorieri', 9500);
-    store.applyCoupon('YUYO10');
+    store.applyCoupon('YUYO10', 10);
 
     const p = store.pricing();
     expect(p.isFullAlbum).toBe(true);
     expect(p.couponDiscountAmount).toBe(950);
     expect(p.finalTotal).toBe(8550);
+  });
+
+  it('debe aplicar el tope de Álbum Completo ANTES del cupón sin anular el beneficio del cupón', () => {
+    store.setAlbumPricing('album-tesorieri', 9500, 1200);
+    for (let i = 1; i <= 15; i++) {
+      store.togglePhoto(createDummyPhoto(`foto-${i}`));
+    }
+    store.applyCoupon('YUYO10', 10);
+
+    const p = store.pricing();
+    expect(p.finalTotal).toBe(8550);
+    expect(p.couponCode).toBe('YUYO10');
   });
 
   it('debe alternar (toggle) fotos correctamente y limpiar carrito', () => {

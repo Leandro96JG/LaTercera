@@ -187,6 +187,59 @@ describe('PaymentSuccessComponent (TDD)', () => {
     expect(component.errorMessage()).toContain('revocado');
   });
 
+  it('debe inicializar downloadedPhotoIds vacío y marcar foto descargada con feedback visual', () => {
+    deliveryServiceMock.getDeliveryInfo.mockReturnValue(of(sampleInfo));
+    component.loadDeliveryInfo('token123');
+
+    expect(component.isPhotoDownloaded('foto-1')).toBe(false);
+    component.downloadPhoto(sampleInfo.photos[0]);
+
+    expect(component.isPhotoDownloaded('foto-1')).toBe(true);
+    expect(component.downloadedCount()).toBe(1);
+    expect(component.isSmallPackJpg()).toBe(true);
+    expect(component.shouldUseZipAsPrimary()).toBe(false);
+  });
+
+  it('debe elegir descarga JPG directa para 1-4 fotos y ZIP como primario para >= 5 fotos o álbum completo', () => {
+    const singleInfo: OrderDeliveryInfo = {
+      ...sampleInfo,
+      totalPhotos: 1,
+      photos: [sampleInfo.photos[0]]
+    };
+    deliveryServiceMock.getDeliveryInfo.mockReturnValue(of(singleInfo));
+    component.loadDeliveryInfo('tok-single');
+    expect(component.isSinglePhoto()).toBe(true);
+    expect(component.shouldUseZipAsPrimary()).toBe(false);
+
+    const fivePhotos = Array.from({ length: 5 }, (_, idx) => ({
+      id: `f-${idx + 1}`,
+      filename: `LA_TERCERA_f-${idx + 1}.jpg`,
+      previewUrl: `/p${idx + 1}.webp`,
+      downloadUrl: `/api/downloads/tok5/file?photoId=f-${idx + 1}`
+    }));
+    deliveryServiceMock.getDeliveryInfo.mockReturnValue(of({
+      ...sampleInfo,
+      totalPhotos: 5,
+      photos: fivePhotos
+    }));
+    component.loadDeliveryInfo('tok-five');
+    expect(component.isSinglePhoto()).toBe(false);
+    expect(component.isSmallPackJpg()).toBe(false);
+    expect(component.shouldUseZipAsPrimary()).toBe(true);
+  });
+
+  it('debe disparar la descarga individual de 2-4 fotos con downloadAllIndividual', () => {
+    deliveryServiceMock.getDeliveryInfo.mockReturnValue(of(sampleInfo));
+    component.loadDeliveryInfo('token123');
+
+    component.downloadAllIndividual();
+
+    expect(deliveryServiceMock.triggerDirectDownload).toHaveBeenCalledWith(
+      sampleInfo.photos[0].downloadUrl,
+      sampleInfo.photos[0].filename
+    );
+  });
+
   it('debe limpiar la URL a / con window.history.replaceState y emitir goHome al hacer clic en volver', () => {
     let homeEmitted = false;
     component.goHome.subscribe(() => {

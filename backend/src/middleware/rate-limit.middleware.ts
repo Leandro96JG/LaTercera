@@ -66,3 +66,48 @@ export const orderRecoveryLimiter = rateLimit({
   skip: () => isTesting()
 });
 
+/**
+ * Limitador para creación de preferencias de pago
+ * Máximo 20 intentos cada 10 minutos por IP
+ */
+export const checkoutLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: {
+    error: 'Demasiadas solicitudes de checkout. Por favor espere unos minutos antes de reintentar.'
+  },
+  skip: () => isTesting()
+});
+
+/**
+ * Limitador para cálculo de precios y enumeración de cupones
+ * Máximo 40 consultas cada 5 minutos por IP
+ */
+export const pricingCalculateLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  limit: 40,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: {
+    error: 'Demasiadas consultas de cálculo de precios. Por favor intente en unos minutos.'
+  },
+  skip: () => isTesting()
+});
+
+/**
+ * Limitador para endpoints de descarga y generación de ZIPs
+ * Máximo 60 peticiones cada 10 minutos por IP
+ */
+export const downloadsLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  limit: 60,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: {
+    error: 'Demasiadas solicitudes de descarga. Por favor espere unos minutos.'
+  },
+  skip: () => isTesting()
+});
+

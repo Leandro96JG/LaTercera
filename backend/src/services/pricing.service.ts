@@ -52,9 +52,6 @@ export function calculateCartTotal(req: PricingRequest): PricingResult {
       couponDiscountPercent = clamp(req.coupon.discountPercent);
       couponAppliedName = req.coupon.code;
     }
-  } else if (req.coupon === undefined && req.couponCode && req.couponCode.trim().toUpperCase() === 'YUYO10') {
-    couponDiscountPercent = 10;
-    couponAppliedName = 'YUYO10';
   }
 
   if (isFullAlbum) {
@@ -89,24 +86,21 @@ export function calculateCartTotal(req: PricingRequest): PricingResult {
     }
   }
 
-  let discount = Math.round(subtotal * (discountPercentage / 100));
-  let total = Math.max(0, subtotal - discount);
+  let baseTotal = Math.max(0, subtotal - Math.round(subtotal * (discountPercentage / 100)));
 
-  // Cupón adicional aplicado sobre el total con descuento base
+  // Tope automático ANTES del cupón: comprar fotos sueltas nunca supera fullAlbumPrice ni anula el cupón
+  if (capAtFullAlbumPrice && fullAlbumPrice > 0 && baseTotal > fullAlbumPrice) {
+    baseTotal = fullAlbumPrice;
+  }
+
+  let couponDiscount = 0;
   if (couponDiscountPercent > 0) {
-    const couponDiscount = Math.round(total * (couponDiscountPercent / 100));
-    discount += couponDiscount;
-    total = Math.max(0, total - couponDiscount);
+    couponDiscount = Math.round(baseTotal * (couponDiscountPercent / 100));
+    couponDiscount = Math.min(baseTotal, Math.max(0, couponDiscount));
   }
 
-  // Tope automático: comprar fotos sueltas nunca cuesta más que fullAlbumPrice
-  if (capAtFullAlbumPrice && fullAlbumPrice > 0 && total > fullAlbumPrice) {
-    total = fullAlbumPrice;
-    discount = Math.max(0, subtotal - total);
-  }
-
-  // Clamping final garantizado: discount entre 0 y subtotal, total >= 0
-  discount = Math.min(subtotal, Math.max(0, discount));
+  let total = Math.max(0, baseTotal - couponDiscount);
+  let discount = Math.min(subtotal, Math.max(0, subtotal - total));
   total = Math.max(0, subtotal - discount);
 
   return {
@@ -117,6 +111,6 @@ export function calculateCartTotal(req: PricingRequest): PricingResult {
     discountPercentage,
     total,
     isFullAlbum: false,
-    couponApplied: couponDiscountPercent > 0 ? couponAppliedName : undefined
+    couponApplied: couponDiscount > 0 ? couponAppliedName : undefined
   };
 }

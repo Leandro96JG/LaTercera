@@ -221,8 +221,47 @@ export interface AdminOrder {
   paymentId?: string;
   downloadToken?: string;
   downloadUrl?: string | null;
+  tokenExpiresAt?: string | null;
+  isTokenExpired?: boolean;
+  downloadCount?: number;
+  lastDownloadedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface VerifyOrderMpResponse {
+  success: boolean;
+  verified: boolean;
+  alreadyProcessed?: boolean;
+  order?: AdminOrder;
+  message?: string;
+  error?: string;
+}
+
+export interface ResendOrderEmailResponse {
+  success: boolean;
+  orderId: string;
+  downloadToken: string;
+  downloadUrl: string;
+  simulated?: boolean;
+  message?: string;
+}
+
+export interface BulkPhotoActionResponse {
+  success: boolean;
+  action: 'mark_hd' | 'unmark_hd' | 'delete';
+  affected: number;
+  message: string;
+}
+
+export interface PhotographerItem {
+  id: string;
+  email: string;
+  name: string;
+  role: 'admin' | 'photographer';
+  photographerId: string;
+  isActive: boolean;
+  createdAt: string;
 }
 
 export interface AdminOrdersResponse {

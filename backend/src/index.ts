@@ -6,7 +6,10 @@ import multer from 'multer';
 import {
   albumAccessLimiter,
   couponValidationLimiter,
-  orderRecoveryLimiter
+  orderRecoveryLimiter,
+  checkoutLimiter,
+  pricingCalculateLimiter,
+  downloadsLimiter
 } from './middleware/rate-limit.middleware';
 import { calculateCartTotal, PricingRequest } from './services/pricing.service';
 import { processImageWithWatermark } from './services/image.service';
@@ -60,14 +63,14 @@ const app = express();
 app.set('trust proxy', 1);
 
 const PORT = process.env.PORT || 4000;
-const APP_URL = process.env.APP_URL || `http://localhost:${PORT}`;
+const APP_URL = process.env.APP_URL || process.env.BACKEND_URL || `http://localhost:${PORT}`;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:4200';
 
 // Configuración dinámica de CORS para producción y previsualizaciones
 const allowedOrigins = FRONTEND_URL
   .split(',')
   .map(url => url.trim().replace(/\/+$/, ''))
-  .filter(Boolean);
+  .filter(url => url && url !== '*');
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
@@ -80,11 +83,7 @@ const corsOptions: cors.CorsOptions = {
       process.env.NODE_ENV !== 'production' &&
       /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(cleanOrigin);
 
-    if (
-      allowedOrigins.includes(cleanOrigin) ||
-      allowedOrigins.includes('*') ||
-      isDevLocalhost
-    ) {
+    if (allowedOrigins.includes(cleanOrigin) || isDevLocalhost) {
       return callback(null, true);
     }
     return callback(new Error(`Acceso CORS no autorizado para el origen: ${origin}`));
@@ -121,8 +120,8 @@ export const deliveryService = new DeliveryService(orderService, tokenService, s
 // Middlewares de Seguridad y CORS
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors(corsOptions));
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
 // Rutas Administrativas y de Autenticación
 app.use(
@@ -134,7 +133,10 @@ app.use(
     tokenService,
     orderService,
     promotionRepository,
-    categoryRepository
+    categoryRepository,
+    emailService,
+    photographerRepository,
+    (paymentId: string, eventId: string) => mpService.verifyAndProcessPaymentFromAPI(paymentId, eventId)
   )
 );
 app.use('/api/admin/albums', createAdminAlbumsRouter(adminAuthService, albumRepository, categoryRepository));
@@ -146,7 +148,8 @@ app.use(
     storageService,
     albumRepository,
     tokenService,
-    adminAuthService
+    adminAuthService,
+    (paymentId: string, eventId: string) => mpService.verifyAndProcessPaymentFromAPI(paymentId, eventId)
   )
 );
 
@@ -201,7 +204,7 @@ app.post('/api/pricing/validate-coupon', couponValidationLimiter, async (req: Re
       });
     }
 
-    if (coupon.albumId && albumId && coupon.albumId !== albumId) {
+    if (coupon.albumId && (!albumId || coupon.albumId !== albumId)) {
       return res.status(200).json({
         valid: false,
         message: 'Este cupón no es válido para este álbum específico'
@@ -259,7 +262,7 @@ app.get('/api/pricing/config', async (req: Request, res: Response) => {
 });
 
 // Endpoint: Cálculo Dinámico de Precios y Descuentos
-app.post('/api/pricing/calculate', async (req: Request, res: Response) => {
+app.post('/api/pricing/calculate', pricingCalculateLimiter, async (req: Request, res: Response) => {
   try {
     const pricingReq: PricingRequest = req.body;
     const config = await promotionRepository.getConfig();
@@ -357,8 +360,20 @@ app.get('/api/albums/:id/photos', async (req: Request, res: Response) => {
     const albumId = Array.isArray(rawId) ? rawId[0] : rawId;
 
     const album = await albumRepository.getAlbumById(albumId);
-    if (!album) {
+    if (!album || album.deletedAt) {
       return res.status(404).json({ success: false, error: `Álbum con ID "${albumId}" no encontrado` });
+    }
+
+    if (album.isPublished === false) {
+      let isAdminCaller = false;
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const verification = adminAuthService.verifyJwt(authHeader.slice(7).trim());
+        isAdminCaller = Boolean(verification.valid && verification.payload);
+      }
+      if (!isAdminCaller) {
+        return res.status(404).json({ success: false, error: `Álbum con ID "${albumId}" no encontrado` });
+      }
     }
 
     // Blindaje de seguridad para álbumes privados con PIN
@@ -382,8 +397,12 @@ app.get('/api/albums/:id/photos', async (req: Request, res: Response) => {
           const rawToken = req.headers['x-album-access-token'] || req.query.accessToken;
           const token = Array.isArray(rawToken) ? rawToken[0] : rawToken;
           if (typeof token === 'string' && token.trim()) {
-            const verification = tokenService.verifyToken(token.trim());
-            if (verification.valid && verification.payload?.resourceId === album.id) {
+            const verification = tokenService.verifyToken(token.trim(), 'album_access');
+            if (
+              verification.valid &&
+              verification.payload?.orderId === 'pin_access' &&
+              verification.payload?.resourceId === album.id
+            ) {
               hasAccess = true;
             }
           }
@@ -459,8 +478,8 @@ app.post('/api/albums/:id/verify-access', albumAccessLimiter, async (req: Reques
     const album = await albumRepository.getAlbumById(albumId);
     const resolvedAlbumId = album ? album.id : albumId;
 
-    // Token criptográfico temporal (24 horas) para confirmar sesión desbloqueada
-    const accessToken = tokenService.generateToken('pin_access', 'album_zip', resolvedAlbumId, 24 * 3600);
+    // Token criptográfico temporal exclusivo para acceso a álbum privado (24 horas)
+    const accessToken = tokenService.generateAlbumAccessToken(resolvedAlbumId, 24 * 3600);
 
     return res.status(200).json({
       success: true,
@@ -476,7 +495,7 @@ app.post('/api/albums/:id/verify-access', albumAccessLimiter, async (req: Reques
 });
 
 // Endpoint: Creación de Preferencia de Pago en Mercado Pago (Zero-Trust)
-app.post('/api/checkout/preference', async (req: Request, res: Response) => {
+app.post('/api/checkout/preference', checkoutLimiter, async (req: Request, res: Response) => {
   try {
     const { albumId, photoIds, isFullAlbum, couponCode, customer } = req.body;
 
@@ -492,10 +511,10 @@ app.post('/api/checkout/preference', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Debes seleccionar al menos una foto o el álbum completo' });
     }
 
-    // Verificar existencia del álbum y rechazar si es descarga gratuita
+    // Verificar existencia del álbum, que esté publicado/no en papelera y rechazar si es descarga gratuita
     const album = await albumRepository.getAlbumById(albumId);
-    if (!album) {
-      return res.status(404).json({ error: 'Álbum no encontrado' });
+    if (!album || album.deletedAt || album.isPublished === false) {
+      return res.status(404).json({ error: 'Álbum no disponible o no encontrado' });
     }
 
     if (album.isFreeDownload) {
@@ -523,8 +542,12 @@ app.post('/api/checkout/preference', async (req: Request, res: Response) => {
           const rawToken = req.headers['x-album-access-token'] || req.body?.accessToken;
           const token = Array.isArray(rawToken) ? rawToken[0] : rawToken;
           if (typeof token === 'string' && token.trim()) {
-            const verification = tokenService.verifyToken(token.trim());
-            if (verification.valid && verification.payload?.resourceId === album.id) {
+            const verification = tokenService.verifyToken(token.trim(), 'album_access');
+            if (
+              verification.valid &&
+              verification.payload?.orderId === 'pin_access' &&
+              verification.payload?.resourceId === album.id
+            ) {
               hasAccess = true;
             }
           }
@@ -593,6 +616,7 @@ app.post('/api/checkout/preference', async (req: Request, res: Response) => {
           isFullAlbumBool
         );
         if (!consumeResult.success) {
+          await orderRepository.updateOrderStatus(order.id, 'CANCELLED').catch(() => {});
           return res.status(400).json({
             error: consumeResult.error || 'El cupón acaba de alcanzar su límite de usos'
           });
@@ -623,10 +647,20 @@ app.post('/api/checkout/preference', async (req: Request, res: Response) => {
 
     // Creación de la preferencia Checkout Pro en Mercado Pago (solo para compras con total > 0)
     const preference = await mpService.createCheckoutPreference(order.id, APP_URL);
+    const statusNonce = tokenService.generateStatusNonce(order.id, 72 * 3600);
+    const safeOrderKey = order.id.replace(/[^a-zA-Z0-9_-]/g, '');
+
+    res.cookie(`lt_order_nonce_${safeOrderKey}`, statusNonce, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 72 * 3600 * 1000
+    });
 
     res.status(201).json({
       success: true,
       orderId: order.id,
+      statusNonce,
       preferenceId: preference.preferenceId,
       initPoint: preference.initPoint,
       sandboxInitPoint: preference.sandboxInitPoint,
@@ -642,6 +676,38 @@ app.post('/api/checkout/preference', async (req: Request, res: Response) => {
     res.status(isClientError ? 400 : 500).json({ error: msg });
   }
 });
+
+// Helper compartido para autorizar consulta de estado de orden sin IDOR
+function hasOrderStatusAuthorization(req: Request, orderId: string): boolean {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const verification = adminAuthService.verifyJwt(authHeader.slice(7).trim());
+    if (verification.valid && verification.payload) return true;
+  }
+
+  const headerNonce = req.headers['x-order-status-nonce'];
+  const queryNonce = req.query?.nonce;
+  let nonce: string | undefined =
+    typeof headerNonce === 'string' && headerNonce.trim()
+      ? headerNonce.trim()
+      : typeof queryNonce === 'string' && queryNonce.trim()
+        ? queryNonce.trim()
+        : undefined;
+
+  if (!nonce && typeof req.headers.cookie === 'string') {
+    const safeKey = orderId.replace(/[^a-zA-Z0-9_-]/g, '');
+    const match = req.headers.cookie.match(new RegExp(`lt_order_nonce_${safeKey}=([^;]+)`));
+    if (match?.[1]) nonce = decodeURIComponent(match[1]);
+  }
+
+  if (nonce) {
+    const verification = tokenService.verifyToken(nonce, 'order_status');
+    if (verification.valid && verification.payload?.orderId === orderId) {
+      return true;
+    }
+  }
+  return false;
+}
 
 // Endpoint: Webhook de Mercado Pago con Verificación Criptográfica HMAC-SHA256
 app.post('/api/webhooks/mercadopago', async (req: Request, res: Response) => {
@@ -682,19 +748,28 @@ app.post('/api/webhooks/mercadopago', async (req: Request, res: Response) => {
       return res.status(200).json({ status: 'fraud_alert_logged' });
     }
 
+    if (!result.success && result.error?.includes('Error consultando API de Mercado Pago')) {
+      return res.status(500).json({ status: 'retry_required', error: result.error });
+    }
+
     res.status(200).json({
       status: 'ok',
       alreadyProcessed: result.alreadyProcessed ?? false
     });
   } catch (error: any) {
     console.error(`[Webhook MP Error Interno] ${error.message}`);
-    res.status(200).json({ status: 'error_logged', error: error.message });
+    res.status(500).json({ status: 'retry_required', error: error.message });
   }
 });
 
-// Endpoint: Consulta de Estado de la Orden
-app.get('/api/orders/:orderId', async (req: Request, res: Response) => {
+// Endpoint: Consulta de Estado de la Orden (Protegido contra IDOR con statusNonce/Cookie/Admin)
+app.get('/api/orders/:orderId', downloadsLimiter, async (req: Request, res: Response) => {
   const orderId = Array.isArray(req.params.orderId) ? req.params.orderId[0] : req.params.orderId;
+
+  if (!hasOrderStatusAuthorization(req, orderId)) {
+    return res.status(401).json({ error: 'Acceso no autorizado al estado de la orden' });
+  }
+
   const order = await orderService.getOrderAsync(orderId);
   if (!order) {
     return res.status(404).json({ error: 'Orden no encontrada' });
@@ -749,57 +824,69 @@ app.post('/api/orders/recover', orderRecoveryLimiter, async (req: Request, res: 
 
       let hasValidToken = false;
       if (order.downloadToken) {
-        const verifyRes = tokenService.verifyToken(order.downloadToken);
+        const verifyRes = tokenService.verifyToken(order.downloadToken, 'download');
         hasValidToken = verifyRes.valid;
       }
 
       return hasValidToken || isWithin72Hours;
     });
 
-    if (validOrders.length === 0) {
+    const preparedOrders = await Promise.all(
+      validOrders.map(async order => {
+        let token = order.downloadToken;
+        let isTokenActive = false;
+        if (token) {
+          isTokenActive = tokenService.verifyToken(token, 'download').valid;
+        }
+
+        if (!token || !isTokenActive) {
+          const resourceType = order.isFullAlbum ? 'album_zip' : 'photo';
+          const resourceId = order.isFullAlbum
+            ? `${order.albumId}_completo.zip`
+            : (order.photoIds[0] || 'foto_seleccionada.jpg');
+          token = tokenService.generateToken(order.id, resourceType, resourceId);
+          await orderRepository.updateOrderStatus(order.id, 'PAID', order.paymentId, token).catch(() => {});
+        }
+
+        // Enviar email de respaldo transaccional en segundo plano (sin bloquear la respuesta)
+        emailService.sendOrderReadyEmail(order, token).catch(err => {
+          console.warn(`[OrderRecovery] Fallo al enviar email de recuperación para orden ${order.id}:`, err);
+        });
+
+        const redirectUrl = `${getPrimaryFrontendUrl()}/pago-exitoso?token=${encodeURIComponent(token)}`;
+        const albumTitle = order.albumTitleSnapshot || order.albumTitle || 'Álbum Fotográfico';
+
+        return {
+          orderId: order.id,
+          albumTitle,
+          photoCount: order.photoCount || order.photoIds?.length || (order.isFullAlbum ? 0 : 1),
+          isFullAlbum: Boolean(order.isFullAlbum),
+          createdAt: order.createdAt,
+          downloadToken: token,
+          redirectUrl
+        };
+      })
+    );
+
+    // Si solo ingresó email (sin paymentId como segundo factor), NUNCA exponer tokens en JSON ni filtrar existencia
+    if (!cleanPaymentId) {
       return res.status(200).json({
-        success: false,
-        message: 'No se encontraron compras vigentes asociadas a este correo en las últimas 72 horas.'
+        success: true,
+        sentToEmail: true,
+        message: 'Si existen compras vigentes asociadas a este correo en las últimas 72 horas, enviamos los enlaces de descarga a tu casilla.'
       });
     }
 
-    const orders = validOrders.map(order => {
-      let token = order.downloadToken;
-      let isTokenActive = false;
-      if (token) {
-        isTokenActive = tokenService.verifyToken(token).valid;
-      }
-
-      if (!token || !isTokenActive) {
-        const resourceType = order.isFullAlbum ? 'album_zip' : 'photo';
-        const resourceId = order.isFullAlbum
-          ? `${order.albumId}_completo.zip`
-          : (order.photoIds[0] || 'foto_seleccionada.jpg');
-        token = tokenService.generateToken(order.id, resourceType, resourceId);
-      }
-
-      // Enviar email de respaldo transaccional en segundo plano (sin bloquear la respuesta)
-      emailService.sendOrderReadyEmail(order, token).catch(err => {
-        console.warn(`[OrderRecovery] Fallo al enviar email de recuperación para orden ${order.id}:`, err);
+    if (preparedOrders.length === 0) {
+      return res.status(200).json({
+        success: false,
+        message: 'No se encontraron compras vigentes asociadas a este correo y número de operación en las últimas 72 horas.'
       });
-
-      const redirectUrl = `${getPrimaryFrontendUrl()}/pago-exitoso?token=${encodeURIComponent(token)}`;
-      const albumTitle = order.albumTitleSnapshot || order.albumTitle || 'Álbum Fotográfico';
-
-      return {
-        orderId: order.id,
-        albumTitle,
-        photoCount: order.photoCount || order.photoIds?.length || (order.isFullAlbum ? 0 : 1),
-        isFullAlbum: Boolean(order.isFullAlbum),
-        createdAt: order.createdAt,
-        downloadToken: token,
-        redirectUrl
-      };
-    });
+    }
 
     return res.status(200).json({
       success: true,
-      orders
+      orders: preparedOrders
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Error al procesar recuperación de órdenes';
@@ -808,17 +895,17 @@ app.post('/api/orders/recover', orderRecoveryLimiter, async (req: Request, res: 
 });
 
 // Endpoint: Verificación de Token Criptográfico de Descarga (72h)
-app.get('/api/downloads/verify/:token', async (req: Request, res: Response) => {
+app.get('/api/downloads/verify/:token', downloadsLimiter, async (req: Request, res: Response) => {
   const token = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
-  const result = tokenService.verifyToken(token);
+  const result = tokenService.verifyToken(token, 'download');
 
   if (!result.valid) {
     return res.status(401).json({ error: result.error });
   }
 
-  // Verificar que la orden no esté cancelada o en fraude
+  // Verificar que la orden exista y siga activa en estado PAID
   const order = await orderService.getOrderAsync(result.payload!.orderId);
-  if (order && order.status !== 'PAID') {
+  if (!order || order.status !== 'PAID') {
     return res.status(403).json({ error: 'La orden vinculada a esta descarga no se encuentra activa' });
   }
 

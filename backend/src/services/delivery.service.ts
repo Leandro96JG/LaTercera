@@ -25,10 +25,12 @@ export interface DeliveryInfoResult {
 export interface ResolvePhotoResult {
   success: boolean;
   error?: string;
+  orderId?: string;
   albumId?: string;
   photoId?: string;
   filename?: string;
   extension?: string;
+  buffer?: Buffer;
 }
 
 // Catálogo de títulos de álbumes conocidos (fallback defensivo)
@@ -72,7 +74,7 @@ export class DeliveryService {
    * Obtiene la información completa de entrega de fotos a partir de un token firmado
    */
   public async getDeliveryInfo(token: string, baseUrl: string): Promise<DeliveryInfoResult> {
-    const verification = this.tokenService.verifyToken(token);
+    const verification = this.tokenService.verifyToken(token, 'download');
     if (!verification.valid || !verification.payload) {
       const isExpired = verification.error?.toLowerCase().includes('expirad') || false;
       return { valid: false, isExpired, error: verification.error };
@@ -132,15 +134,11 @@ export class DeliveryService {
       if (this.albumRepository) {
         try {
           const albumPhotos = await this.albumRepository.getPhotosByAlbumId(order.albumId);
-          if (albumPhotos && albumPhotos.length > 0) {
-            photoIds = albumPhotos.map(p => p.id);
-          }
+          photoIds = Array.isArray(albumPhotos) ? albumPhotos.map(p => p.id) : [];
         } catch (err) {
           console.warn('[DeliveryService] Error al obtener fotos del álbum:', err);
+          photoIds = [];
         }
-      }
-      if (photoIds.length === 0) {
-        photoIds = Array.from({ length: 15 }, (_, i) => `foto_${i + 1}`);
       }
     }
 
@@ -291,7 +289,7 @@ export class DeliveryService {
    * Valida y resuelve el archivo de una foto individual dentro de la orden
    */
   public async resolvePhotoFile(token: string, photoId?: string): Promise<ResolvePhotoResult> {
-    const verification = this.tokenService.verifyToken(token);
+    const verification = this.tokenService.verifyToken(token, 'download');
     if (!verification.valid || !verification.payload) {
       return { success: false, error: verification.error };
     }
@@ -320,19 +318,15 @@ export class DeliveryService {
 
     const cleanPhotoId = this.sanitizeId(requestedId);
 
-    // Verificación de pertenencia a la orden
+    // Verificación de pertenencia a la orden (Fail-Closed cuando hay repositorio de álbumes)
     let belongsToOrder = false;
     if (order.isFullAlbum) {
       if (this.albumRepository) {
         try {
           const albumPhotos = await this.albumRepository.getPhotosByAlbumId(order.albumId);
-          if (albumPhotos && albumPhotos.length > 0) {
-            belongsToOrder = albumPhotos.some(p => this.sanitizeId(p.id) === cleanPhotoId);
-          } else {
-            belongsToOrder = true;
-          }
+          belongsToOrder = Array.isArray(albumPhotos) && albumPhotos.some(p => this.sanitizeId(p.id) === cleanPhotoId);
         } catch {
-          belongsToOrder = true;
+          belongsToOrder = false;
         }
       } else {
         belongsToOrder = true;
@@ -347,15 +341,17 @@ export class DeliveryService {
 
     const cleanAlbumId = this.sanitizeId(order.albumId);
 
-    // Detección de la extensión real registrada o en Storage
+    // Detección de la extensión real registrada en base de datos
     let detectedExt = '.jpg';
+    let hasKnownExt = false;
     if (this.albumRepository) {
       try {
         const photo = await this.albumRepository.getPhotoById(order.albumId, requestedId);
         if (photo) {
-          const ext = path.extname(photo.filename || photo.originalPath || '').toLowerCase();
+          const ext = path.extname(photo.originalPath || photo.filename || '').toLowerCase();
           if (DeliveryService.SUPPORTED_EXTENSIONS.includes(ext)) {
             detectedExt = ext;
+            hasKnownExt = true;
           }
         }
       } catch (err) {
@@ -363,9 +359,14 @@ export class DeliveryService {
       }
     }
 
-    const found = await this.getOriginalBufferWithExtension(cleanAlbumId, cleanPhotoId, detectedExt);
-    if (found) {
-      detectedExt = found.extension;
+    // Solo descargar buffer aquí si no disponemos de Signed URL directa o aún desconocemos la extensión
+    let foundBuffer: Buffer | undefined;
+    if (!this.storageService.createSignedDownloadUrl || !hasKnownExt) {
+      const found = await this.getOriginalBufferWithExtension(cleanAlbumId, cleanPhotoId, detectedExt);
+      if (found) {
+        detectedExt = found.extension;
+        foundBuffer = found.buffer;
+      }
     }
 
     let albumTitle = `Álbum #${cleanAlbumId}`;
@@ -392,10 +393,12 @@ export class DeliveryService {
 
     return {
       success: true,
+      orderId: order.id,
       albumId: cleanAlbumId,
       photoId: cleanPhotoId,
       extension: detectedExt,
-      filename: cleanFilename
+      filename: cleanFilename,
+      buffer: foundBuffer
     };
   }
 
@@ -403,7 +406,7 @@ export class DeliveryService {
    * Empaqueta en streaming todas las fotos de la orden en un archivo ZIP con archiver
    */
   public async streamOrderZip(token: string, res: Response): Promise<void> {
-    const verification = this.tokenService.verifyToken(token);
+    const verification = this.tokenService.verifyToken(token, 'download');
     if (!verification.valid || !verification.payload) {
       res.status(401).json({ error: verification.error });
       return;

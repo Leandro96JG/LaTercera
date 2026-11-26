@@ -1,6 +1,8 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, input, output } from '@angular/core';
 import { CartStore } from '../../core/state/cart.store';
 import { AlbumService } from '../../core/services/album.service';
+import { DeliveryService } from '../../core/services/delivery.service';
+import { ZIP_DOWNLOAD_THRESHOLD } from '../../core/models/delivery.model';
 
 @Component({
   selector: 'app-floating-cart',
@@ -141,10 +143,16 @@ import { AlbumService } from '../../core/services/album.service';
                     </button>
                     <button
                       type="button"
-                      (click)="downloadSelectiveZip()"
+                      (click)="downloadFreeSelection()"
                       class="flex-1 sm:flex-none min-h-[44px] px-6 py-3 rounded-full bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-display font-extrabold text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-lg active:scale-98 focus-visible:ring-2 focus-visible:ring-emerald-400 group"
                     >
-                      <span>Descargar Selección ({{ cartStore.freeSelectedCount() }} Fotos ZIP)</span>
+                      @if (cartStore.freeSelectedCount() === 1) {
+                        <span>Descargar Foto (.JPG)</span>
+                      } @else if (isFreeSmallPack()) {
+                        <span>Descargar {{ cartStore.freeSelectedCount() }} Fotos (.JPG)</span>
+                      } @else {
+                        <span>Descargar Selección ({{ cartStore.freeSelectedCount() }} Fotos ZIP)</span>
+                      }
                       <svg class="w-4 h-4 text-zinc-950 shrink-0 group-hover:translate-y-0.5 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                         <polyline points="7 10 12 15 17 10"/>
@@ -164,7 +172,7 @@ import { AlbumService } from '../../core/services/album.service';
             class="fixed bottom-4 sm:bottom-6 inset-x-0 z-40 w-full max-w-[100vw] overflow-x-hidden px-3 sm:px-6 flex flex-col items-center pointer-events-none transition-all duration-300"
             aria-label="Bandeja de fotos de cortesía seleccionadas"
           >
-            <div class="pointer-events-auto w-auto max-w-[calc(100vw-1.5rem)] sm:max-w-fit bg-zinc-950/95 text-white rounded-full p-1.5 pl-3 sm:px-5 sm:py-2.5 shadow-2xl border border-emerald-500/40 flex items-center justify-between gap-2 sm:gap-4 backdrop-blur-xl box-border overflow-hidden animate-float-cart-in">
+            <div class="pointer-events-auto w-auto max-w-[calc(100vw-1.5rem)] sm:max-w-fit bg-zinc-950/95 text-white rounded-full p-1.5 pl-3 sm:px-5 sm:py-2.5 shadow-2xl border border-emerald-500/40 flex items-center justify-between gap-2 sm:gap-4 box-border overflow-hidden animate-float-cart-in">
               <button
                 type="button"
                 (click)="toggleExpanded()"
@@ -186,7 +194,7 @@ import { AlbumService } from '../../core/services/album.service';
 
               <button
                 type="button"
-                (click)="downloadSelectiveZip()"
+                (click)="downloadFreeSelection()"
                 class="min-h-[44px] px-4 sm:px-5 py-2 rounded-full bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black text-xs sm:text-sm transition flex items-center gap-1.5 shadow-md active:scale-95 shrink-0 focus-visible:ring-2 focus-visible:ring-emerald-400"
               >
                 <svg class="w-3.5 h-3.5 text-zinc-950 stroke-[2.5] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -194,7 +202,13 @@ import { AlbumService } from '../../core/services/album.service';
                   <polyline points="7 10 12 15 17 10"/>
                   <line x1="12" y1="15" x2="12" y2="3"/>
                 </svg>
-                <span>Descargar Selección (ZIP)</span>
+                @if (cartStore.freeSelectedCount() === 1) {
+                  <span>Descargar (.JPG)</span>
+                } @else if (isFreeSmallPack()) {
+                  <span>Descargar {{ cartStore.freeSelectedCount() }} (.JPG)</span>
+                } @else {
+                  <span>Descargar Selección (ZIP)</span>
+                }
               </button>
             </div>
           </aside>
@@ -288,7 +302,7 @@ import { AlbumService } from '../../core/services/album.service';
                     </div>
                     <div class="text-right shrink-0">
                       <span class="block text-xs text-zinc-400 line-through">
-                        &dollar;{{ (cartStore.unitPrice() * 48).toLocaleString('es-AR') }} ARS
+                        &dollar;{{ fullAlbumOriginalListPrice().toLocaleString('es-AR') }} ARS
                       </span>
                       <span class="font-display font-extrabold text-xl text-amber-300">
                         &dollar;{{ cartStore.fullAlbumPrice().toLocaleString('es-AR') }} ARS
@@ -496,7 +510,7 @@ import { AlbumService } from '../../core/services/album.service';
               </div>
             }
 
-            <div class="pointer-events-auto w-auto max-w-[calc(100vw-1.5rem)] sm:max-w-fit bg-zinc-950/95 text-white rounded-full p-1.5 pl-3 sm:px-5 sm:py-2.5 shadow-2xl border border-white/20 flex items-center justify-between gap-2 sm:gap-5 backdrop-blur-xl box-border overflow-hidden animate-float-cart-in">
+            <div class="pointer-events-auto w-auto max-w-[calc(100vw-1.5rem)] sm:max-w-fit bg-zinc-950/95 text-white rounded-full p-1.5 pl-3 sm:px-5 sm:py-2.5 shadow-2xl border border-white/20 flex items-center justify-between gap-2 sm:gap-5 box-border overflow-hidden animate-float-cart-in">
               <!-- Zona Clickeable para Expandir Selección -->
               <button
                 type="button"
@@ -560,11 +574,13 @@ import { AlbumService } from '../../core/services/album.service';
 export class FloatingCartComponent {
   public readonly cartStore = inject(CartStore);
   private readonly albumService = inject(AlbumService);
+  private readonly deliveryService = inject(DeliveryService);
 
   // Inputs
   public readonly isFreeAlbum = input<boolean>(false);
   public readonly activeAlbumId = input<string | null>(null);
   public readonly activeAlbumTitle = input<string | null>(null);
+  public readonly activeAlbumPhotosCount = input<number>(48);
 
   // Outputs
   public readonly checkout = output<void>();
@@ -572,6 +588,16 @@ export class FloatingCartComponent {
   public readonly isExpanded = signal<boolean>(false);
 
   public readonly isFreeMode = computed<boolean>(() => this.isFreeAlbum());
+
+  public readonly isFreeSmallPack = computed<boolean>(() => {
+    const count = this.cartStore.freeSelectedCount();
+    return count > 0 && count < ZIP_DOWNLOAD_THRESHOLD;
+  });
+
+  public readonly fullAlbumOriginalListPrice = computed<number>(() => {
+    const count = Math.max(1, this.activeAlbumPhotosCount() || 48);
+    return this.cartStore.unitPrice() * count;
+  });
 
   public readonly shouldShowCart = computed<boolean>(() => {
     if (this.isFreeMode()) {
@@ -623,22 +649,41 @@ export class FloatingCartComponent {
     this.isExpanded.set(false);
   }
 
+  public downloadFreeSelection(): void {
+    const albumId = this.activeAlbumId() || this.cartStore.freeActiveAlbumId();
+    const photos = this.cartStore.freeSelectedPhotosArray();
+    if (!albumId || photos.length === 0) return;
+
+    if (photos.length < ZIP_DOWNLOAD_THRESHOLD) {
+      photos.forEach((photo, idx) => {
+        const url = this.albumService.getFreePhotoDownloadUrl(albumId, photo.id);
+        const filename = `${(photo.title || `foto-${photo.id}`).replace(/\s+/g, '_')}.jpg`;
+        if (idx === 0) {
+          this.deliveryService.triggerDirectDownload(url, filename);
+        } else if (typeof window !== 'undefined') {
+          window.setTimeout(() => {
+            this.deliveryService.triggerDirectDownload(url, filename);
+          }, idx * 350);
+        }
+      });
+      return;
+    }
+
+    this.downloadSelectiveZip();
+  }
+
   public downloadSelectiveZip(): void {
     const albumId = this.activeAlbumId() || this.cartStore.freeActiveAlbumId();
     const photoIds = [...this.cartStore.freeSelectedPhotoIds()];
     if (!albumId || photoIds.length === 0) return;
     const url = this.albumService.getFreeAlbumZipUrl(albumId, photoIds);
-    if (typeof window !== 'undefined') {
-      window.open(url, '_blank');
-    }
+    this.deliveryService.triggerDirectDownload(url, `LA_TERCERA_${albumId}_SELECCION.zip`);
   }
 
   public downloadFullAlbumZip(): void {
     const albumId = this.activeAlbumId() || this.cartStore.freeActiveAlbumId();
     if (!albumId) return;
     const url = this.albumService.getFreeAlbumZipUrl(albumId);
-    if (typeof window !== 'undefined') {
-      window.open(url, '_blank');
-    }
+    this.deliveryService.triggerDirectDownload(url, `LA_TERCERA_${albumId}_COMPLETO.zip`);
   }
 }

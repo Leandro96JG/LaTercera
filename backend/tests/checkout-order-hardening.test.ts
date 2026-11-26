@@ -129,7 +129,7 @@ describe('Checkout & Orders API Hardening (Zero-Trust & Persistencia)', () => {
         accessCode: '5555'
       });
 
-      const token = tokenService.generateToken('pin_access', 'album_zip', privateAlbumId, 3600);
+      const token = tokenService.generateAlbumAccessToken(privateAlbumId, 3600);
 
       const res = await fetch(`${baseUrl}/api/checkout/preference`, {
         method: 'POST',
@@ -167,7 +167,7 @@ describe('Checkout & Orders API Hardening (Zero-Trust & Persistencia)', () => {
         accessCode: '7777'
       });
 
-      const token = tokenService.generateToken('pin_access', 'album_zip', privateAlbumId, 3600);
+      const token = tokenService.generateAlbumAccessToken(privateAlbumId, 3600);
 
       const res = await fetch(`${baseUrl}/api/checkout/preference`, {
         method: 'POST',
@@ -246,7 +246,7 @@ describe('Checkout & Orders API Hardening (Zero-Trust & Persistencia)', () => {
         accessCode: '2222'
       });
 
-      const wrongToken = tokenService.generateToken('pin_access', 'album_zip', 'otro-album-distinto', 3600);
+      const wrongToken = tokenService.generateAlbumAccessToken('otro-album-distinto', 3600);
 
       const res = await fetch(`${baseUrl}/api/checkout/preference`, {
         method: 'POST',
@@ -370,8 +370,20 @@ describe('Checkout & Orders API Hardening (Zero-Trust & Persistencia)', () => {
     });
   });
 
-  describe('GET /api/orders/:orderId - Recuperación Asíncrona y Protección de DownloadToken', () => {
-    it('debe recuperar la orden de forma asíncrona y NO exponer downloadToken si el status es PENDING', async () => {
+  describe('GET /api/orders/:orderId - Recuperación Asíncrona y Protección Anti-IDOR', () => {
+    it('debe rechazar con 401 si no se envía statusNonce ni token de administrador', async () => {
+      const order = await orderService.createOrderAsync({
+        albumId: 'album-1',
+        photoIds: ['photo-idor-1'],
+        isFullAlbum: false,
+        customer: { email: 'idor@test.com' }
+      });
+
+      const res = await fetch(`${baseUrl}/api/orders/${order.id}`);
+      expect(res.status).toBe(401);
+    });
+
+    it('debe recuperar la orden de forma asíncrona con statusNonce válido y NO exponer downloadToken si el status es PENDING', async () => {
       // 1. Crear una orden directamente en OrderService
       const order = await orderService.createOrderAsync({
         albumId: 'album-1',
@@ -384,8 +396,9 @@ describe('Checkout & Orders API Hardening (Zero-Trust & Persistencia)', () => {
       orderService.clearMemoryCache();
       expect(orderService.getOrder(order.id)).toBeUndefined();
 
-      // 3. Consultar vía HTTP GET /api/orders/:orderId
-      const res = await fetch(`${baseUrl}/api/orders/${order.id}`);
+      // 3. Consultar vía HTTP GET /api/orders/:orderId con statusNonce válido
+      const nonce = tokenService.generateStatusNonce(order.id);
+      const res = await fetch(`${baseUrl}/api/orders/${order.id}?nonce=${encodeURIComponent(nonce)}`);
       expect(res.status).toBe(200);
       const data = await res.json();
 
@@ -395,7 +408,7 @@ describe('Checkout & Orders API Hardening (Zero-Trust & Persistencia)', () => {
       expect(data.downloadToken).toBeUndefined(); // Protegido contra filtraciones
     });
 
-    it('debe entregar downloadToken solo cuando la orden fue efectivamente pagada (PAID)', async () => {
+    it('debe entregar downloadToken solo cuando la orden fue efectivamente pagada (PAID) y posee statusNonce válido', async () => {
       const order = await orderService.createOrderAsync({
         albumId: 'album-1',
         photoIds: ['photo-paid-1'],
@@ -416,8 +429,11 @@ describe('Checkout & Orders API Hardening (Zero-Trust & Persistencia)', () => {
       orderService.clearMemoryCache();
       expect(orderService.getOrder(order.id)).toBeUndefined();
 
-      // Consultar endpoint tras el reinicio
-      const res = await fetch(`${baseUrl}/api/orders/${order.id}`);
+      // Consultar endpoint tras el reinicio con statusNonce
+      const nonce = tokenService.generateStatusNonce(order.id);
+      const res = await fetch(`${baseUrl}/api/orders/${order.id}`, {
+        headers: { 'x-order-status-nonce': nonce }
+      });
       expect(res.status).toBe(200);
       const data = await res.json();
 
@@ -428,8 +444,9 @@ describe('Checkout & Orders API Hardening (Zero-Trust & Persistencia)', () => {
       expect(data.downloadToken.length).toBeGreaterThan(10);
     });
 
-    it('debe responder 404 si la orden no existe en memoria ni en la base de datos', async () => {
-      const res = await fetch(`${baseUrl}/api/orders/orden-inexistente-123456`);
+    it('debe responder 404 si la orden no existe en memoria ni en la base de datos (con autorización)', async () => {
+      const nonce = tokenService.generateStatusNonce('orden-inexistente-123456');
+      const res = await fetch(`${baseUrl}/api/orders/orden-inexistente-123456?nonce=${encodeURIComponent(nonce)}`);
       expect(res.status).toBe(404);
       const data = await res.json();
       expect(data.error).toBe('Orden no encontrada');

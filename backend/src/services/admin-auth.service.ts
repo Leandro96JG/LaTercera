@@ -184,7 +184,7 @@ export class AdminAuthService {
       );
 
       const now = Math.floor(Date.now() / 1000);
-      if (payload.exp && payload.exp <= now) {
+      if (typeof payload.exp !== 'number' || !Number.isFinite(payload.exp) || payload.exp <= now) {
         return { valid: false, error: 'Token expirado' };
       }
 

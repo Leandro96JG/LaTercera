@@ -56,8 +56,8 @@ describe('Order Service & Anti-Tampering - Zero-Trust de Precios', () => {
     expect(order.isFullAlbum).toBe(true);
   });
 
-  it('debe aplicar cupón de descuento oficial si es válido', () => {
-    const order = orderService.createOrder({
+  it('debe aplicar cupón de descuento oficial si es válido desde el repositorio', async () => {
+    const order = await orderService.createOrderAsync({
       albumId: 'album-1',
       photoIds: ['p1'],
       isFullAlbum: false,

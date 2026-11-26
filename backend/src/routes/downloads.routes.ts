@@ -8,6 +8,7 @@ import { createAlbumRepository } from '../repositories';
 import { DownloadTokenService } from '../services/token.service';
 import { AdminAuthService } from '../services/admin-auth.service';
 import { buildCleanDownloadFilename } from '../services/mime-validator.service';
+import { downloadsLimiter } from '../middleware/rate-limit.middleware';
 
 export function createDownloadsRouter(
   deliveryService: DeliveryService,
@@ -15,9 +16,11 @@ export function createDownloadsRouter(
   storageService?: IStorageService,
   albumRepo?: IAlbumRepository,
   tokenService?: DownloadTokenService,
-  authService?: AdminAuthService
+  authService?: AdminAuthService,
+  verifyPaymentFn?: (paymentId: string, eventId: string) => Promise<{ success: boolean }>
 ): Router {
   const router = Router();
+  router.use(downloadsLimiter);
   const albumRepository = albumRepo || createAlbumRepository();
   const resolvedTokenService = tokenService || new DownloadTokenService(
     process.env.DOWNLOAD_TOKEN_SECRET || 'secreto_descargas_la_tercera_cripto_72_horas_min_32_caracteres_hex'
@@ -26,6 +29,33 @@ export function createDownloadsRouter(
     process.env.JWT_SECRET || 'secreto_para_autenticacion_jwt_admin_la_tercera_32c'
   );
 
+  function extractOrderNonce(req: Request, orderId: string): string | undefined {
+    const headerNonce = req.headers['x-order-status-nonce'];
+    if (typeof headerNonce === 'string' && headerNonce.trim()) return headerNonce.trim();
+    const queryNonce = req.query?.nonce;
+    if (typeof queryNonce === 'string' && queryNonce.trim()) return queryNonce.trim();
+    const rawCookie = req.headers?.cookie;
+    if (typeof rawCookie === 'string') {
+      const match = rawCookie.match(new RegExp(`lt_order_nonce_${orderId.replace(/[^a-zA-Z0-9_-]/g, '')}=([^;]+)`));
+      if (match?.[1]) return decodeURIComponent(match[1]);
+    }
+    return undefined;
+  }
+
+  function hasOrderStatusAccess(req: Request, orderId: string): boolean {
+    const authHeader = req.headers?.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const verification = resolvedAuthService.verifyJwt(authHeader.slice(7).trim());
+      if (verification.valid && verification.payload) return true;
+    }
+    const nonce = extractOrderNonce(req, orderId);
+    if (nonce) {
+      const verification = resolvedTokenService.verifyToken(nonce, 'order_status');
+      if (verification.valid && verification.payload?.orderId === orderId) return true;
+    }
+    return false;
+  }
+
   /**
    * GET /api/downloads/order/:orderId/status
    * Consulta el estado de procesamiento del pago para polling desde /pago-exitoso
@@ -33,8 +63,36 @@ export function createDownloadsRouter(
   router.get('/order/:orderId/status', async (req: Request, res: Response) => {
     const rawOrderId = req.params.orderId;
     const orderId = Array.isArray(rawOrderId) ? rawOrderId[0] : rawOrderId;
+    const rawPaymentId = req.query?.payment_id || req.query?.collection_id;
+    const paymentId = typeof rawPaymentId === 'string' && rawPaymentId.trim() ? rawPaymentId.trim() : undefined;
 
-    const order = await orderService.getOrderAsync(orderId);
+    let order = await orderService.getOrderAsync(orderId);
+    let verifiedMpReturn = false;
+
+    // Si llega payment_id desde el retorno de Mercado Pago y la orden aún está pendiente, verificar activamente contra MP
+    if (order && order.status !== 'PAID' && paymentId && verifyPaymentFn) {
+      try {
+        const mpRes = await verifyPaymentFn(paymentId, `return_poll_${orderId}_${paymentId}`);
+        if (mpRes.success) {
+          verifiedMpReturn = true;
+          order = await orderService.getOrderAsync(orderId);
+        }
+      } catch {
+        // El polling continuará intentando
+      }
+    }
+
+    const hasNonceAccess = hasOrderStatusAccess(req, orderId);
+    const hasVerifiedPaymentMatch = Boolean(
+      verifiedMpReturn || (paymentId && order?.status === 'PAID' && order.paymentId === paymentId)
+    );
+
+    if (!hasNonceAccess && !hasVerifiedPaymentMatch) {
+      return res.status(401).json({
+        error: 'Acceso no autorizado al estado de la orden. Usa el enlace de recuperación o correo.'
+      });
+    }
+
     if (!order) {
       return res.status(404).json({ error: 'Orden no encontrada' });
     }
@@ -105,8 +163,12 @@ export function createDownloadsRouter(
     const rawToken = req.headers['x-album-access-token'] || req.query.accessToken;
     const token = Array.isArray(rawToken) ? rawToken[0] : rawToken;
     if (typeof token === 'string' && token.trim()) {
-      const verification = resolvedTokenService.verifyToken(token.trim());
-      if (verification.valid && verification.payload?.resourceId === album.id) {
+      const verification = resolvedTokenService.verifyToken(token.trim(), 'album_access');
+      if (
+        verification.valid &&
+        verification.payload?.orderId === 'pin_access' &&
+        verification.payload?.resourceId === album.id
+      ) {
         return true;
       }
     }
@@ -129,26 +191,36 @@ export function createDownloadsRouter(
         return res.status(403).json({ error: resolved.error });
       }
 
-      let detectedExt = resolved.extension || (resolved.filename ? path.extname(resolved.filename).toLowerCase() : '.jpg') || '.jpg';
-      let buffer: Buffer | null = null;
+      if (resolved.orderId) {
+        orderService.recordDownloadAsync(resolved.orderId).catch(() => {});
+      }
 
-      // Buscar metadatos de la foto en el álbum para obtener extensión real directamente
-      if (albumRepository) {
+      let detectedExt = resolved.extension || (resolved.filename ? path.extname(resolved.filename).toLowerCase() : '.jpg') || '.jpg';
+      let buffer: Buffer | null = resolved.buffer || null;
+
+      const downloadFilename = resolved.filename && path.extname(resolved.filename)
+        ? resolved.filename.replace(/\.[^.]+$/, detectedExt)
+        : `LA_TERCERA_${resolved.albumId}_${resolved.photoId}${detectedExt}`;
+
+      // Optimización CDN: si no tenemos buffer precargado en memoria y existe createSignedDownloadUrl (Supabase), redirigir 302 directo al Storage
+      if (!buffer && storageService?.createSignedDownloadUrl) {
         try {
-          const photoMeta = await albumRepository.getPhotoById(resolved.albumId, resolved.photoId);
-          if (photoMeta) {
-            const realExt = path.extname(photoMeta.originalPath || photoMeta.filename || '').toLowerCase();
-            if (DeliveryService.SUPPORTED_EXTENSIONS.includes(realExt)) {
-              detectedExt = realExt;
-            }
+          const signedUrl = await storageService.createSignedDownloadUrl(
+            resolved.albumId,
+            resolved.photoId,
+            detectedExt,
+            { expiresInSeconds: 300, downloadFilename }
+          );
+          if (signedUrl) {
+            return res.redirect(302, signedUrl);
           }
         } catch (err) {
-          console.warn('[Downloads Route] Error buscando metadatos de la foto:', err);
+          console.warn('[Downloads Route] Fallo creando Signed URL, usando buffer directo:', err);
         }
       }
 
-      // Buscar buffer en storageService probando primero la extensión real detectada
-      if (storageService?.getOriginalBuffer) {
+      // Buscar buffer en storageService solo si resolvePhotoFile no lo obtuvo ya (cero doble descarga)
+      if (!buffer && storageService?.getOriginalBuffer) {
         try {
           const b = await storageService.getOriginalBuffer(resolved.albumId, resolved.photoId, detectedExt);
           if (b && b.length > 0) {
@@ -158,7 +230,6 @@ export function createDownloadsRouter(
           console.warn(`[Downloads Route] No se pudo obtener buffer HD para ${resolved.photoId} con extensión ${detectedExt}:`, err);
         }
 
-        // Fallback al resto de extensiones solo si no se encontró con la detectada
         if (!buffer) {
           const supported = DeliveryService.SUPPORTED_EXTENSIONS;
           const candidates = supported.filter(e => e !== detectedExt);
@@ -184,9 +255,6 @@ export function createDownloadsRouter(
         '.jpeg': 'image/jpeg'
       };
       const contentType = mimeMap[detectedExt] || 'image/jpeg';
-      const downloadFilename = resolved.filename && path.extname(resolved.filename)
-        ? resolved.filename.replace(/\.[^.]+$/, detectedExt)
-        : `LA_TERCERA_${resolved.albumId}_${resolved.photoId}${detectedExt}`;
 
       res.setHeader('Content-Type', contentType);
       res.setHeader('Content-Disposition', `attachment; filename="${downloadFilename}"`);
@@ -216,6 +284,10 @@ export function createDownloadsRouter(
     try {
       const rawToken = req.params.token;
       const token = Array.isArray(rawToken) ? rawToken[0] : rawToken;
+      const verified = resolvedTokenService.verifyToken(token, 'download');
+      if (verified.valid && verified.payload?.orderId) {
+        orderService.recordDownloadAsync(verified.payload.orderId).catch(() => {});
+      }
       await deliveryService.streamOrderZip(token, res);
     } catch (error: unknown) {
       if (!res.headersSent) {
@@ -342,16 +414,20 @@ export function createDownloadsRouter(
 
       // Buscar metadatos de la foto en el repositorio para evitar adivinanza de extensiones
       let detectedExt = '.jpg';
-      let photoFilename: string | undefined;
+      let photoIndex = -1;
 
       try {
+        const albumPhotos = await albumRepository.getPhotosByAlbumId(album.id);
         const photo = await albumRepository.getPhotoById(album.id, cleanPhotoId);
+        if (albumPhotos.length > 0 && !photo) {
+          return res.status(404).json({ error: 'Fotografía no encontrada en este álbum' });
+        }
         if (photo) {
-          photoFilename = photo.filename;
           const realExt = path.extname(photo.originalPath || photo.filename || '').toLowerCase();
           if (DeliveryService.SUPPORTED_EXTENSIONS.includes(realExt)) {
             detectedExt = realExt;
           }
+          photoIndex = albumPhotos.findIndex(p => deliveryService.sanitizeId(p.id) === cleanPhotoId);
         }
       } catch (err) {
         console.warn(`[Downloads Route] Error consultando metadatos para foto ${cleanPhotoId}:`, err);
@@ -393,14 +469,6 @@ export function createDownloadsRouter(
         '.jpeg': 'image/jpeg'
       };
       const contentType = mimeMap[detectedExt] || 'image/jpeg';
-
-      let photoIndex = -1;
-      try {
-        const albumPhotos = await albumRepository.getPhotosByAlbumId(album.id);
-        if (albumPhotos && albumPhotos.length > 0) {
-          photoIndex = albumPhotos.findIndex(p => deliveryService.sanitizeId(p.id) === cleanPhotoId);
-        }
-      } catch {}
 
       const seq = (photoIndex >= 0 ? photoIndex : 0) + 1;
       const downloadFilename = buildCleanDownloadFilename(album.title, seq, detectedExt);

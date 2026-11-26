@@ -400,20 +400,31 @@ describe('App Root Component - LA TERCERA', () => {
     window.history.pushState({}, '', '/');
   });
 
-  it('debe inicializar showSplash y ocultarlo al llamar a dismissSplash() guardando en sessionStorage', () => {
-    const fixture = TestBed.createComponent(App);
-    const app = fixture.componentInstance;
+  it('debe inicializar showSplash y renderSplash, y desmontar el DOM del splash tras dismissSplash()', () => {
+    vi.useFakeTimers();
+    try {
+      const fixture = TestBed.createComponent(App);
+      const app = fixture.componentInstance;
 
-    app.showSplash.set(true);
-    expect(app.showSplash()).toBe(true);
+      app.showSplash.set(true);
+      app.renderSplash.set(true);
+      expect(app.showSplash()).toBe(true);
+      expect(app.renderSplash()).toBe(true);
 
-    app.dismissSplash();
-    expect(app.showSplash()).toBe(false);
-    expect(sessionStorage.getItem('la_tercera_splash_seen')).toBe('true');
+      app.dismissSplash();
+      expect(app.showSplash()).toBe(false);
+      expect(sessionStorage.getItem('la_tercera_splash_seen')).toBe('true');
 
-    // Al re-inicializar con la sesión ya vista, debe desactivarse de inmediato
-    app.initSplashScreen();
-    expect(app.showSplash()).toBe(false);
+      vi.advanceTimersByTime(550);
+      expect(app.renderSplash()).toBe(false);
+
+      // Al re-inicializar con la sesión ya vista, debe desactivarse y desmontarse de inmediato
+      app.initSplashScreen();
+      expect(app.showSplash()).toBe(false);
+      expect(app.renderSplash()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('debe gestionar isLoadingPublicAlbums y actualizarlo a false al recibir álbumes', () => {
@@ -620,43 +631,7 @@ describe('App Root Component - LA TERCERA', () => {
     expect(app.cartStore.isPhotoSelected(photo.id)).toBe(false);
   });
 
-  it('debe alternar el modo linterna móvil con toggleMobileSpotlight y controlar el tutorial', () => {
-    const fixture = TestBed.createComponent(App);
-    const app = fixture.componentInstance;
-
-    expect(app.isMobileSpotlightActive()).toBe(false);
-    app.toggleMobileSpotlight();
-    expect(app.isMobileSpotlightActive()).toBe(true);
-    app.toggleMobileSpotlight();
-    expect(app.isMobileSpotlightActive()).toBe(false);
-
-    expect(app.isSpotlightTutorialOpen()).toBe(false);
-    app.openSpotlightTutorial();
-    expect(app.isSpotlightTutorialOpen()).toBe(true);
-    expect(app.isSpotlightTutorialManual()).toBe(true);
-    app.closeSpotlightTutorial();
-    expect(app.isSpotlightTutorialOpen()).toBe(false);
-    expect(app.isSpotlightTutorialManual()).toBe(false);
-  });
-
-  it('no debe abrir el tutorial automáticamente al seleccionar un álbum si ya fue visto en localStorage', () => {
-    localStorage.setItem('la_tercera_spotlight_tutorial_v1', 'true');
-    const fixture = TestBed.createComponent(App);
-    const app = fixture.componentInstance;
-
-    const mockPaidAlbum: any = {
-      id: 'album-pago',
-      title: 'Torneo Apertura 2026',
-      isFreeDownload: false,
-      fullAlbumPrice: 12000,
-      unitPrice: 1500
-    };
-
-    app.openAlbum(mockPaidAlbum);
-    expect(app.isSpotlightTutorialOpen()).toBe(false);
-  });
-
-  it('debe abrir el tutorial automáticamente al seleccionar un álbum pago si nunca fue visto en localStorage', () => {
+  it('no debe renderizar botones ni tutorial de linterna al abrir un álbum pago', () => {
     localStorage.clear();
     const fixture = TestBed.createComponent(App);
     const app = fixture.componentInstance;
@@ -670,8 +645,12 @@ describe('App Root Component - LA TERCERA', () => {
     };
 
     app.openAlbum(mockPaidAlbum);
-    expect(app.isSpotlightTutorialOpen()).toBe(true);
-    expect(app.isSpotlightTutorialManual()).toBe(false);
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('app-spotlight-tutorial')).toBeNull();
+    expect(compiled.textContent).not.toContain('Linterna OFF');
+    expect(compiled.textContent).not.toContain('¿Cómo iluminar?');
   });
 
   it('debe registrar un estado en el historial al abrir un álbum y volver al portfolio al presionar atrás (popstate)', () => {

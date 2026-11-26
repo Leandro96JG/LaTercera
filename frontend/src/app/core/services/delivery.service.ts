@@ -18,8 +18,16 @@ export class DeliveryService {
   /**
    * Consulta el estado de una orden para confirmar acreditación en Mercado Pago
    */
-  getOrderStatus(orderId: string): Observable<DeliveryStatusResponse> {
-    return this.http.get<DeliveryStatusResponse>(`${this.downloadApiUrl}/order/${encodeURIComponent(orderId)}/status`);
+  getOrderStatus(orderId: string, statusNonce?: string, paymentId?: string): Observable<DeliveryStatusResponse> {
+    const queryParts: string[] = [];
+    if (statusNonce) {
+      queryParts.push(`nonce=${encodeURIComponent(statusNonce)}`);
+    }
+    if (paymentId) {
+      queryParts.push(`payment_id=${encodeURIComponent(paymentId)}`);
+    }
+    const qs = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+    return this.http.get<DeliveryStatusResponse>(`${this.downloadApiUrl}/order/${encodeURIComponent(orderId)}/status${qs}`);
   }
 
   /**
@@ -56,7 +64,55 @@ export class DeliveryService {
   }
 
   /**
-   * Dispara la descarga directa de un archivo en el navegador
+   * Detecta si el cliente abrió la web dentro del navegador interno de Instagram, WhatsApp o Facebook
+   */
+  isInAppBrowser(): boolean {
+    if (typeof navigator === 'undefined') return false;
+    const ua = navigator.userAgent || '';
+    return /Instagram|FBAN|FBAV|WhatsApp|Line|MicroMessenger/i.test(ua);
+  }
+
+  /**
+   * Verifica si el navegador móvil soporta Web Share API con archivos (para "Guardar en Galería")
+   */
+  canWebShareFiles(): boolean {
+    if (typeof navigator === 'undefined') return false;
+    return typeof navigator.share === 'function' && typeof navigator.canShare === 'function';
+  }
+
+  /**
+   * Intenta guardar una foto directamente en la Galería / Carrete usando Web Share API en celulares,
+   * con fallback transparente a descarga directa si el navegador no soporta compartir archivos.
+   */
+  async savePhotoToGallery(url: string, filename: string): Promise<'shared' | 'downloaded'> {
+    if (typeof window === 'undefined') return 'downloaded';
+    if (this.canWebShareFiles()) {
+      try {
+        const res = await fetch(url);
+        if (res.ok) {
+          const blob = await res.blob();
+          const mime = blob.type || 'image/jpeg';
+          const file = new File([blob], filename, { type: mime });
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              files: [file],
+              title: filename
+            });
+            return 'shared';
+          }
+        }
+      } catch (err) {
+        if ((err as { name?: string })?.name === 'AbortError') {
+          return 'shared';
+        }
+      }
+    }
+    this.triggerDirectDownload(url, filename);
+    return 'downloaded';
+  }
+
+  /**
+   * Dispara la descarga directa de un archivo en el navegador sin abrir pestañas en blanco
    */
   triggerDirectDownload(url: string, filename?: string): void {
     if (typeof window === 'undefined') return;
@@ -66,7 +122,6 @@ export class DeliveryService {
     if (filename) {
       link.download = filename;
     }
-    link.target = '_blank';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

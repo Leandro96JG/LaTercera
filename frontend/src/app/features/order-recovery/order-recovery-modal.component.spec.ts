@@ -160,4 +160,24 @@ describe('OrderRecoveryModalComponent', () => {
 
     expect(spy).toHaveBeenCalledWith('comprador@gmail.com', '8945123456');
   });
+
+  it('debe mostrar confirmación de envío de email cuando sentToEmail es true sin listar órdenes', () => {
+    fixture.componentRef.setInput('isOpen', true);
+    fixture.detectChanges();
+
+    vi.spyOn(paymentService, 'recoverOrdersByEmail').mockReturnValue(
+      of({
+        success: true,
+        sentToEmail: true,
+        message: 'Te enviamos los enlaces por email.'
+      })
+    );
+
+    component.emailInput = 'cliente@gmail.com';
+    component.recoverOrders();
+    fixture.detectChanges();
+
+    expect(component.successMessage()).toContain('Te enviamos los enlaces por email.');
+    expect(component.recoveredOrders().length).toBe(0);
+  });
 });

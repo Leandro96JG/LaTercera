@@ -7,8 +7,14 @@ dotenv.config();
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
-// En el backend preferimos SERVICE_ROLE_KEY para operaciones transaccionales y bypass de RLS, con fallback a ANON_KEY
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+const isProd = process.env.NODE_ENV === 'production' && process.env.VITEST !== 'true';
+if (isProd && SUPABASE_URL && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error(
+    '[SEGURIDAD FATAL] SUPABASE_SERVICE_ROLE_KEY es obligatoria en producción cuando SUPABASE_URL está configurado.'
+  );
+}
+// En el backend usamos SERVICE_ROLE_KEY para operaciones transaccionales seguras (nunca ANON_KEY en producción)
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || (!isProd ? process.env.SUPABASE_ANON_KEY : undefined);
 
 function isTestEnvironment(): boolean {
   if (process.env.FORCE_SUPABASE_LIVE === 'true') {
