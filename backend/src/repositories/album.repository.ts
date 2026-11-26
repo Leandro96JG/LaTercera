@@ -962,6 +962,20 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
     if (updates.isPrivate !== undefined) updatePayload.is_private = updates.isPrivate;
     if (updates.accessCode !== undefined) updatePayload.access_code = updates.accessCode;
 
+    const optionalColumns = [
+      'event_date_iso',
+      'event_time',
+      'event_date_display',
+      'is_free_download',
+      'free_download_unlocked_at',
+      'is_hero_featured',
+      'watermark_text',
+      'watermark_logo_url',
+      'is_private',
+      'access_code',
+      'deleted_at'
+    ];
+
     let { data, error } = await this.supabase
       .from('albums')
       .update(updatePayload)
@@ -970,17 +984,20 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
       .maybeSingle();
 
     // Fallback defensivo si columnas opcionales aún no existen en el schema remoto
-    if (error && (error.code === 'PGRST204' || error.message.includes('column'))) {
-      delete updatePayload.event_date_iso;
-      delete updatePayload.event_time;
-      delete updatePayload.event_date_display;
-      delete updatePayload.is_free_download;
-      delete updatePayload.free_download_unlocked_at;
-      delete updatePayload.is_hero_featured;
-      delete updatePayload.watermark_logo_url;
-      delete updatePayload.is_private;
-      delete updatePayload.access_code;
-      delete updatePayload.deleted_at;
+    let retriesLeft = optionalColumns.length;
+    while (error && (error.code === 'PGRST204' || error.message.includes('column')) && retriesLeft > 0) {
+      retriesLeft -= 1;
+      const colMatch = error.message.match(/['"]([a-z0-9_]+)['"]\s+column|column\s+['"]?([a-z0-9_]+)['"]?/i);
+      const missingCol = colMatch?.[1] || colMatch?.[2];
+
+      if (missingCol && missingCol in updatePayload && optionalColumns.includes(missingCol)) {
+        delete updatePayload[missingCol];
+      } else {
+        for (const col of optionalColumns) {
+          delete updatePayload[col];
+        }
+        retriesLeft = 0;
+      }
 
       const retry = await this.supabase
         .from('albums')
@@ -992,7 +1009,12 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
       error = retry.error;
     }
 
-    if (error || !data) {
+    if (error) {
+      console.warn('[SupabaseAlbumRepository] Error en updateAlbum:', error.message);
+      throw new Error(`[Supabase Error updateAlbum] ${error.message}`);
+    }
+
+    if (!data) {
       return null;
     }
 

@@ -240,5 +240,69 @@ describe('AlbumRepository (TDD)', () => {
     expect(albums.length).toBe(1);
     expect(albums[0].createdAt).toBe('2026-10-12T15:30:00.000Z');
   });
+
+  it('debe actualizar el álbum si Supabase reporta PGRST204 por columna watermark_text faltante', async () => {
+    const { SupabaseAlbumRepository } = await import('../src/repositories/album.repository');
+    const capturedPayloads: Record<string, unknown>[] = [];
+
+    const mockSupabase = {
+      from: () => ({
+        update: (payload: Record<string, unknown>) => {
+          capturedPayloads.push({ ...payload });
+          return {
+            eq: () => ({
+              select: () => ({
+                maybeSingle: async () => {
+                  if ('watermark_text' in payload) {
+                    return {
+                      data: null,
+                      error: {
+                        code: 'PGRST204',
+                        message: "Could not find the 'watermark_text' column of 'albums' in the schema cache"
+                      }
+                    };
+                  }
+                  return {
+                    data: {
+                      id: 'defensores-de-la-boca-vs-gral-paz-junior-2026-5108',
+                      category: 'futbol',
+                      title: 'Defensores de la Boca Vs Gral Paz Junior',
+                      subtitle: 'Torneo Regional Federal Amateur',
+                      location: 'La Rioja, Argentina',
+                      photos_count: 20,
+                      unit_price: 1200,
+                      full_album_price: 9500,
+                      cover_url: 'https://example.com/c.webp',
+                      is_hero_featured: Boolean(payload.is_hero_featured),
+                      is_published: true
+                    },
+                    error: null
+                  };
+                }
+              })
+            })
+          };
+        }
+      })
+    } as unknown as import('@supabase/supabase-js').SupabaseClient;
+
+    const sbRepo = new SupabaseAlbumRepository(mockSupabase);
+    const updated = await sbRepo.updateAlbum('defensores-de-la-boca-vs-gral-paz-junior-2026-5108', {
+      title: 'Defensores de la Boca Vs Gral Paz Junior',
+      subtitle: 'Torneo Regional Federal Amateur',
+      category: 'futbol',
+      isHeroFeatured: true,
+      watermarkText: 'LA TERCERA • MUESTRA',
+      watermarkLogoUrl: null
+    });
+
+    expect(updated).not.toBeNull();
+    expect(updated?.title).toBe('Defensores de la Boca Vs Gral Paz Junior');
+    expect(updated?.isHeroFeatured).toBe(true);
+    expect(updated?.watermarkText).toBe('LA TERCERA • MUESTRA');
+    expect(capturedPayloads.length).toBe(2);
+    expect('watermark_text' in capturedPayloads[1]).toBe(false);
+    expect(capturedPayloads[1].is_hero_featured).toBe(true);
+  });
 });
 
