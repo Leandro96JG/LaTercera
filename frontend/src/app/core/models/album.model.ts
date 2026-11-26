@@ -27,6 +27,7 @@ export interface Album {
   readonly isPrivate?: boolean;
   readonly accessCode?: string | null;
   readonly customSlug?: string;
+  readonly createdAt?: string;
   readonly photos?: readonly Photo[];
 }
 

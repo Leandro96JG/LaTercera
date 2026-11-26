@@ -60,7 +60,7 @@ export class App implements OnInit, OnDestroy {
   public readonly publicCategories = computed(() => {
     const albums = this.albums();
     const baseCategories = this.apiCategories();
-    const map = new Map<string, { id: string; name: string; icon: string; count: number }>();
+    const map = new Map<string, { id: string; name: string; icon: string; count: number; latestTs: number; firstIndex: number }>();
 
     for (const cat of baseCategories) {
       if (cat.isActive) {
@@ -68,12 +68,14 @@ export class App implements OnInit, OnDestroy {
           id: cat.id,
           name: cat.name,
           icon: cat.icon,
-          count: 0
+          count: 0,
+          latestTs: -Infinity,
+          firstIndex: Number.MAX_SAFE_INTEGER
         });
       }
     }
 
-    for (const album of albums) {
+    albums.forEach((album, index) => {
       const catKey = album.category || 'otros';
       if (!map.has(catKey)) {
         const badgeParts = (album.badge || '').trim().split(' ');
@@ -83,16 +85,29 @@ export class App implements OnInit, OnDestroy {
           id: catKey,
           name: name.charAt(0).toUpperCase() + name.slice(1),
           icon,
-          count: 0
+          count: 0,
+          latestTs: -Infinity,
+          firstIndex: index
         });
       }
       const existing = map.get(catKey)!;
       existing.count += 1;
-    }
+      existing.firstIndex = Math.min(existing.firstIndex, index);
+      if (album.createdAt) {
+        const ts = Date.parse(album.createdAt);
+        if (!Number.isNaN(ts)) {
+          existing.latestTs = Math.max(existing.latestTs, ts);
+        }
+      }
+    });
 
-    return Array.from(map.values()).filter(
-      c => c.count > 0 || ['futbol', 'motos', 'hockey', 'basquet', 'sociales'].includes(c.id)
-    );
+    return Array.from(map.values())
+      .filter(c => c.count > 0)
+      .sort((a, b) => {
+        if (a.latestTs !== b.latestTs) return b.latestTs - a.latestTs;
+        return a.firstIndex - b.firstIndex;
+      })
+      .map(({ id, name, icon, count }) => ({ id, name, icon, count }));
   });
 
   // Splash Screen de Inicio
@@ -172,51 +187,50 @@ export class App implements OnInit, OnDestroy {
       );
     }
 
-    return list;
+    return [...list]
+      .map((a, i) => ({ a, i }))
+      .sort((x, y) => {
+        const tx = x.a.createdAt ? Date.parse(x.a.createdAt) : NaN;
+        const ty = y.a.createdAt ? Date.parse(y.a.createdAt) : NaN;
+        if (!Number.isNaN(tx) && !Number.isNaN(ty) && tx !== ty) return ty - tx;
+        return x.i - y.i;
+      })
+      .map(({ a }) => a);
   });
 
   public onSearchInput(event: Event): void {
     const target = event.target as HTMLInputElement;
     this.searchQuery.set(target.value);
-    this.currentPage.set(1);
+    this.visibleCount.set(6);
   }
 
   public clearSearch(): void {
     this.searchQuery.set('');
-    this.currentPage.set(1);
+    this.visibleCount.set(6);
   }
 
-  // Paginación en portfolio público (6 tarjetas por página)
-  public readonly currentPage = signal<number>(1);
-  public readonly pageSize = signal<number>(6);
+  // Carga progresiva en portfolio público («Ver más álbumes», de a 6)
+  public readonly visibleCount = signal<number>(6);
+  public readonly loadMoreAnnouncement = signal<string>('');
 
-  public readonly totalPages = computed(() => {
-    const total = this.filteredAlbums().length;
-    return Math.max(1, Math.ceil(total / this.pageSize()));
+  public readonly visibleAlbums = computed(() => {
+    return this.filteredAlbums().slice(0, this.visibleCount());
   });
 
-  public readonly paginatedAlbums = computed(() => {
-    const list = this.filteredAlbums();
-    const page = this.currentPage();
-    const size = this.pageSize();
-    const from = (page - 1) * size;
-    return list.slice(from, from + size);
+  public readonly remainingCount = computed(() => {
+    return Math.max(0, this.filteredAlbums().length - this.visibleCount());
   });
 
-  public readonly paginationPages = computed<number[]>(() => {
-    const total = this.totalPages();
-    return Array.from({ length: total }, (_, i) => i + 1);
+  public readonly activeCategoryName = computed<string>(() => {
+    const cat = this.selectedCategory();
+    if (cat === 'all') return '';
+    return this.publicCategories().find(c => c.id === cat)?.name || cat;
   });
 
-  public readonly showingFrom = computed(() => {
-    const total = this.filteredAlbums().length;
-    if (total === 0) return 0;
-    return (this.currentPage() - 1) * this.pageSize() + 1;
-  });
-
-  public readonly showingTo = computed(() => {
-    const total = this.filteredAlbums().length;
-    return Math.min(this.currentPage() * this.pageSize(), total);
+  public readonly activeCategoryIcon = computed<string>(() => {
+    const cat = this.selectedCategory();
+    if (cat === 'all') return '📸';
+    return this.publicCategories().find(c => c.id === cat)?.icon || '📸';
   });
 
   // --- Paginación y Filtros de la Galería Interna de Fotos (12 fotos por página) ---
@@ -298,23 +312,14 @@ export class App implements OnInit, OnDestroy {
   }
 
   constructor() {
-    // Resetear a página 1 del portfolio cuando cambian filtros
+    // Resetear cantidad visible del portfolio cuando cambian filtros
     effect(() => {
       this.selectedCategory();
       this.searchQuery();
       this.selectedDate();
       untracked(() => {
-        this.currentPage.set(1);
+        this.visibleCount.set(6);
       });
-    });
-
-    // Ajustar currentPage si totalPages disminuye
-    effect(() => {
-      const total = this.totalPages();
-      const curr = untracked(() => this.currentPage());
-      if (curr > total) {
-        untracked(() => this.currentPage.set(total));
-      }
     });
 
     // Ajustar photosCurrentPage si photosTotalPages disminuye
@@ -828,26 +833,27 @@ export class App implements OnInit, OnDestroy {
     this.resetToPortfolio(true);
   }
 
-  public setCategory(cat: string): void {
+  public setCategory(cat: string, event?: Event): void {
     this.selectedCategory.set(cat);
-    this.currentPage.set(1);
-  }
-
-  public goToPage(page: number): void {
-    if (page >= 1 && page <= this.totalPages()) {
-      this.currentPage.set(page);
+    this.visibleCount.set(6);
+    if (event && typeof document !== 'undefined') {
+      const target = event.currentTarget as HTMLElement | null;
+      target?.scrollIntoView?.({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+      document.getElementById('catalogo-albumes')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
     }
   }
 
-  public nextPage(): void {
-    if (this.currentPage() < this.totalPages()) {
-      this.goToPage(this.currentPage() + 1);
-    }
-  }
+  public loadMore(): void {
+    const prevCount = this.visibleAlbums().length;
+    this.visibleCount.set(this.visibleCount() + 6);
+    const loaded = Math.min(6, Math.max(0, this.filteredAlbums().length - prevCount));
+    this.loadMoreAnnouncement.set(loaded > 0 ? `Se cargaron ${loaded} álbumes más` : '');
 
-  public prevPage(): void {
-    if (this.currentPage() > 1) {
-      this.goToPage(this.currentPage() - 1);
+    if (typeof document !== 'undefined') {
+      queueMicrotask(() => {
+        const cards = document.querySelectorAll<HTMLElement>('#catalogo-albumes app-album-card-3d .album-card-root');
+        cards[prevCount]?.focus();
+      });
     }
   }
 

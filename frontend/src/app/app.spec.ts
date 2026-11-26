@@ -107,41 +107,94 @@ describe('App Root Component - LA TERCERA', () => {
     expect(replaceStateSpy).toHaveBeenCalledWith({}, document.title, '/');
   });
 
-  it('debe paginar los álbumes en el catálogo público y calcular páginas correctamente', () => {
+  it('debe mostrar 6 álbumes iniciales, cargar más con loadMore() y reiniciar al filtrar', () => {
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+
+    const manyAlbums: Album[] = Array.from({ length: 10 }, (_, i) => ({
+      id: String(i + 1),
+      category: i < 7 ? 'futbol' : 'hockey',
+      title: `Álbum ${i + 1}`,
+      subtitle: `Sub ${i + 1}`,
+      date: '2026',
+      badge: i < 7 ? '⚽ Fútbol' : '🏑 Hockey',
+      photosCount: 10,
+      unitPrice: 1000,
+      fullAlbumPrice: 8000,
+      coverUrl: '',
+      createdAt: new Date(Date.UTC(2026, 9, 10 - i)).toISOString()
+    }));
+
+    app.albums.set(manyAlbums);
+    expect(app.visibleCount()).toBe(6);
+    expect(app.visibleAlbums().length).toBe(6);
+    expect(app.remainingCount()).toBe(4);
+
+    app.loadMore();
+    expect(app.visibleCount()).toBe(12);
+    expect(app.visibleAlbums().length).toBe(10);
+    expect(app.remainingCount()).toBe(0);
+
+    // Cambiar categoría reinicia visibleCount a 6
+    app.setCategory('futbol');
+    expect(app.visibleCount()).toBe(6);
+    expect(app.filteredAlbums().length).toBe(7);
+    expect(app.visibleAlbums().length).toBe(6);
+    expect(app.remainingCount()).toBe(1);
+
+    // Buscar reinicia visibleCount a 6
+    app.loadMore();
+    expect(app.visibleCount()).toBe(12);
+    app.onSearchInput({ target: { value: 'Álbum 1' } } as unknown as Event);
+    expect(app.visibleCount()).toBe(6);
+  });
+
+  it('debe ordenar filteredAlbums por createdAt descendente y respetar el orden original sin createdAt', () => {
     const fixture = TestBed.createComponent(App);
     const app = fixture.componentInstance;
 
     app.albums.set([
-      { id: '1', category: 'futbol', title: 'Álbum 1', subtitle: 'Sub 1', date: '2026', badge: '⚽', photosCount: 10, unitPrice: 1000, fullAlbumPrice: 8000, coverUrl: '' },
-      { id: '2', category: 'futbol', title: 'Álbum 2', subtitle: 'Sub 2', date: '2026', badge: '⚽', photosCount: 10, unitPrice: 1000, fullAlbumPrice: 8000, coverUrl: '' },
-      { id: '3', category: 'hockey', title: 'Álbum 3', subtitle: 'Sub 3', date: '2026', badge: '🏑', photosCount: 10, unitPrice: 1000, fullAlbumPrice: 8000, coverUrl: '' },
-      { id: '4', category: 'sociales', title: 'Álbum 4', subtitle: 'Sub 4', date: '2026', badge: '🎉', photosCount: 10, unitPrice: 1000, fullAlbumPrice: 8000, coverUrl: '' }
+      { id: 'old', category: 'futbol', title: 'Partido Viejo', subtitle: 'Sub', date: '2026', badge: '⚽ Fútbol', photosCount: 10, unitPrice: 1000, fullAlbumPrice: 8000, coverUrl: '', createdAt: '2026-10-01T10:00:00.000Z' },
+      { id: 'newest', category: 'hockey', title: 'Torneo Nuevo', subtitle: 'Sub', date: '2026', badge: '🏑 Hockey', photosCount: 10, unitPrice: 1000, fullAlbumPrice: 8000, coverUrl: '', createdAt: '2026-10-15T10:00:00.000Z' },
+      { id: 'mid', category: 'futbol', title: 'Partido Medio', subtitle: 'Sub', date: '2026', badge: '⚽ Fútbol', photosCount: 10, unitPrice: 1000, fullAlbumPrice: 8000, coverUrl: '', createdAt: '2026-10-10T10:00:00.000Z' }
     ]);
 
-    app.pageSize.set(2);
-    expect(app.totalPages()).toBe(2);
-    expect(app.paginatedAlbums().length).toBe(2);
-    expect(app.currentPage()).toBe(1);
+    expect(app.filteredAlbums().map(a => a.id)).toEqual(['newest', 'mid', 'old']);
 
-    app.nextPage();
-    expect(app.currentPage()).toBe(2);
-    expect(app.paginatedAlbums().length).toBe(2);
-
-    app.prevPage();
-    expect(app.currentPage()).toBe(1);
-
-    // Cambiar categoría resetea a página 1
-    app.goToPage(2);
-    expect(app.currentPage()).toBe(2);
     app.setCategory('futbol');
-    expect(app.currentPage()).toBe(1);
-    expect(app.filteredAlbums().length).toBe(2);
+    expect(app.filteredAlbums().map(a => a.id)).toEqual(['mid', 'old']);
+
+    app.setCategory('all');
+    app.searchQuery.set('Partido');
+    expect(app.filteredAlbums().map(a => a.id)).toEqual(['mid', 'old']);
+
+    // Sin createdAt respeta el orden original
+    app.searchQuery.set('');
+    app.albums.set([
+      { id: 'a', category: 'futbol', title: 'A', subtitle: '', date: '2026', badge: '⚽', photosCount: 5, unitPrice: 1000, fullAlbumPrice: 5000, coverUrl: '' },
+      { id: 'b', category: 'futbol', title: 'B', subtitle: '', date: '2026', badge: '⚽', photosCount: 5, unitPrice: 1000, fullAlbumPrice: 5000, coverUrl: '' }
+    ]);
+    expect(app.filteredAlbums().map(a => a.id)).toEqual(['a', 'b']);
   });
 
-  it('debe tener pageSize por defecto en 6 y permitir filtrar por selectedDate', () => {
+  it('debe ocultar categorías sin álbumes y ordenarlas por el álbum más reciente de cada categoría', () => {
     const fixture = TestBed.createComponent(App);
     const app = fixture.componentInstance;
-    expect(app.pageSize()).toBe(6);
+
+    app.albums.set([
+      { id: '1', category: 'futbol', title: 'F1', subtitle: '', date: '2026', badge: '⚽ Fútbol', photosCount: 5, unitPrice: 1000, fullAlbumPrice: 5000, coverUrl: '', createdAt: '2026-10-05T10:00:00.000Z' },
+      { id: '2', category: 'hockey', title: 'H1', subtitle: '', date: '2026', badge: '🏑 Hockey', photosCount: 5, unitPrice: 1000, fullAlbumPrice: 5000, coverUrl: '', createdAt: '2026-10-20T10:00:00.000Z' },
+      { id: '3', category: 'sociales', title: 'S1', subtitle: '', date: '2026', badge: '🎉 Sociales', photosCount: 5, unitPrice: 1000, fullAlbumPrice: 5000, coverUrl: '', createdAt: '2026-10-12T10:00:00.000Z' }
+    ]);
+
+    const cats = app.publicCategories();
+    expect(cats.map(c => c.id)).toEqual(['hockey', 'sociales', 'futbol']);
+    expect(cats.every(c => c.count > 0)).toBe(true);
+  });
+
+  it('debe permitir filtrar por selectedDate', () => {
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
 
     app.albums.set([
       { id: '1', category: 'futbol', title: 'Álbum 1', subtitle: 'Sub 1', date: '12 Octubre, 2026', eventDate: '2026-10-12', badge: '⚽', photosCount: 10, unitPrice: 1000, fullAlbumPrice: 8000, coverUrl: '' },

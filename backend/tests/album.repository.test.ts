@@ -209,5 +209,36 @@ describe('AlbumRepository (TDD)', () => {
     expect(photos.length).toBeGreaterThan(0);
     expect(photos[0].albumId).toBe('album-2');
   });
+
+  it('debe exponer createdAt cuando la fila de Supabase trae created_at', async () => {
+    const { SupabaseAlbumRepository } = await import('../src/repositories/album.repository');
+    const mockRows = [
+      {
+        id: 'album-sb-1',
+        category: 'futbol',
+        title: 'Partido con fecha',
+        photos_count: 12,
+        unit_price: 1200,
+        full_album_price: 9500,
+        cover_url: 'https://example.com/c.webp',
+        is_published: true,
+        created_at: '2026-10-12T15:30:00.000Z'
+      }
+    ];
+    const chain = {
+      select: () => chain,
+      eq: () => chain,
+      is: () => chain,
+      order: async () => ({ data: mockRows, error: null })
+    };
+    const mockSupabase = {
+      from: () => chain
+    } as unknown as import('@supabase/supabase-js').SupabaseClient;
+
+    const sbRepo = new SupabaseAlbumRepository(mockSupabase);
+    const albums = await sbRepo.listAlbums();
+    expect(albums.length).toBe(1);
+    expect(albums[0].createdAt).toBe('2026-10-12T15:30:00.000Z');
+  });
 });
 

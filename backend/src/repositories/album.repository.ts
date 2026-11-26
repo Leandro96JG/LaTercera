@@ -28,6 +28,7 @@ export interface AlbumDTO {
   freeDownloadUnlockedAt?: string | null;
   isPrivate?: boolean;
   accessCode?: string | null;
+  createdAt?: string;
 }
 
 export interface TrashAlbumDTO extends AlbumDTO {
@@ -748,7 +749,8 @@ export class SupabaseAlbumRepository implements IAlbumRepository {
       isFreeDownload: localFree !== undefined ? localFree : (row.is_free_download ?? false),
       freeDownloadUnlockedAt: row.free_download_unlocked_at || (localFree ? new Date().toISOString() : null),
       isPrivate: localPrivacy !== undefined ? localPrivacy.isPrivate : (row.is_private ?? false),
-      accessCode: localPrivacy !== undefined ? localPrivacy.accessCode : (row.access_code || null)
+      accessCode: localPrivacy !== undefined ? localPrivacy.accessCode : (row.access_code || null),
+      createdAt: row.created_at || undefined
     };
   }
 
