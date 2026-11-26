@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import sharp from 'sharp';
 import {
   GoogleDriveImporterService,
+  DefaultDriveHttpClient,
   IDriveHttpClient,
   DriveFileMetadata
 } from '../src/services/drive-importer.service';
@@ -298,5 +299,101 @@ describe('Google Drive Importer Service (TDD con Mocks HTTP)', () => {
     // startIndex = 2, markHdFirstN = 3 => índice global 2 es HD (2 < 3), índice global 3 no es HD (3 >= 3)
     expect(result.photos[0].isHD).toBe(true);
     expect(result.photos[1].isHD).toBe(false);
+  });
+
+  describe('DefaultDriveHttpClient - Diagnóstico de errores y reintentos', () => {
+    it('debe traducir un 403 cannotDownload con mensaje claro de permisos sin reintentar', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: {
+              code: 403,
+              message: 'The user has not granted the app read access.',
+              errors: [{ reason: 'cannotDownloadFile', message: 'Cannot download file' }]
+            }
+          }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
+      try {
+        const client = new DefaultDriveHttpClient({ retryBaseDelayMs: 1 });
+        await expect(client.downloadFile('file_403', 'fake_key')).rejects.toThrow(
+          /Permiso denegado en Google Drive \(403/
+        );
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    it('debe reintentar automáticamente ante 403 rateLimitExceeded y tener éxito si Drive responde en el reintento', async () => {
+      const okBytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              error: {
+                code: 403,
+                message: 'User rate limit exceeded.',
+                errors: [{ reason: 'userRateLimitExceeded', message: 'Rate limit' }]
+              }
+            }),
+            { status: 403, headers: { 'Content-Type': 'application/json' } }
+          )
+        )
+        .mockResolvedValueOnce(new Response(okBytes, { status: 200 }));
+
+      try {
+        const client = new DefaultDriveHttpClient({ retryBaseDelayMs: 1 });
+        const buf = await client.downloadFile('file_rate', 'fake_key');
+        expect(buf.length).toBe(4);
+        expect(fetchSpy).toHaveBeenCalledTimes(2);
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    it('debe traducir un 404 notFound con mensaje claro sin reintentar', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: {
+              code: 404,
+              message: 'File not found',
+              errors: [{ reason: 'notFound', message: 'File not found' }]
+            }
+          }),
+          { status: 404, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
+      try {
+        const client = new DefaultDriveHttpClient({ retryBaseDelayMs: 1 });
+        await expect(client.downloadFile('file_404', 'fake_key')).rejects.toThrow(
+          /no encontrado en Google Drive \(404\)/
+        );
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    it('debe reintentar ante 429 o 503 y reportar error de servidor si agota los reintentos', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+        new Response('Service Unavailable', { status: 503 })
+      );
+
+      try {
+        const client = new DefaultDriveHttpClient({ maxRetries: 2, retryBaseDelayMs: 1 });
+        await expect(client.downloadFile('file_503', 'fake_key')).rejects.toThrow(
+          /Error temporal del servidor de Google Drive \(503\)/
+        );
+        expect(fetchSpy).toHaveBeenCalledTimes(3);
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
   });
 });

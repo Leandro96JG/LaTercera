@@ -18,10 +18,183 @@ export interface IDriveHttpClient {
   downloadFile(fileId: string, apiKey?: string): Promise<Buffer>;
 }
 
+export interface DefaultDriveHttpClientOptions {
+  maxRetries?: number;
+  retryBaseDelayMs?: number;
+}
+
+interface ParsedDriveError {
+  message: string;
+  retryable: boolean;
+}
+
+const TRANSIENT_403_REASONS = new Set([
+  'rateLimitExceeded',
+  'userRateLimitExceeded',
+  'sharingRateLimitExceeded'
+]);
+
+const API_KEY_ERROR_REASONS = new Set([
+  'keyInvalid',
+  'keyExpired',
+  'ipRefererBlocked',
+  'accessNotConfigured',
+  'dailyLimitExceeded'
+]);
+
+const PERMISSION_403_REASONS = new Set([
+  'cannotDownload',
+  'cannotDownloadFile',
+  'cannotDownloadAbuse',
+  'insufficientFilePermissions',
+  'forbidden',
+  'domainPolicy'
+]);
+
+function parseDriveApiError(
+  status: number,
+  rawBody: string,
+  context: 'list' | 'download',
+  targetId: string
+): ParsedDriveError {
+  let reason = '';
+  let apiMessage = '';
+
+  try {
+    const parsed = JSON.parse(rawBody) as {
+      error?: { message?: string; errors?: Array<{ reason?: string; message?: string }> };
+    };
+    reason = parsed?.error?.errors?.[0]?.reason || '';
+    apiMessage = parsed?.error?.message || parsed?.error?.errors?.[0]?.message || '';
+  } catch {
+    apiMessage = rawBody.trim().slice(0, 200);
+  }
+
+  const label = context === 'list' ? `carpeta ${targetId}` : `archivo ${targetId}`;
+
+  if (status === 403) {
+    if (TRANSIENT_403_REASONS.has(reason)) {
+      return {
+        message: `Límite de velocidad de Google Drive alcanzado (403 - ${reason}) al acceder a ${label}. Intenta bajar la concurrencia o reintenta en unos segundos.`,
+        retryable: true
+      };
+    }
+    if (reason === 'downloadQuotaExceeded') {
+      return {
+        message: `Cuota de descarga de Google Drive excedida (403) para ${label}: Google bloqueó temporalmente las descargas de este archivo por exceso de tráfico.`,
+        retryable: false
+      };
+    }
+    if (API_KEY_ERROR_REASONS.has(reason)) {
+      return {
+        message: `Error de configuración en GOOGLE_DRIVE_API_KEY (403 - ${reason}): verifica restricciones de API/IP o cuota en Google Cloud.`,
+        retryable: false
+      };
+    }
+    if (PERMISSION_403_REASONS.has(reason) || !reason) {
+      return {
+        message: `Permiso denegado en Google Drive (403${reason ? ` - ${reason}` : ''}) para ${label}: verifica que sea público ("Cualquier persona con el enlace: Lector") y tenga habilitada la opción de descargar, imprimir y copiar.`,
+        retryable: false
+      };
+    }
+    return {
+      message: `Acceso denegado por Google Drive (403 - ${reason}) en ${label}${apiMessage ? `: ${apiMessage}` : ''}`,
+      retryable: false
+    };
+  }
+
+  if (status === 404) {
+    return {
+      message: `${context === 'list' ? 'Carpeta' : 'Archivo'} ${targetId} no encontrado en Google Drive (404): verifica que el enlace exista y no esté en la papelera.`,
+      retryable: false
+    };
+  }
+
+  if (status === 401) {
+    return {
+      message: `No autorizado en Google Drive (401) para ${label}: el recurso requiere autenticación o la clave de API es inválida.`,
+      retryable: false
+    };
+  }
+
+  if (status === 400) {
+    return {
+      message: `Solicitud inválida a Google Drive (400${reason ? ` - ${reason}` : ''}) para ${label}${apiMessage ? `: ${apiMessage}` : ''}`,
+      retryable: false
+    };
+  }
+
+  if (status === 429) {
+    return {
+      message: `Demasiadas peticiones a Google Drive (429) para ${label}. Reintenta en unos momentos.`,
+      retryable: true
+    };
+  }
+
+  if (status >= 500 && status <= 599) {
+    return {
+      message: `Error temporal del servidor de Google Drive (${status}) para ${label}.`,
+      retryable: true
+    };
+  }
+
+  return {
+    message: `Error de Google Drive (${status}) para ${label}${apiMessage ? `: ${apiMessage}` : ''}`,
+    retryable: false
+  };
+}
+
 /**
  * Cliente HTTP por defecto utilizando fetch nativo y Google Drive API v3
  */
 export class DefaultDriveHttpClient implements IDriveHttpClient {
+  private readonly maxRetries: number;
+  private readonly retryBaseDelayMs: number;
+
+  constructor(options: DefaultDriveHttpClientOptions = {}) {
+    this.maxRetries = options.maxRetries ?? 2;
+    this.retryBaseDelayMs = options.retryBaseDelayMs ?? 600;
+  }
+
+  private async fetchWithRetry(
+    url: string,
+    timeoutMs: number,
+    context: 'list' | 'download',
+    targetId: string
+  ): Promise<Response> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+      try {
+        const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+        if (response.ok) {
+          return response;
+        }
+
+        const rawBody = await response.text();
+        const parsed = parseDriveApiError(response.status, rawBody, context, targetId);
+        lastError = new Error(parsed.message);
+
+        if (!parsed.retryable || attempt === this.maxRetries) {
+          throw lastError;
+        }
+      } catch (err) {
+        if (err === lastError) {
+          throw err;
+        }
+        lastError = err instanceof Error ? err : new Error(String(err));
+        if (attempt === this.maxRetries) {
+          throw lastError;
+        }
+      }
+
+      const delay = this.retryBaseDelayMs * Math.pow(2, attempt);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+
+    throw lastError || new Error(`Error inesperado al consultar Google Drive (${targetId})`);
+  }
+
   async listFiles(folderId: string, apiKey?: string): Promise<DriveFileMetadata[]> {
     if (!apiKey) {
       throw new Error(
@@ -33,12 +206,7 @@ export class DefaultDriveHttpClient implements IDriveHttpClient {
     const fields = encodeURIComponent('files(id, name, mimeType, size)');
     const url = `https://www.googleapis.com/drive/v3/files?q=${query}&fields=${fields}&pageSize=1000&key=${apiKey}`;
 
-    const response = await fetch(url, { signal: AbortSignal.timeout(20000) });
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Google Drive API error (${response.status}): ${errorText}`);
-    }
-
+    const response = await this.fetchWithRetry(url, 20000, 'list', folderId);
     const data = (await response.json()) as { files?: DriveFileMetadata[] };
     return data.files || [];
   }
@@ -48,11 +216,7 @@ export class DefaultDriveHttpClient implements IDriveHttpClient {
       ? `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${apiKey}`
       : `https://drive.google.com/uc?export=download&id=${fileId}`;
 
-    const response = await fetch(url, { signal: AbortSignal.timeout(45000) });
-    if (!response.ok) {
-      throw new Error(`Error descargando archivo ${fileId} de Google Drive (${response.status})`);
-    }
-
+    const response = await this.fetchWithRetry(url, 45000, 'download', fileId);
     const arrayBuffer = await response.arrayBuffer();
     return Buffer.from(arrayBuffer);
   }
